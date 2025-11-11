@@ -529,12 +529,12 @@ void main() {
         }
 
         if (blockId == BLOCK_FURNACE_LIT) {
-            lightColor = vec3(0.8, 0.7, 0.1);
-            lightRange = 13.0;
+            lightColor = vec3(0.8, 0.25, 0.2);
+            lightRange = 9.0;
         }
 
         if (blockId == BLOCK_GLOW_LICHEN || blockId == ITEM_GLOW_LICHEN) {
-            lightColor = vec3(0.1, 0.2, 0.12);
+            lightColor = vec3(0.07, 0.11, 0.09);
             lightRange = 7.0;
         }
 
@@ -544,8 +544,8 @@ void main() {
         }
 
         if (blockId == ITEM_GLOWSTONE_DUST) {
-            lightColor = vec3(0.747, 0.594, 0.326);
-            lightRange = 8.0;
+            lightColor = vec3(0.547, 0.394, 0.126);
+            lightRange = 1.0;
         }
 
         if (blockId == BLOCK_JACK_O_LANTERN || blockId == ITEM_JACK_O_LANTERN) {
@@ -557,6 +557,12 @@ void main() {
             lightColor = vec3(0.839, 0.541, 0.2);
             lightRange = 15.0;
             mixWeight = 0.8;
+        }
+
+        if (blockId == BLOCK_ELECTRICAL_LIGHT) {
+            lightColor = vec3(1.000, 0.801, 0.822);
+            lightRange = 20.0;
+            mixWeight = 1.0;
         }
 
         if (blockId == BLOCK_LAVA) {
@@ -853,6 +859,23 @@ void main() {
                     lightColor = LightColor_Candles_Yellow;
                     break;
             }
+        }
+
+        // extras
+
+        if (blockId == BLOCK_BLUEISH_LIGHT) {
+            lightColor = vec3(0.08, 0.09, 0.12);
+            lightRange = 10.0;
+        }
+
+        if (blockId == BLOCK_PINKISH_LIGHT) {
+            lightColor = vec3(0.14, 0.08, 0.09);
+            lightRange = 8.0;
+        }
+
+        if (blockId == BLOCK_SCREEN) {
+            lightColor = vec3(0.085, 0.09, 0.1);
+            lightRange = 4.0;
         }
 
         // reflective translucents / glass
