@@ -55,6 +55,31 @@ void PopulateShadowVoxel(const in vec3 playerPos) {
 				}
 			}
 		}
+		
+		if (renderStage == MC_RENDER_STAGE_ENTITIES && entityId == ENTITY_PLAYER) {
+			
+			vec3 cameraPosMog = fract(cameraPosition);
+    		float playerDistance = length(cameraPosMog - originPos);
+			
+			// If entity position is very close to viewer in first person, it's local player
+			bool isLocalPlayer = playerDistance < 3;
+
+            // Check held items for any player entity
+			if (!isLocalPlayer) {
+				if (currentRenderedItemId > 0 && currentRenderedItemId < 1200) {
+					// Get light data for held item
+					uint blockDataR = texelFetch(texBlockData, currentRenderedItemId, 0).r;
+					float lightRange = unpackUnorm4x8(blockDataR).a * 255.0;
+
+					if (lightRange > 0.0) {
+						voxelId = uint(currentRenderedItemId);
+						// Base hand offset in player-space
+						vec3 playerHandPosOffset = vec3(-0.4, -0.3, 0.2);						
+						originPos += playerHandPosOffset;
+					}
+				}
+			}
+        }
 	#endif
 
 	if (voxelId > 0u)
