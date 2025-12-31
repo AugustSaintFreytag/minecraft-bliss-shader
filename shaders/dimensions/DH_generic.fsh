@@ -45,7 +45,7 @@ if (gl_FragCoord.x * texelSize.x < 1.0  && gl_FragCoord.y * texelSize.y < 1.0 )	
     #endif
 
 	
-	vec3 Albedo = toLinear(gcolor.rgb)  ;
+	vec3 Albedo = toLinear(gcolor.rgb);
 
 	gl_FragData[0] = vec4(Albedo * Emissive_Brightness * 0.1, gcolor.a);
 }

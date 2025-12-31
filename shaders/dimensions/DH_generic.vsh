@@ -7,6 +7,10 @@ varying vec4 pos;
 varying vec4 gcolor;
 
 uniform vec2 texelSize;
+uniform mat4 gbufferModelViewInverse;
+uniform mat4 gbufferModelView;
+uniform mat4 dhProjection;
+uniform vec3 cameraPosition;
 
 
 #if DOF_QUALITY == 5
@@ -22,7 +26,25 @@ uniform vec2 texelSize;
 
 
 void main() {
-    gl_Position = ftransform();
+	vec4 vPos = gl_Vertex;
+
+	vec3 cameraOffset = fract(cameraPosition);
+	vPos.xyz = floor(vPos.xyz + cameraOffset + 0.5) - cameraOffset;
+
+	vec4 viewPos = gl_ModelViewMatrix * vPos;
+
+	#ifdef PLANET_CURVATURE
+		vec4 worldPos = gbufferModelViewInverse * viewPos;
+
+		float curvature = length(worldPos) / (16*8);
+		worldPos.y -= curvature*curvature * CURVATURE_AMOUNT;
+
+		worldPos = gbufferModelView * worldPos;
+
+		gl_Position = dhProjection * worldPos;
+	#else
+		gl_Position = dhProjection * viewPos;
+	#endif
 
 	#if TAA_MODE == 3
 		gl_Position.xy = gl_Position.xy * RENDER_SCALE + RENDER_SCALE * gl_Position.w - gl_Position.w;
@@ -31,7 +53,7 @@ void main() {
 		gl_Position.xy += taaJitter * gl_Position.w*texelSize;
 	#endif
 	
-    pos = gl_ModelViewMatrix * gl_Vertex;
+    pos = viewPos;
     gcolor = gl_Color;
 	
 	#if DOF_QUALITY == 5
