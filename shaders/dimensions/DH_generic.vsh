@@ -27,10 +27,7 @@ uniform vec3 cameraPosition;
 
 void main() {
 	vec4 vPos = gl_Vertex;
-
 	vec3 cameraOffset = fract(cameraPosition);
-	vPos.xyz = floor(vPos.xyz + cameraOffset + 0.5) - cameraOffset;
-
 	vec4 viewPos = gl_ModelViewMatrix * vPos;
 
 	#ifdef PLANET_CURVATURE
