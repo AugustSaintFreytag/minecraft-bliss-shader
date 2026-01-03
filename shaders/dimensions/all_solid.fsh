@@ -281,6 +281,15 @@ void main() {
 
 	vec3 fragpos = toScreenSpace(FragCoord*vec3(texelSize/RENDER_SCALE,1.0)-vec3(vec2(tempOffset)*texelSize*0.5, 0.0));
 	vec3 playerpos = mat3(gbufferModelViewInverse) * fragpos  + gbufferModelViewInverse[3].xyz;
+
+	#if defined DISTANT_HORIZONS && !defined HAND
+		float dist = length(playerpos);
+		if (dist > far * 0.9) {
+			float dither = interleaved_gradientNoise();
+			if (dither < (dist - far * 0.9) / (far * 0.1)) discard;
+		}
+	#endif
+
 	vec3 worldpos = playerpos + cameraPosition;
 
 	float torchlightmap = lmtexcoord.z;
