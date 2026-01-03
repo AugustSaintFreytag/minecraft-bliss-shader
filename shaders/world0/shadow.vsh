@@ -49,6 +49,7 @@ uniform vec3 shadowLightVec;
 uniform float shadowMaxProj;
 attribute vec4 mc_midTexCoord;
 varying vec4 color;
+varying vec3 playerPosVarying;
 
 attribute vec4 mc_Entity;
 uniform int blockEntityId;
@@ -67,6 +68,7 @@ uniform int entityId;
 	#endif
     uniform int currentRenderedItemId;
 	uniform int renderStage;
+	uniform usampler1D texBlockData;
 
 	#include "/lib/voxel_common.glsl"
 	#include "/lib/voxel_write.glsl"
@@ -207,6 +209,7 @@ void main() {
 	// #if defined IS_LPV_ENABLED || defined WAVY_PLANTS  || !defined PLANET_CURVATURE
 		vec3 playerpos = mat3(shadowModelViewInverse) * position + shadowModelViewInverse[3].xyz;
 	// #endif
+	playerPosVarying = playerpos;
 
 	#if defined IS_LPV_ENABLED && defined MC_GL_ARB_shader_image_load_store
 		PopulateShadowVoxel(playerpos);
