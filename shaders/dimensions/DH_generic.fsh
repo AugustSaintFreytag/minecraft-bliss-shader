@@ -1,6 +1,8 @@
 #define ANTIALIASING_RELATED_SETTINGS
 #define EMISSION_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
+#include "/lib/DH_utils.glsl"
 
 varying vec4 pos;
 varying vec4 gcolor;
@@ -10,43 +12,48 @@ uniform vec3 cameraPosition;
 uniform sampler2D depthtex1;
 
 uniform mat4 gbufferModelViewInverse;
-uniform float far;
 uniform int frameCounter;
 
+flat varying vec3 averageSkyCol_Clouds;
+
+// Utility
+
 vec3 toLinear(vec3 sRGB){
-	return sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);
+	return sRGB * sRGB;
 }
 
-float interleaved_gradientNoise_temporal(){
-	#if TAA_MODE > 0
-		return fract(52.9829189*fract(0.06711056*gl_FragCoord.x + 0.00583715*gl_FragCoord.y ) + 1.0/1.6180339887 * frameCounter);
-	#else
-		return fract(52.9829189*fract(0.06711056*gl_FragCoord.x + 0.00583715*gl_FragCoord.y ) + 1.0/1.6180339887);
-	#endif
-}
+// Main
+
 /* RENDERTARGETS:2 */
 void main() {
-if (gl_FragCoord.x * texelSize.x < 1.0  && gl_FragCoord.y * texelSize.y < 1.0 )	{
-   
-    vec3 viewPos = pos.xyz;
-    vec3 playerPos = mat3(gbufferModelViewInverse) * viewPos + gbufferModelViewInverse[3].xyz;
+	if (gl_FragCoord.x * texelSize.x < 1.0 && gl_FragCoord.y * texelSize.y < 1.0 )	{
+		vec3 viewPos = pos.xyz;
+		vec3 playerPos = mat3(gbufferModelViewInverse) * viewPos + gbufferModelViewInverse[3].xyz;
+		float falloff = exp(-10.0 * (1.0-clamp(1.0 - playerPos.y/5000.0,0.0,1.0)));
 
-	float falloff = exp(-10.0 * (1.0-clamp(1.0 - playerPos.y/5000.0,0.0,1.0)));
+		#ifdef DH_OVERDRAW_PREVENTION
+			#if OVERDRAW_MAX_DISTANCE == 0
+				float maxOverdrawDistance = far;
+			#else
+				float maxOverdrawDistance = OVERDRAW_MAX_DISTANCE;
+			#endif
 
-
-    #ifdef DH_OVERDRAW_PREVENTION
-		#if OVERDRAW_MAX_DISTANCE == 0
-			float maxOverdrawDistance = far;
-		#else
-			float maxOverdrawDistance = OVERDRAW_MAX_DISTANCE;
+			if(length(playerPos) < clamp(far * 0.9, 16.0, maxOverdrawDistance) || texture2D(depthtex1, gl_FragCoord.xy*texelSize).x < 1.0){ 
+				discard; 
+				return;
+			}
 		#endif
 
-        if(length(playerPos) < clamp(far-16*4, 16, maxOverdrawDistance) || texture2D(depthtex1, gl_FragCoord.xy*texelSize).x < 1.0){ discard; return;}
-    #endif
+		vec3 albedo = toLinear(gcolor.rgb);
 
-	
-	vec3 Albedo = toLinear(gcolor.rgb);
+		#ifdef DH_NOISE_TEXTURE
+			albedo = applyNoise(vec4(albedo, 1.0), playerPos + cameraPosition, length(playerPos)).rgb;
+		#endif
 
-	gl_FragData[0] = vec4(Albedo * Emissive_Brightness * 0.1, gcolor.a);
-}
+		vec3 ambientLightColor = averageSkyCol_Clouds / 900.0;
+		float lightness = luma(ambientLightColor);
+		vec3 skylightInfluence = mix(vec3(lightness), ambientLightColor, 0.2);
+
+		gl_FragData[0] = vec4(albedo * skylightInfluence * Emissive_Brightness * 0.1, gcolor.a);
+	}
 }

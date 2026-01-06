@@ -31,6 +31,7 @@ Read the terms of modification and sharing before changing something below pleas
     uniform int currentRenderedItemId;
 	uniform int blockEntityId;
 	uniform int entityId;
+	uniform usampler1D texBlockData;
 
 	#include "/lib/blocks.glsl"
 	#include "/lib/entities.glsl"

@@ -416,6 +416,14 @@ if (gl_FragCoord.x * texelSize.x < 1.0  && gl_FragCoord.y * texelSize.y < 1.0 )	
 	#endif
 
 	vec3 feetPlayerPos = mat3(gbufferModelViewInverse) * viewPos;
+
+	#if defined DISTANT_HORIZONS && !defined HAND
+		float dist = length(feetPlayerPos);
+		if (dist > far * 0.9) {
+			float dither = interleaved_gradientNoise();
+			if (dither < (dist - far * 0.9) / (far * 0.1)) discard;
+		}
+	#endif
 ////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// MATERIAL MASKS ////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////

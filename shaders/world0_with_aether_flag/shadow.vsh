@@ -64,6 +64,7 @@ uniform int entityId;
 	#endif
     uniform int currentRenderedItemId;
 	uniform int renderStage;
+	uniform usampler1D texBlockData;
 
 	#include "/lib/voxel_common.glsl"
 	#include "/lib/voxel_write.glsl"
