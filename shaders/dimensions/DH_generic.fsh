@@ -33,12 +33,16 @@ void main() {
 
 		#ifdef DH_OVERDRAW_PREVENTION
 			#if OVERDRAW_MAX_DISTANCE == 0
-				float maxOverdrawDistance = far;
+				float overdrawDistance = 0.0;
 			#else
-				float maxOverdrawDistance = OVERDRAW_MAX_DISTANCE;
+				float overdrawDistance = OVERDRAW_MAX_DISTANCE - 16.0;
 			#endif
 
-			if(length(playerPos) < clamp(far * 0.9, 16.0, maxOverdrawDistance) || texture2D(depthtex1, gl_FragCoord.xy*texelSize).x < 1.0){ 
+			float lodFadeLength = min(16.0, far);
+			float lodStart = far - lodFadeLength;
+			float drawStart = max(lodStart - overdrawDistance, 0.0);
+			
+			if(length(playerPos) < drawStart || texture2D(depthtex1, gl_FragCoord.xy*texelSize).x < 1.0){ 
 				discard; 
 				return;
 			}
