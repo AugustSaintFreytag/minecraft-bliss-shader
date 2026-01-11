@@ -22,6 +22,11 @@ vec3 toLinear(vec3 sRGB){
 	return sRGB * sRGB;
 }
 
+float interleaved_gradientNoise(){
+	vec2 coord = gl_FragCoord.xy;
+	return fract(52.9829189*fract(0.06711056*coord.x + 0.00583715*coord.y));
+}
+
 // Main
 
 /* RENDERTARGETS:2 */
@@ -29,6 +34,7 @@ void main() {
 	if (gl_FragCoord.x * texelSize.x < 1.0 && gl_FragCoord.y * texelSize.y < 1.0 )	{
 		vec3 viewPos = pos.xyz;
 		vec3 playerPos = mat3(gbufferModelViewInverse) * viewPos + gbufferModelViewInverse[3].xyz;
+		float viewDist = length(playerPos);
 		float falloff = exp(-10.0 * (1.0-clamp(1.0 - playerPos.y/5000.0,0.0,1.0)));
 
 		#ifdef DH_OVERDRAW_PREVENTION
@@ -42,9 +48,18 @@ void main() {
 			float lodStart = far - lodFadeLength;
 			float drawStart = max(lodStart - overdrawDistance, 0.0);
 			
-			if(length(playerPos) < drawStart || texture2D(depthtex1, gl_FragCoord.xy*texelSize).x < 1.0){ 
+			if(viewDist < drawStart || texture2D(depthtex1, gl_FragCoord.xy*texelSize).x < 1.0){ 
 				discard; 
 				return;
+			}
+
+			if (viewDist < drawStart + lodFadeLength) {
+				float dither = interleaved_gradientNoise();
+				float fade = clamp((viewDist - drawStart) / max(lodFadeLength, 0.0001), 0.0, 1.0);
+				if (dither > fade) {
+					discard;
+					return;
+				}
 			}
 		#endif
 
