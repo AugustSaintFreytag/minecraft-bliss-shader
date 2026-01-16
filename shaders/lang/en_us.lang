@@ -203,9 +203,11 @@ screen.Clouds = Cloud Settings
     option.SMALL_CUMULUS_LABEL = Small Cumulus Layer
     option.LARGE_CUMULUS_LABEL = Large Cumulus Layer
     option.ALTOSTRATUS_LABEL =   Altostratus Layer
+    option.FOG_LABEL = Fog
     value.SMALL_CUMULUS_LABEL.0 = §f↓
     value.LARGE_CUMULUS_LABEL.0 = §f↓
     value.ALTOSTRATUS_LABEL.0 = §f↓
+    value.FOG_LABEL.0 = §f↓
 
     option.CLOUD_SHADOW_AMOUNT = Cloud Shadow Visibilty
     value.CLOUD_SHADOW_AMOUNT.0 = OFF
@@ -269,6 +271,8 @@ screen.Clouds = Cloud Settings
     option.DAILY_PROFILE_1_LAYER1_DENSITY = Density
     option.DAILY_PROFILE_1_LAYER2_COVERAGE = Coverage
     option.DAILY_PROFILE_1_LAYER2_DENSITY = Density
+    option.DAILY_PROFILE_1_UNIFORM_FOG = Uniform Fog
+    option.DAILY_PROFILE_1_CLUMPY_FOG = Cloudy Fog
 
     option.DAILY_PROFILE_2_LAYER0_COVERAGE = Coverage
     option.DAILY_PROFILE_2_LAYER0_DENSITY = Density
@@ -276,6 +280,8 @@ screen.Clouds = Cloud Settings
     option.DAILY_PROFILE_2_LAYER1_DENSITY = Density
     option.DAILY_PROFILE_2_LAYER2_COVERAGE = Coverage
     option.DAILY_PROFILE_2_LAYER2_DENSITY = Density
+    option.DAILY_PROFILE_2_UNIFORM_FOG = Uniform Fog
+    option.DAILY_PROFILE_2_CLUMPY_FOG = Cloudy Fog
 
     option.DAILY_PROFILE_3_LAYER0_COVERAGE = Coverage
     option.DAILY_PROFILE_3_LAYER0_DENSITY = Density
@@ -283,6 +289,8 @@ screen.Clouds = Cloud Settings
     option.DAILY_PROFILE_3_LAYER1_DENSITY = Density
     option.DAILY_PROFILE_3_LAYER2_COVERAGE = Coverage
     option.DAILY_PROFILE_3_LAYER2_DENSITY = Density
+    option.DAILY_PROFILE_3_UNIFORM_FOG = Uniform Fog
+    option.DAILY_PROFILE_3_CLUMPY_FOG = Cloudy Fog
 
     option.DAILY_PROFILE_4_LAYER0_COVERAGE = Coverage
     option.DAILY_PROFILE_4_LAYER0_DENSITY = Density
@@ -290,6 +298,8 @@ screen.Clouds = Cloud Settings
     option.DAILY_PROFILE_4_LAYER1_DENSITY = Density
     option.DAILY_PROFILE_4_LAYER2_COVERAGE = Coverage
     option.DAILY_PROFILE_4_LAYER2_DENSITY = Density
+    option.DAILY_PROFILE_4_UNIFORM_FOG = Uniform Fog
+    option.DAILY_PROFILE_4_CLUMPY_FOG = Cloudy Fog
 
     option.DAILY_PROFILE_5_LAYER0_COVERAGE = Coverage
     option.DAILY_PROFILE_5_LAYER0_DENSITY = Density
@@ -297,6 +307,8 @@ screen.Clouds = Cloud Settings
     option.DAILY_PROFILE_5_LAYER1_DENSITY = Density
     option.DAILY_PROFILE_5_LAYER2_COVERAGE = Coverage
     option.DAILY_PROFILE_5_LAYER2_DENSITY = Density
+    option.DAILY_PROFILE_5_UNIFORM_FOG = Uniform Fog
+    option.DAILY_PROFILE_5_CLUMPY_FOG = Cloudy Fog
 
     option.DAILY_PROFILE_6_LAYER0_COVERAGE = Coverage
     option.DAILY_PROFILE_6_LAYER0_DENSITY = Density
@@ -304,6 +316,8 @@ screen.Clouds = Cloud Settings
     option.DAILY_PROFILE_6_LAYER1_DENSITY = Density
     option.DAILY_PROFILE_6_LAYER2_COVERAGE = Coverage
     option.DAILY_PROFILE_6_LAYER2_DENSITY = Density
+    option.DAILY_PROFILE_6_UNIFORM_FOG = Uniform Fog
+    option.DAILY_PROFILE_6_CLUMPY_FOG = Cloudy Fog
 
     option.RAINY_PROFILE_1_LAYER0_COVERAGE = Coverage
     option.RAINY_PROFILE_1_LAYER0_DENSITY = Density

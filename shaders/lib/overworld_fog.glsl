@@ -1,18 +1,11 @@
-// uniform float NoRainFallEnviornmentSmooth;
 uniform ivec2 eyeBrightness;
 
-float densityAtPosFog(in vec3 pos){
-	pos /= 18.;
-	pos.xz *= 0.5;
-	vec3 p = floor(pos);
-	vec3 f = fract(pos);
-	f = (f*f) * (3.-2.*f);
-	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0,193.0);
-	vec2 coord =  uv / 512.0;
-	vec2 xy = texture2D(noisetex, coord).yx;
-	return mix(xy.r,xy.g, f.y);
-}
+#include "/lib/fog_utils.glsl"
 
+#define FOG_USE_EDGE_SHARPENING 0
+#define FOG_USE_TURBULENCE 1
+
+const float FOG_TURBULENCE_MIX = 0.25;
 
 float phaseRayleigh(float cosTheta) {
 	const float oneOverPi 	= 1.0 / acos(-1.0);
@@ -37,7 +30,52 @@ float phaseCloudFog(float x, float g){
     return (gg * -0.25 + 0.25) * pow(-2.0 * (g * x) + (gg + 1.0), -1.5) / 3.14;
 }
 
-vec3 sampleShadowmapVL(vec3 start, vec3 shadowMapRayStartPos, vec3 shadowMapRayProgress, float increment){
+float densityAtPosFog(in vec3 pos){
+	pos /= 18.;
+	pos.xz *= 0.5;
+	
+	vec3 p = floor(pos);
+	vec3 f = fract(pos);
+	
+	f = (f*f) * (3.-2.*f);
+	
+	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0,193.0);
+	vec2 coord =  uv / 512.0;
+	vec2 xy = texture2D(noisetex, coord).yx;
+
+	return mix(xy.r,xy.g, f.y);
+}
+
+float turbulenceFogNoise(in vec3 pos){
+	float n0 = densityAtPosFog(pos);
+	float n1 = densityAtPosFog(pos * 2.0 + vec3(17.0, 0.0, 23.0));
+	float n2 = densityAtPosFog(pos * 4.0 + vec3(31.0, 11.0, 47.0));
+
+	n0 = abs(n0 * 2.0 - 1.0);
+	n1 = abs(n1 * 2.0 - 1.0);
+	n2 = abs(n2 * 2.0 - 1.0);
+
+	return clamp(n0 * 0.6 + n1 * 0.3 + n2 * 0.1, 0.0, 1.0);
+}
+
+float applyFogSharpening(float noise){
+#if FOG_USE_EDGE_SHARPENING
+	return sharpenFogNoise(noise);
+#else
+	return clamp(noise, 0.0, 1.0);
+#endif
+}
+
+float applyFogTurbulence(float baseNoise, vec3 pos){
+#if FOG_USE_TURBULENCE
+	float turbNoise = turbulenceFogNoise(pos);
+	return mix(baseNoise, turbNoise, FOG_TURBULENCE_MIX);
+#else
+	return baseNoise;
+#endif
+}
+
+vec3 sampleShadowmapVL(vec3 start, vec3 shadowMapRayStartPos, vec3 shadowMapRayProgress, float increment) {
 	vec3 shadowColor = vec3(1.0);
 
 	shadowMapRayProgress = start.xyz + increment*shadowMapRayStartPos;
@@ -70,10 +108,14 @@ vec3 sampleShadowmapVL(vec3 start, vec3 shadowMapRayStartPos, vec3 shadowMapRayP
 }
 
 vec3 getShadows(
-	vec3 rayProgress, in vec3 sunVector,
-	float increment, vec3 start, vec3 shadowMapRayStartPos, vec3 shadowMapRayProgress
-	,float flatPhase
-	,inout float sunPhase
+	vec3 rayProgress, 
+	in vec3 sunVector,
+	float increment, 
+	vec3 start, 
+	vec3 shadowMapRayStartPos, 
+	vec3 shadowMapRayProgress,
+	float flatPhase,
+	inout float sunPhase
 ){
 	vec3 shadows = vec3(1.0);
 
@@ -102,7 +144,9 @@ float getLocalEffectDensity(
 		vec3 samplePos = playerPos * vec3(1.0,1.0/48.0,1.0) * 24.0 * 7.0;
 		samplePos += vec3(1.0, -0.01, 1.0)*frameTimeCounter*1500.0;
 
-		float clumpyFog = min(max(densityAtPosFog(samplePos) - 0.2,0.0)/0.8,1.0);
+		float baseNoise = densityAtPosFog(samplePos);
+		float clumpyNoise = applyFogTurbulence(baseNoise, samplePos * 0.7);
+		float clumpyFog = min(max(applyFogSharpening(clumpyNoise) - 0.2,0.0)/0.8,1.0);
 
 		fogResult += clumpyFog * parameters.localFog.y;
 	}
@@ -116,20 +160,27 @@ float getFogDensities(
 ){	
 
 	float fogResult = 0.0;
-	
-	fogResult = pow(parameters.fog.x,3);
-	
-	if(parameters.fog.y > 0.0){
+
+	float uniformFog = scaleFogSetting(parameters.fog.x, FOG_UNIFORM_SCALE);
+	float clumpyFog = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
+
+	fogResult = pow(uniformFog,3);
+
+	if(clumpyFog > 0.0){
 		vec3 movement = vec3(1.0, -0.01, 1.0)*frameTimeCounter;
 		vec3 pos = playerPos;
 		vec3 samplePos = playerPos * vec3(1.0,1.0/24.0,1.0) + movement;
 		vec3 samplePos2 = playerPos * vec3(1.0,1.0/48.0,1.0) + movement;
 
-		float shape = 1.0 - densityAtPosFog(samplePos * 24.0);
-		float shape2 = 1.0 - densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6 ,0.0) * 2.0 ,1.0)*200.0));
+		float shapeBaseNoise = densityAtPosFog(samplePos * 24.0);
+		float shapeNoise = applyFogTurbulence(shapeBaseNoise, samplePos * 18.0);
+		float shape = 1.0 - applyFogSharpening(shapeNoise);
+		float shape2BaseNoise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6 ,0.0) * 2.0 ,1.0) * 200.0));
+		float shape2Noise = applyFogTurbulence(shape2BaseNoise, samplePos2 * 150.0);
+		float shape2 = 1.0 - applyFogSharpening(shape2Noise);
 		float finalShape = max(min(max(shape - 0.6 ,0.0) * 2.0 ,1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - 60,0.0));
 
-		fogResult += finalShape * pow(parameters.fog.y,3);
+		fogResult += finalShape * pow(clumpyFog,3);
 	}
 	
 	return fogResult;

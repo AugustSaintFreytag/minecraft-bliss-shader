@@ -3,6 +3,7 @@
 
 uniform int worldDay;
 uniform ivec3 cameraPositionInt;
+uniform vec3 cameraPosition;
 
 uniform bool isInColdArea;
 uniform bool isInHotArea;
@@ -12,6 +13,9 @@ uniform bool isInSpecialEnviornment;
 uniform bool isInSnowFallEnviornment;
 uniform bool isInRainFallEnviornment;
 uniform bool isInNoRainFallEnviornment;
+
+uniform vec3 swampEdgePos;
+uniform vec3 jungleEdgePos;
 
 uniform int worldTime;
 
@@ -26,12 +30,25 @@ float hash11( uint n )
     n = n * (n * n * 15731U + 789221U) + 1376312589U;
     return float( n & uint(0x7fffffffU))/float(0x7fffffff);
 }
+
 bool playerIsWithinArea(in vec3 positionA, in vec3 positionB){
     return cameraPositionInt.x > positionA.x && cameraPositionInt.y > positionA.y && cameraPositionInt.z > positionA.z && cameraPositionInt.x < positionB.x && cameraPositionInt.y < positionB.y && cameraPositionInt.z < positionB.z; 
 }
+
 bool playerIsOutsideArea(in vec3 positionA, in vec3 positionB){
     return !(cameraPositionInt.x > positionA.x && cameraPositionInt.y > positionA.y && cameraPositionInt.z > positionA.z && cameraPositionInt.x < positionB.x && cameraPositionInt.y < positionB.y && cameraPositionInt.z < positionB.z); 
 }
+
+// Blend biome-local effects over the first x blocks after entry.
+float biomeEdgeBlend(in vec3 position, in vec3 edgePos, in bool isInBiome){
+    if(!isInBiome){
+        return 0.0;
+    }
+
+    vec2 offset = position.xz - edgePos.xz;
+    return clamp(length(offset) / 32.0, 0.0, 1.0);
+}
+
 vec4 timesOfDay(){
 
 	float time = float(worldTime%24000);
@@ -65,6 +82,9 @@ void applySceneControllerParameters(
     LocalClumpyFogDensity = 0.0;
     localFogColor = vec3(1.0);
 
+	float dailyUniformFog = 0.0;
+	float dailyClumpyFog = 0.0;
+
 #if TOD_FOG_AMOUNT > 0
     vec4 timesOfDay = timesOfDay();
     uniformFogDensity = dot(timesOfDay, vec4(Morning_Uniform_Fog, Noon_Uniform_Fog, Evening_Uniform_Fog, Night_Uniform_Fog));
@@ -86,6 +106,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.0;
             largeCumulusDensity = 0.0;
             smallCumulusDensity = 0.0;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.0;
             break;
         }
         case 1: {
@@ -96,6 +119,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.0;
             largeCumulusDensity = 0.5;
             smallCumulusDensity = 0.25;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.45;
             break;
         }
         case 2: {
@@ -106,6 +132,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.5;
             largeCumulusDensity = 0.5;
             smallCumulusDensity = 0.0;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.25;
             break;
         }
         case 3: {
@@ -116,6 +145,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.0;
             largeCumulusDensity = 0.5;
             smallCumulusDensity = 0.0;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.0;
             break;
         }
         case 4: {
@@ -126,6 +158,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.25;
             largeCumulusDensity = 0.1;
             smallCumulusDensity = 0.1;
+
+            uniformFogDensity = 0.2;
+            clumpyFogDensity = 0.2;
             break;
         }
         case 5 : {
@@ -136,6 +171,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.1;
             largeCumulusDensity = 0.5;
             smallCumulusDensity = 0.5;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.0;
             break;
         }
         case 6: {
@@ -146,6 +184,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.5;
             largeCumulusDensity = 0.0;
             smallCumulusDensity = 0.0;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.0;
             break;
         }
         case 7: {
@@ -156,6 +197,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.0;
             largeCumulusDensity = 0.2;
             smallCumulusDensity = 0.0;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.0;
             break;
         }
         case 8: {
@@ -166,6 +210,9 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.0;
             largeCumulusDensity = 0.0;
             smallCumulusDensity = 0.5;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.0;
             break;
         }
         case 9: {
@@ -176,16 +223,22 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.3;
             largeCumulusDensity = 0.0;
             smallCumulusDensity = 0.0;
+
+            uniformFogDensity = 0.0;
+            clumpyFogDensity = 0.0;
             break;
         }
         case 10: {
-            altostratusCoverage = 0.0;
-            largeCumulusCoverage = 0.0;
+            altostratusCoverage = 0.2;
+            largeCumulusCoverage = 0.5;
             smallCumulusCoverage = 1.0;
 
-            altostratusDensity = 0.0;
-            largeCumulusDensity = 0.0;
-            smallCumulusDensity = 0.5;
+            altostratusDensity = 0.2;
+            largeCumulusDensity = 0.2;
+            smallCumulusDensity = 0.4;
+
+            uniformFogDensity = 0.5;
+            clumpyFogDensity = 0.2;
             break;
         }
     }
@@ -200,6 +253,8 @@ float RNG = hash11(worldDay + 0.2);
             smallCumulusDensity =  DAILY_PROFILE_1_LAYER0_DENSITY;
             largeCumulusDensity =  DAILY_PROFILE_1_LAYER1_DENSITY;
             altostratusDensity =   DAILY_PROFILE_1_LAYER2_DENSITY;
+            uniformFogDensity = DAILY_PROFILE_1_UNIFORM_FOG;
+            clumpyFogDensity = DAILY_PROFILE_1_CLUMPY_FOG;
             break;
         }
     #if USE_CUSTOM_DAILY_WEATHER_PROFILE >= 2
@@ -210,6 +265,8 @@ float RNG = hash11(worldDay + 0.2);
             smallCumulusDensity =  DAILY_PROFILE_2_LAYER0_DENSITY;
             largeCumulusDensity =  DAILY_PROFILE_2_LAYER1_DENSITY;
             altostratusDensity =   DAILY_PROFILE_2_LAYER2_DENSITY;
+            uniformFogDensity = DAILY_PROFILE_2_UNIFORM_FOG;
+            clumpyFogDensity = DAILY_PROFILE_2_CLUMPY_FOG;
             break;
         }
     #endif
@@ -221,6 +278,8 @@ float RNG = hash11(worldDay + 0.2);
             smallCumulusDensity =  DAILY_PROFILE_3_LAYER0_DENSITY;
             largeCumulusDensity =  DAILY_PROFILE_3_LAYER1_DENSITY;
             altostratusDensity =   DAILY_PROFILE_3_LAYER2_DENSITY;
+            uniformFogDensity = DAILY_PROFILE_3_UNIFORM_FOG;
+            clumpyFogDensity = DAILY_PROFILE_3_CLUMPY_FOG;
             break;
         }
     #endif
@@ -232,6 +291,8 @@ float RNG = hash11(worldDay + 0.2);
             smallCumulusDensity =  DAILY_PROFILE_4_LAYER0_DENSITY;
             largeCumulusDensity =  DAILY_PROFILE_4_LAYER1_DENSITY;
             altostratusDensity =   DAILY_PROFILE_4_LAYER2_DENSITY;
+            uniformFogDensity = DAILY_PROFILE_4_UNIFORM_FOG;
+            clumpyFogDensity = DAILY_PROFILE_4_CLUMPY_FOG;
             break;
         }
     #endif
@@ -243,6 +304,8 @@ float RNG = hash11(worldDay + 0.2);
             smallCumulusDensity =  DAILY_PROFILE_5_LAYER0_DENSITY;
             largeCumulusDensity =  DAILY_PROFILE_5_LAYER1_DENSITY;
             altostratusDensity =   DAILY_PROFILE_5_LAYER2_DENSITY;
+            uniformFogDensity = DAILY_PROFILE_5_UNIFORM_FOG;
+            clumpyFogDensity = DAILY_PROFILE_5_CLUMPY_FOG;
             break;
         }
     #endif
@@ -254,6 +317,8 @@ float RNG = hash11(worldDay + 0.2);
             smallCumulusDensity =  DAILY_PROFILE_6_LAYER0_DENSITY;
             largeCumulusDensity =  DAILY_PROFILE_6_LAYER1_DENSITY;
             altostratusDensity =   DAILY_PROFILE_6_LAYER2_DENSITY;
+            uniformFogDensity = DAILY_PROFILE_6_UNIFORM_FOG;
+            clumpyFogDensity = DAILY_PROFILE_6_CLUMPY_FOG;
             break;
         }
     #endif
@@ -296,8 +361,8 @@ if(rainStrength > 0.0001){
 	            altostratusCoverage = 1.3;
 	            altostratusDensity = 0.5;
 
-	            uniformFogDensity = 0.3;
-                clumpyFogDensity = 0.2;
+	            uniformFogDensity = 0.4;
+                clumpyFogDensity = 0.3;
                 break;
             }
             case 3: { // heavy rain
@@ -309,7 +374,7 @@ if(rainStrength > 0.0001){
 	            altostratusDensity = 0.5;
 
 	            uniformFogDensity = 0.1;
-                clumpyFogDensity = 0.2;
+                clumpyFogDensity = 0.8;
                 break;
             }
             case 4: { // medium rain
@@ -319,7 +384,7 @@ if(rainStrength > 0.0001){
 	            altostratusCoverage = 2.0;
 	            altostratusDensity = 0.3;
 
-	            uniformFogDensity = 0.1;
+	            uniformFogDensity = 0.2;
                 clumpyFogDensity = 0.2;
                 break;
             }
@@ -330,7 +395,7 @@ if(rainStrength > 0.0001){
 	            altostratusCoverage = 0.0;
 
 	            uniformFogDensity = 0.1;
-                clumpyFogDensity = 0.2;
+                clumpyFogDensity = 0.3;
                 break;
             }
         }
@@ -544,44 +609,51 @@ if(rainStrength > 0.0001){
         }
     #endif
 }
-#if USE_CUSTOM_SWAMP_CATEGORY_PROFILE == 0
-    if(isInSwampBiomes){
-	    uniformFogDensity = 0.0;
-        clumpyFogDensity = 0.0;
 
-        LocalUniformFogDensity = 0.01;
-        LocalClumpyFogDensity = 0.1;
-        localFogColor = vec3(0.8,1.0,0.1);
+uniformFogDensity = max(uniformFogDensity, dailyUniformFog);
+clumpyFogDensity = max(clumpyFogDensity, dailyClumpyFog);
+
+float swampBlend = biomeEdgeBlend(cameraPosition, swampEdgePos, isInSwampBiomes);
+float jungleBlend = biomeEdgeBlend(cameraPosition, jungleEdgePos, isInJungleBiomes);
+
+#if USE_CUSTOM_SWAMP_CATEGORY_PROFILE == 0
+    if(swampBlend > 0.0){
+	    uniformFogDensity = mix(uniformFogDensity, 0.0, swampBlend);
+        clumpyFogDensity = mix(clumpyFogDensity, 0.0, swampBlend);
+
+        LocalUniformFogDensity = mix(LocalUniformFogDensity, 0.0, swampBlend);
+        LocalClumpyFogDensity = mix(LocalClumpyFogDensity, 0.05, swampBlend);
+        localFogColor = mix(localFogColor, vec3(0.9,1.0,0.85), swampBlend);
     }
 #endif
 #if USE_CUSTOM_SWAMP_CATEGORY_PROFILE == 1
-    if(isInSwampBiomes){
-	    uniformFogDensity = 0.0;
-        clumpyFogDensity = 0.0;
+    if(swampBlend > 0.0){
+	    uniformFogDensity = mix(uniformFogDensity, 0.0, swampBlend);
+        clumpyFogDensity = mix(clumpyFogDensity, 0.0, swampBlend);
 
-        LocalUniformFogDensity = CUSTOM_SWAMP_PROFILE_1_UNIFORM_FOG_DENSITY;
-        LocalClumpyFogDensity = CUSTOM_SWAMP_PROFILE_1_CLUMPY_FOG_DENSITY;
-        localFogColor = vec3(CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_R, CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_G, CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_B);
+        LocalUniformFogDensity = mix(LocalUniformFogDensity, CUSTOM_SWAMP_PROFILE_1_UNIFORM_FOG_DENSITY, swampBlend);
+        LocalClumpyFogDensity = mix(LocalClumpyFogDensity, CUSTOM_SWAMP_PROFILE_1_CLUMPY_FOG_DENSITY, swampBlend);
+        localFogColor = mix(localFogColor, vec3(CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_R, CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_G, CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_B), swampBlend);
     }
 #endif
 #if USE_CUSTOM_JUNGLE_CATEGORY_PROFILE == 0
-    if(isInJungleBiomes){
-	    uniformFogDensity = 0.0;
-        clumpyFogDensity = 0.0;
+    if(jungleBlend > 0.0){
+	    uniformFogDensity = mix(uniformFogDensity, 0.01, jungleBlend);
+        clumpyFogDensity = mix(clumpyFogDensity, 0.02, jungleBlend);
         
-        LocalUniformFogDensity = 0.01;
-        LocalClumpyFogDensity = 0.0;
-        localFogColor = vec3(0.5,1.0,0.8);
+        LocalUniformFogDensity = mix(LocalUniformFogDensity, 0.01, jungleBlend);
+        LocalClumpyFogDensity = mix(LocalClumpyFogDensity, 0.02, jungleBlend);
+        localFogColor = mix(localFogColor, vec3(0.8,1.0,0.85), jungleBlend);
     }
 #endif
 #if USE_CUSTOM_JUNGLE_CATEGORY_PROFILE == 1
-    if(isInJungleBiomes){
-	    uniformFogDensity = 0.0;
-        clumpyFogDensity = 0.0;
+    if(jungleBlend > 0.0){
+	    uniformFogDensity = mix(uniformFogDensity, 0.1, jungleBlend);
+        clumpyFogDensity = mix(clumpyFogDensity, 0.1, jungleBlend);
 
-        LocalUniformFogDensity = CUSTOM_JUNGLE_PROFILE_1_UNIFORM_FOG_DENSITY;
-        LocalClumpyFogDensity = CUSTOM_JUNGLE_PROFILE_1_CLUMPY_FOG_DENSITY;
-        localFogColor = vec3(CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_R, CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_G, CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_B);
+        LocalUniformFogDensity = mix(LocalUniformFogDensity, CUSTOM_JUNGLE_PROFILE_1_UNIFORM_FOG_DENSITY, jungleBlend);
+        LocalClumpyFogDensity = mix(LocalClumpyFogDensity, CUSTOM_JUNGLE_PROFILE_1_CLUMPY_FOG_DENSITY, jungleBlend);
+        localFogColor = mix(localFogColor, vec3(CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_R, CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_G, CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_B), jungleBlend);
     }
 #endif
 

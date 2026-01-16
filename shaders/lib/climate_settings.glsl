@@ -2,6 +2,8 @@
 // i gotta start centralizing shit someday. 
 // THAT DAY HAS COME!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+#include "/lib/fog_utils.glsl"
+
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////// SEASONS /////////////////////////////////////
@@ -167,6 +169,8 @@
 
 		BiomeFogDensity.x = isSwamps*SWAMP_UNIFORM_DENSITY + isJungles*JUNGLE_UNIFORM_DENSITY + isDarkForests*DARKFOREST_UNIFORM_DENSITY + sandStorm*0.0 + snowStorm*0.01;
 		BiomeFogDensity.y = isSwamps*SWAMP_CLOUDY_DENSITY + isJungles*JUNGLE_CLOUDY_DENSITY + isDarkForests*DARKFOREST_CLOUDY_DENSITY + sandStorm*0.5 + snowStorm*0.5;
+		BiomeFogDensity.x = scaleFogSetting(BiomeFogDensity.x, FOG_UNIFORM_SCALE);
+		BiomeFogDensity.y = scaleFogSetting(BiomeFogDensity.y, FOG_CLUMPY_SCALE);
 		
 		UniformDensity = mix(UniformDensity, vec4(BiomeFogDensity.x), Inbiome*maxDistance);
 		CloudyDensity  = mix(CloudyDensity,  vec4(BiomeFogDensity.y), Inbiome*maxDistance);
