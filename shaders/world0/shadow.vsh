@@ -207,9 +207,21 @@ void main() {
 	// #endif
 
 	// #if defined IS_LPV_ENABLED || defined WAVY_PLANTS  || !defined PLANET_CURVATURE
-		vec3 playerpos = mat3(shadowModelViewInverse) * position + shadowModelViewInverse[3].xyz;
+	// vec3 playerpos = mat3(shadowModelViewInverse) * position + shadowModelViewInverse[3].xyz;
 	// #endif
+
+	vec4 clip = ftransform();
+	vec4 shadowView = shadowProjectionInverse * clip;
+	vec4 world = shadowModelViewInverse * shadowView;
+	vec3 playerpos = world.xyz / world.w; // safe even if w==1
+
+	// Render stage 0/none is apparently used by Flywheel entities.
+	// if (renderStage != 0) { gl_Position = vec4(-1.0); return; }
+
 	playerPosVarying = playerpos;
+
+	vec3 worldpos = playerpos;
+	int blockId = int(mc_Entity.x + 0.5);
 
 	#if defined IS_LPV_ENABLED && defined MC_GL_ARB_shader_image_load_store
 		PopulateShadowVoxel(playerpos);
@@ -233,10 +245,8 @@ void main() {
 	// 		position = mat3(shadowModelView) * playerpos + shadowModelView[3].xyz;
   	// 	}
 	// #endif
+	
 
-	int blockId = int(mc_Entity.x + 0.5);
-
-	vec3 worldpos = playerpos;
 	#ifdef WAVY_PLANTS
 		// also use normal, so up/down facing geometry does not get detatched from its model parts.
 		bool InterpolateFromBase = gl_MultiTexCoord0.t < max(mc_midTexCoord.t, abs(viewToWorld(normalize(gl_NormalMatrix * gl_Normal)).y));
@@ -270,14 +280,17 @@ void main() {
 	#endif
 
 	position = mat3(shadowModelView) * worldpos + shadowModelView[3].xyz;
+	
+	vec4 shadowViewOut = shadowModelView * vec4(worldpos, 1.0);
+	vec4 clipOut = shadowProjection * shadowViewOut;
 
 	#ifdef DISTORT_SHADOWMAP
 		if (entityId == ENTITY_SSS_MEDIUM || entityId == ENTITY_SLIME)
 			position.xyz = position.xyz - normalize(gl_NormalMatrix * gl_Normal) * 0.25;
 
-		gl_Position = BiasShadowProjection(toClipSpace3(position));
+		gl_Position = BiasShadowProjection(clipOut);
 	#else
-		gl_Position = toClipSpace3(position);
+		gl_Position = clipOut;
 	#endif
  	
 
