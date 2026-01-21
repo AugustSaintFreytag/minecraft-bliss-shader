@@ -403,6 +403,7 @@ float swapperlinZ(float depth, float _near, float _far) {
 
 }
 
+#if defined DISTANT_HORIZONS
 float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanilladepth){
 
 	// return 1.0;1
@@ -410,13 +411,8 @@ float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanillad
 	float godrays = 0.0;
 	float samples = 8.0;
 
-	float _near = near; float _far = far*4.0;
-
-	// #ifdef DISTANT_HORIZONS
-	// 	bool depthCheck = true;
-	// #else
-	// 	bool depthCheck = false;
-	// #endif
+	float _near = near; 
+	float _far = far * 4.0;
 
 	bool depthCheck = true;
 
@@ -426,7 +422,7 @@ float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanillad
 	}
     
     float lightRange = pow(clamp(-dot(normalize(viewPos), lightDir)+0.65,0.0,1.0),2.0);
-    vec3 position = toClipSpace3_DH(viewPos, depthCheck) ;
+    vec3 position = toClipSpace3_DH(viewPos, depthCheck);
 	
 	//prevents the ray from going behind the camera
 	float rayLength = ((viewPos.z + lightDir.z * _far * sqrt(3.)) > -_near) ? (-_near - viewPos.z) / lightDir.z : _far * sqrt(3.);
@@ -446,18 +442,20 @@ float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanillad
 	for (int i = 0; i < int(samples); i++) { 
 		newPos.xy = clamp(newPos.xy, screenEdges, 1.0-screenEdges);
 
-		float sampleDepth = invLinZ(sqrt(texelFetch2D(colortex4, ivec2(newPos.xy/texelSize/4.0),0).a/65000.0));
-		
-		#ifdef DISTANT_HORIZONS
-			if(depthCheck) sampleDepth = texelFetch2D(dhDepthTex1, ivec2(newPos.xy/texelSize),0).x;
-		#endif
-		
-		godrays += (swapperlinZ(sampleDepth, _near, _far) > 1.0 ? 1.0 : lightRange);
+		float sampleDepth = texelFetch2D(LOD_DEPTHTEX1, ivec2(newPos.xy/texelSize),0).x;
+		float linDepth = swapperlinZ(sampleDepth, _near, _far);
+
+		godrays += (linDepth >= 1.0 ? 1.0 : lightRange);
 		newPos += direction;
 	}
 
 	return godrays/samples;
 }
+#else
+float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanilladepth){
+	return 1.0;
+}
+#endif
 
 vec4 waterVolumetrics_alt( vec3 rayStart, vec3 rayEnd, float estEndDepth, float estSunDepth, float rayLength, float dither, vec3 waterCoefs, vec3 scatterCoef, vec3 ambient, vec3 lightSource, float VdotL){
 	int spCount = rayMarchSampleCount;
@@ -622,6 +620,7 @@ void main() {
 	vec3 scatterCoef = dirtAmount * vec3(Dirt_Scatter_R, Dirt_Scatter_G, Dirt_Scatter_B) / 3.14;
 
 	vec3 directLightColor = lightCol.rgb / 2400.0;
+	vec3 directLightColorVL = directLightColor;
 	vec3 indirectLightColor = averageSkyCol / 1200.0;
 	vec3 indirectLightColor_dynamic = averageSkyCol_Clouds / 1200.0;
 	
@@ -629,10 +628,15 @@ void main() {
     float minimumLightAmount = 0.02*nightVision + 0.005 * mix(MINIMUM_INDOOR_LIGHT, MINIMUM_OUTDOOR_LIGHT, skyLightLevelSmooth);
     indirectLight += vec3(1.0) * minimumLightAmount;
 	
-    vec3 indirectLight_fog = indirectLightColor * skyLightLevelSmooth * ambient_brightness; 
+	vec3 indirectLight_fog = indirectLightColor * skyLightLevelSmooth * ambient_brightness; 
     indirectLight_fog += vec3(1.0) * minimumLightAmount;
 	
 	float cloudPlaneDistance = 0.0;
+
+#ifdef OVERWORLD_SHADER
+	float sunVisibility = godrayTest(viewPos0, normalize(sunVec * lightCol.a), BN.x, z0);
+	directLightColorVL *= clamp(sunVisibility, 0.0, 1.0);
+#endif
 	
 	// #ifdef DISTANT_HORIZONS
 	// 	float godrays = godrayTest(viewPos0, normalize(WsunVec*mat3(gbufferModelViewInverse)),BN.x, z0);
@@ -659,7 +663,7 @@ void main() {
   		  }
   		#endif
 
-		vec4 VolumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
+		vec4 VolumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, directLightColorVL, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
 		#if defined LPV_VL_FOG_ILLUMINATION
 			VolumetricFog.a *= LPV_ILLUMINATION.a;
@@ -685,7 +689,7 @@ void main() {
 	#endif
 
 	if (isEyeInWater == 1){
-		vec4 underWaterFog =  waterVolumetrics(vec3(0.0), viewPos0, length(viewPos0), vec2(noise_1), totEpsilon, scatterCoef, indirectLightColor_dynamic, directLightColor , dot(normalize(viewPos0), normalize(sunVec* lightCol.a ) ), LPV_ILLUMINATION.rgb);
+		vec4 underWaterFog =  waterVolumetrics(vec3(0.0), viewPos0, length(viewPos0), vec2(noise_1), totEpsilon, scatterCoef, indirectLightColor_dynamic, directLightColorVL , dot(normalize(viewPos0), normalize(sunVec* lightCol.a ) ), LPV_ILLUMINATION.rgb);
 		VolumetricFog = vec4(underWaterFog.rgb, 1.0);
 	}
 
@@ -702,7 +706,7 @@ void main() {
 		#if defined OVERWORLD_SHADER
 			VolumetricClouds = GetVolumetricClouds(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
 	
-			VolumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
+			VolumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, directLightColorVL, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
 			VolumetricFog = vec4(VolumetricClouds.rgb*VolumetricFog.a + VolumetricFog.rgb, VolumetricFog.a*VolumetricClouds.a);
 		#endif
@@ -714,7 +718,7 @@ void main() {
 		gl_FragData[1] = clamp(VolumetricFog, 0.0, 65000.0);
 
 		if(iswater && isEyeInWater != 1){
-			vec4 underWaterVL = waterVolumetrics_alt(viewPos0, viewPos1, estimatedDepth, estimatedSunDepth, Vdiff, noise_1, totEpsilon, scatterCoef, indirectLight, directLightColor, dot(normalize(viewPos0), normalize(sunVec*lightCol.a)));
+			vec4 underWaterVL = waterVolumetrics_alt(viewPos0, viewPos1, estimatedDepth, estimatedSunDepth, Vdiff, noise_1, totEpsilon, scatterCoef, indirectLight, directLightColorVL, dot(normalize(viewPos0), normalize(sunVec*lightCol.a)));
 			gl_FragData[1] = clamp(underWaterVL, 0.0, 65000.0);
 		}
 	}

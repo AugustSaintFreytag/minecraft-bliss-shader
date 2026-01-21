@@ -33,6 +33,7 @@ uniform mat4 gbufferPreviousModelView;
 #include "/lib/color_transforms.glsl"
 #include "/lib/color_dither.glsl"
 #include "/lib/res_params.glsl"
+#include "/lib/macro_lod_mod.glsl"
 
 uniform float near;
 uniform float far;
@@ -180,7 +181,8 @@ void main() {
     COLOR = vec3(ld(texture2D(depthtex0, texcoord*RENDER_SCALE).r));
   #endif
   #if DEBUG_VIEW == debug_DEPTHTEX1
-    COLOR = vec3(ld(texture2D(depthtex1, texcoord*RENDER_SCALE).r));
+    // COLOR = vec3(ld(texture2D(depthtex1, texcoord*RENDER_SCALE).r));
+    COLOR = vec3(ld(texture2D(LOD_DEPTHTEX0, texcoord*RENDER_SCALE).r));
   #endif
 
 
