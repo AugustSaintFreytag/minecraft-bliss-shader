@@ -2,10 +2,11 @@ uniform ivec2 eyeBrightness;
 
 #include "/lib/fog_utils.glsl"
 
-#define FOG_USE_EDGE_SHARPENING 0
+#define FOG_USE_SHAPING 1
 #define FOG_USE_TURBULENCE 1
 
-const float FOG_TURBULENCE_MIX = 0.25;
+const float FOG_TURBULENCE_MIX = 0.85;
+const float FOG_SHAPING_INTENSITY = 0.95;
 
 float phaseRayleigh(float cosTheta) {
 	const float oneOverPi 	= 1.0 / acos(-1.0);
@@ -20,8 +21,6 @@ float fogPhase(float lightPoint){
 	float exponential = exp2(pow(linear,0.3) * -15.0 ) * 1.5;
 	exponential += sqrt(exp2(sqrt(linear) * -12.5));
 
-	// float exponential = 1.0 / (linear * 10.0 + 0.05);
-
 	return exponential;
 }
 
@@ -31,7 +30,7 @@ float phaseCloudFog(float x, float g){
 }
 
 float densityAtPosFog(in vec3 pos){
-	pos /= 18.;
+	pos /= 24.0;
 	pos.xz *= 0.5;
 	
 	vec3 p = floor(pos);
@@ -39,28 +38,45 @@ float densityAtPosFog(in vec3 pos){
 	
 	f = (f*f) * (3.-2.*f);
 	
-	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0,193.0);
+	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0, 193.0);
 	vec2 coord =  uv / 512.0;
 	vec2 xy = texture2D(noisetex, coord).yx;
 
-	return mix(xy.r,xy.g, f.y);
+	return mix(xy.r, xy.g, f.y);
 }
 
-float turbulenceFogNoise(in vec3 pos){
-	float n0 = densityAtPosFog(pos);
-	float n1 = densityAtPosFog(pos * 2.0 + vec3(17.0, 0.0, 23.0));
-	float n2 = densityAtPosFog(pos * 4.0 + vec3(31.0, 11.0, 47.0));
+float turbulentFogNoise(in vec3 pos){
+	vec3 p = pos * 0.5;
+	float noise = 0.0;
+	float amplitude = 0.6;
+	float frequency = 1.0;
+	vec3 warp = frameTimeCounter * 10 * Cloud_Speed * vec3(-0.02, 0.004, -0.006);
 
-	n0 = abs(n0 * 2.0 - 1.0);
-	n1 = abs(n1 * 2.0 - 1.0);
-	n2 = abs(n2 * 2.0 - 1.0);
+	for(int i = 0; i < 3; i++){
+		float n = densityAtPosFog(p * frequency + warp);
 
-	return clamp(n0 * 0.6 + n1 * 0.3 + n2 * 0.1, 0.0, 1.0);
+		n = 1.0 - abs(n * 2.0 - 1.0);
+		n = n * n;
+		noise += n * amplitude;
+		warp += vec3(n) * 0.35;
+		frequency *= 2.2;
+		amplitude *= 0.5;
+	}
+
+	return noise;
 }
 
-float applyFogSharpening(float noise){
-#if FOG_USE_EDGE_SHARPENING
-	return sharpenFogNoise(noise);
+float shapeFogNoise(float noise, float coverage, float intensity){
+	float noiseFloor = mix(0, 0.2, coverage - 0.5);
+	float noiseCeiling = mix(0.3, 0.9, coverage);
+	float shapedNoise = smoothstep(noiseFloor, noiseCeiling, noise);
+
+	return mix(noise, shapedNoise, intensity);
+}
+
+float applyFogShaping(float noise, float coverage, float intensity){
+#if FOG_USE_SHAPING
+	return clamp(shapeFogNoise(noise, coverage, intensity), 0.0, 1.0);
 #else
 	return clamp(noise, 0.0, 1.0);
 #endif
@@ -68,12 +84,72 @@ float applyFogSharpening(float noise){
 
 float applyFogTurbulence(float baseNoise, vec3 pos){
 #if FOG_USE_TURBULENCE
-	float turbNoise = turbulenceFogNoise(pos);
-	return mix(baseNoise, turbNoise, FOG_TURBULENCE_MIX);
+	float turbulentNoise = turbulentFogNoise(pos);
+	return mix(baseNoise, turbulentNoise, FOG_TURBULENCE_MIX);
 #else
 	return baseNoise;
 #endif
 }
+
+uniform bool isInSpecialEnviornment;
+uniform vec3 exitedBiomePos;
+
+float getLocalEffectDensity(
+	in vec3 playerPos
+){	
+	float uniformFog = scaleFogSetting(parameters.localFog.x, FOG_UNIFORM_SCALE * 0.1);
+	float clumpyFog = scaleFogSetting(parameters.localFog.y, FOG_CLUMPY_SCALE * 0.1);
+	float clumpyCoverage = clamp(parameters.localFog.z, 0.0, 1.0);
+
+	float fogResult = uniformFog;
+	
+	if(clumpyFog > 0.0){
+		vec3 pos = playerPos;
+		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) * 24.0 * 7.0;
+
+		samplePos += vec3(1.0, -0.01, 1.0) * frameTimeCounter * 500.0 * Cloud_Speed;
+
+		float baseNoise = densityAtPosFog(samplePos);
+		float localClumpyNoise = applyFogTurbulence(baseNoise, samplePos);
+		float localClumpyFog = min(max(1.0 - applyFogShaping(localClumpyNoise, clumpyCoverage, FOG_SHAPING_INTENSITY) - 0.2, 0.0) / 0.8, 1.0);
+
+		fogResult += localClumpyFog * clumpyFog;
+	}
+	
+	return fogResult;
+}
+
+float getFogDensities(
+	in vec3 playerPos,
+	float localEffectRadius
+){	
+	float uniformFog = scaleFogSetting(parameters.fog.x, FOG_UNIFORM_SCALE);
+	float clumpyFog = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
+	float clumpyCoverage = parameters.fog.z;
+
+	float fogResult = pow(uniformFog, 3);
+
+	if(clumpyFog > 0.0){
+		vec3 movement = vec3(1.0, -0.01, 1.0) * frameTimeCounter * Cloud_Speed;
+		vec3 pos = playerPos;
+		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 24.0, 1.0) + movement;
+		vec3 samplePos2 = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) + movement;
+
+		float shapeBaseNoise = densityAtPosFog(samplePos * 24.0);
+		float shapeNoise = applyFogTurbulence(shapeBaseNoise, samplePos * 18.0);
+		float shape = 1.0 - applyFogShaping(shapeNoise, clumpyCoverage, FOG_SHAPING_INTENSITY);
+		float shape2BaseNoise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6 ,0.0) * 2.0 ,1.0) * 200.0));
+		float shape2Noise = applyFogTurbulence(shape2BaseNoise, samplePos2 * 150.0);
+		float shape2 = 1.0 - applyFogShaping(shape2Noise, clumpyCoverage, FOG_SHAPING_INTENSITY);
+		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - 60, 0.0));
+
+		fogResult += finalShape * pow(clumpyFog, 3);
+	}
+	
+	return fogResult;
+}
+
+// Shadows
 
 vec3 sampleShadowmapVL(vec3 start, vec3 shadowMapRayStartPos, vec3 shadowMapRayProgress, float increment) {
 	vec3 shadowColor = vec3(1.0);
@@ -128,113 +204,7 @@ vec3 getShadows(
 	return shadows;
 }
 
-uniform bool isInSpecialEnviornment;
-uniform vec3 exitedBiomePos;
-// uniform float fadeAwayLocalEffect;
-
-float getLocalEffectDensity(
-	in vec3 playerPos
-){	
-	float fogResult = 0.0;
-	
-	fogResult = parameters.localFog.x;
-	
-	if(parameters.localFog.y > 0.0){
-		vec3 pos = playerPos;
-		vec3 samplePos = playerPos * vec3(1.0,1.0/48.0,1.0) * 24.0 * 7.0;
-		samplePos += vec3(1.0, -0.01, 1.0)*frameTimeCounter*1500.0;
-
-		float baseNoise = densityAtPosFog(samplePos);
-		float clumpyNoise = applyFogTurbulence(baseNoise, samplePos * 0.7);
-		float clumpyFog = min(max(applyFogSharpening(clumpyNoise) - 0.2,0.0)/0.8,1.0);
-
-		fogResult += clumpyFog * parameters.localFog.y;
-	}
-	
-	return fogResult;
-}
-
-float getFogDensities(
-	in vec3 playerPos,
-	float localEffectRadius
-){	
-
-	float fogResult = 0.0;
-
-	float uniformFog = scaleFogSetting(parameters.fog.x, FOG_UNIFORM_SCALE);
-	float clumpyFog = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
-
-	fogResult = pow(uniformFog,3);
-
-	if(clumpyFog > 0.0){
-		vec3 movement = vec3(1.0, -0.01, 1.0)*frameTimeCounter;
-		vec3 pos = playerPos;
-		vec3 samplePos = playerPos * vec3(1.0,1.0/24.0,1.0) + movement;
-		vec3 samplePos2 = playerPos * vec3(1.0,1.0/48.0,1.0) + movement;
-
-		float shapeBaseNoise = densityAtPosFog(samplePos * 24.0);
-		float shapeNoise = applyFogTurbulence(shapeBaseNoise, samplePos * 18.0);
-		float shape = 1.0 - applyFogSharpening(shapeNoise);
-		float shape2BaseNoise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6 ,0.0) * 2.0 ,1.0) * 200.0));
-		float shape2Noise = applyFogTurbulence(shape2BaseNoise, samplePos2 * 150.0);
-		float shape2 = 1.0 - applyFogSharpening(shape2Noise);
-		float finalShape = max(min(max(shape - 0.6 ,0.0) * 2.0 ,1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - 60,0.0));
-
-		fogResult += finalShape * pow(clumpyFog,3);
-	}
-	
-	return fogResult;
-
-	// FogDensities(medium_gradientFog, cloudyFog, rainyFog, maxDistance, dailyWeatherParams0.a, dailyWeatherParams1.a);
-
-	// return uniformFog + medium_gradientFog + cloudyFog + rainyFog;
-
-	// float fog = pow(parameters.fog.x,5);
-	// if(parameters.localFog.y > 0.0){
-	// }
-	// return fog;
-
-	// vec3 samplePos = playerPos * vec3(1.0,1.0/48.0,1.0) * 24.0 * 5;
-	// samplePos += vec3(1.0, -0.01, 1.0)*frameTimeCounter*1500.0;
-	// float clumpyFog = densityAtPosFog(samplePos);
-
-	// float localUniformFogDensity = pow(parameters.localFog.x,5.0);
-	// float localClumpyFogDensity = pow(parameters.localFog.y,5.0);
-	// float localFogEffects = localEffectRadius * (localUniformFogDensity + max(clumpyFog*localClumpyFogDensity - 0.3,0.0));
-
-	// return localFogEffects;
-
-	// float fogYstart = FOG_START_HEIGHT+3;
-	// vec3 samplePos = pos*vec3(1.0,1./24.,1.0);
-	// vec3 samplePos2 = pos*vec3(1.0,1./48.,1.0);
-	
-	// float uniformFog = 0.0;
-
-	// float low_gradientFog = exp2(-0.3 * max(pos.y - fogYstart,0.0));
-	// float medium_gradientFog = exp2(-0.15 * max(pos.y - fogYstart,0.0));
-	// float high_gradientFog = exp2(-0.06 * max(pos.y - fogYstart,0.0));
-	
-	// float fog_shape = 0.0;
-	// float fog_erosion = 0.0;
-	// if(sandStorm < 1.0 && snowStorm < 1.0){
-	// 	fog_shape = 1.0 - densityAtPosFog(samplePos * 24.0);
-	// 	fog_erosion = 1.0 - densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(fog_shape - 0.6 ,0.0) * 2.0 ,1.0)*200.0));
-	// }
-	
-	// float cloudyFog = max(min(max(fog_shape - 0.6 ,0.0) * 2.0 ,1.0) - fog_erosion * 0.4	, 0.0)	*	exp(-0.05 * max(pos.y - (fogYstart+20),0.0));
-	// float rainyFog = (low_gradientFog * 0.5 + exp2(-0.06 * max(pos.y - fogYstart,0.0))) * rainStrength * NoRainFallEnviornmentSmooth;
-	
-	// if(sandStorm > 0.0 || snowStorm > 0.0){
-	// 	float IntenseFogs = pow(1.0 - densityAtPosFog( (samplePos2  - vec3(frameTimeCounter,0,frameTimeCounter)*15.0) * 100.0),2.0) * mix(1.0, high_gradientFog, snowStorm);
-	// 	cloudyFog = mix(cloudyFog, IntenseFogs, sandStorm+snowStorm);
-
-	// 	medium_gradientFog = 1.0;
-	// }
-
-	// FogDensities(medium_gradientFog, cloudyFog, rainyFog, maxDistance, 1.0, 1.0);
-
-	// return uniformFog + medium_gradientFog + cloudyFog;
-}
+// Entry
 
 vec4 GetVolumetricFog(
 	in vec3 viewPos,
@@ -338,6 +308,7 @@ vec4 GetVolumetricFog(
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			vec3 lightningFlash = createLightningPointLight(rayProgress - cameraPosition, lightningBoltPosition.xyz, 1.0, 1.0) * indoors;
 		#endif
+		
 		/// ATMOSOPHERE
 		float planetVolume = clamp(1.0 - length((rayProgress-cameraPosition) - vec3(0.0, 250.0, 0.0)) / 2500.0, 0.0,1.0);
 		#ifdef USING_LOD_MOD
@@ -345,6 +316,7 @@ vec4 GetVolumetricFog(
 		#else
 			vec2 airCoef = exp2(-max(rayProgress.y-62.0,0.0)/vec2(8.0e3, 1.2e3)*vec2(6.,7.0)) * planetVolume * 25.0 * Haze_amount;
 		#endif
+
 		vec3 rayleigh = rayleighCoeffs*airCoef.x;
 		vec3 mie = mieCoeffs*(airCoef.y + min(Haze_amount,1.0));
 		vec3 airDensity = kill*(rayleigh + mie);
@@ -393,5 +365,6 @@ vec4 GetVolumetricFog(
 		airAbsorbance *= airVolumeCoeff*fogVolumeCoeff*localFogVolumeCoeff;
 		absorbance *= fogVolumeCoeff*localFogVolumeCoeff*dot(airVolumeCoeff,vec3(0.33333));
 	}
+
 	return vec4(color, absorbance);
 }

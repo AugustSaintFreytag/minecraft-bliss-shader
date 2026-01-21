@@ -33,8 +33,9 @@
 
     uniformFogDensity = 0.0;
     clumpyFogDensity = 0.0;
-    LocalUniformFogDensity = 0.0;
-    LocalClumpyFogDensity = 0.0;
+    clumpyFogCoverage = 1.0;
+    localUniformFogDensity = 0.0;
+    localClumpyFogDensity = 0.0;
 
 --------------------------------------
 // for fog colors, input the numerical color values of red, green and blue, within the range of 0.0 - 1.0 or N/255.0
@@ -79,7 +80,7 @@
     ){
         uniformFogDensity = 1.5;
         smallCumulusCoverage = 0.0;
-        LocalClumpyFogDensity = 0.0;
+        localClumpyFogDensity = 0.0;
     }
 
 --------------------------------------

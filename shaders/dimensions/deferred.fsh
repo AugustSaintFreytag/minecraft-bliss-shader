@@ -212,7 +212,7 @@ float mixhistory = 0.06;
 	/// --- STORE DAILY WEATHER PARAMETERS --- ///
 	//////////////////////////////////////////////
 
-	// the idea is to store the 8 values, coverage + density of 3 cloud layers and 2 fog density values.
+	// the idea is to store the 9 values, coverage + density of 3 cloud layers and 3 fog values.
 	if (gl_FragCoord.x > 1 && gl_FragCoord.x < 4 && gl_FragCoord.y > 1 && gl_FragCoord.y < 4){
 		mixhistory = 10.0 * frameTime;
 

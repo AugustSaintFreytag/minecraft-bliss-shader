@@ -14,9 +14,6 @@ uniform bool isInSnowFallEnviornment;
 uniform bool isInRainFallEnviornment;
 uniform bool isInNoRainFallEnviornment;
 
-uniform vec3 swampEdgePos;
-uniform vec3 jungleEdgePos;
-
 uniform int worldTime;
 
 #define DECLARE_UNIFORMS_OR_WRITE_FUNCTIONS_FOR_CUSTOM_SCENE_CONTROLLER_PROFILES
@@ -39,18 +36,7 @@ bool playerIsOutsideArea(in vec3 positionA, in vec3 positionB){
     return !(cameraPositionInt.x > positionA.x && cameraPositionInt.y > positionA.y && cameraPositionInt.z > positionA.z && cameraPositionInt.x < positionB.x && cameraPositionInt.y < positionB.y && cameraPositionInt.z < positionB.z); 
 }
 
-// Blend biome-local effects over the first x blocks after entry.
-float biomeEdgeBlend(in vec3 position, in vec3 edgePos, in bool isInBiome){
-    if(!isInBiome){
-        return 0.0;
-    }
-
-    vec2 offset = position.xz - edgePos.xz;
-    return clamp(length(offset) / 32.0, 0.0, 1.0);
-}
-
 vec4 timesOfDay(){
-
 	float time = float(worldTime%24000);
 
 	// set schedules for fog to appear at specific ranges of time in the day.
@@ -65,8 +51,8 @@ void applySceneControllerParameters(
 	out float smallCumulusCoverage, out float smallCumulusDensity,
 	out float largeCumulusCoverage, out float largeCumulusDensity,
 	out float altostratusCoverage, out float altostratusDensity,
-	out float uniformFogDensity, out float clumpyFogDensity,
-    out float LocalUniformFogDensity, out float LocalClumpyFogDensity, out vec3 localFogColor
+	out float uniformFogDensity, out float clumpyFogDensity, out float clumpyFogCoverage,
+    out float localUniformFogDensity, out float localClumpyFogDensity, out float localClumpyFogCoverage, out vec3 localFogColor
 ){
     // these are the default parameters if no "trigger" or custom uniform is being used.
     // do not remove them
@@ -78,18 +64,12 @@ void applySceneControllerParameters(
     altostratusDensity = 0.0;
 	uniformFogDensity = 0.0;
     clumpyFogDensity = 0.0;
-    LocalUniformFogDensity = 0.0;
-    LocalClumpyFogDensity = 0.0;
+    clumpyFogCoverage = 0.0;
+
+    localUniformFogDensity = 0.0;
+    localClumpyFogDensity = 0.0;
+    localClumpyFogCoverage = -1.0;
     localFogColor = vec3(1.0);
-
-	float dailyUniformFog = 0.0;
-	float dailyClumpyFog = 0.0;
-
-#if TOD_FOG_AMOUNT > 0
-    vec4 timesOfDay = timesOfDay();
-    uniformFogDensity = dot(timesOfDay, vec4(Morning_Uniform_Fog, Noon_Uniform_Fog, Evening_Uniform_Fog, Night_Uniform_Fog));
-    clumpyFogDensity = dot(timesOfDay, vec4(Morning_Cloudy_Fog, Noon_Cloudy_Fog, Evening_Cloudy_Fog, Night_Cloudy_Fog));
-#endif
 
 // the seed is the in-game day counter. 
 // give a random value within the range 0.0-1.0 which is scaled up to the wanted range, and then quantized to choose a profile
@@ -98,147 +78,169 @@ float RNG = hash11(worldDay + 0.2);
 #if USE_CUSTOM_DAILY_WEATHER_PROFILE == 0
     int dailyWeatherProfile = int(RNG * 11.0);
     switch (dailyWeatherProfile){
-        default : {
-            altostratusCoverage = 0.0;
-            largeCumulusCoverage = 0.0;
+        default: {
+            // Clear & Crisp
             smallCumulusCoverage = 0.0;
+            largeCumulusCoverage = 0.0;
+            altostratusCoverage = 0.0;
 
-            altostratusDensity = 0.0;
-            largeCumulusDensity = 0.0;
             smallCumulusDensity = 0.0;
+            largeCumulusDensity = 0.0;
+            altostratusDensity = 0.0;
 
             uniformFogDensity = 0.0;
             clumpyFogDensity = 0.0;
+            clumpyFogCoverage = 0.0;
             break;
         }
         case 1: {
-            altostratusCoverage = 0.0;
-            largeCumulusCoverage = 1.0;
-            smallCumulusCoverage = 1.0;
+            // Clear, Lightly Cloudy
+            smallCumulusCoverage = 0.5;
+            largeCumulusCoverage = 0.0;
+            altostratusCoverage = 0.8;
 
-            altostratusDensity = 0.0;
-            largeCumulusDensity = 0.5;
-            smallCumulusDensity = 0.25;
+            smallCumulusDensity = 0.2;
+            largeCumulusDensity = 0.0;
+            altostratusDensity = 0.25;
 
             uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.45;
+            clumpyFogDensity = 0.0;
+            clumpyFogCoverage = 0.0;
             break;
         }
         case 2: {
-            altostratusCoverage = 1.0;
-            largeCumulusCoverage = 1.0;
-            smallCumulusCoverage = 0.0;
+            // Clear, Lightly Cloudy, Chunky
+            smallCumulusCoverage = 0.6;
+            largeCumulusCoverage = 0.7;
+            altostratusCoverage = 0.2;
 
-            altostratusDensity = 0.5;
-            largeCumulusDensity = 0.5;
-            smallCumulusDensity = 0.0;
+            smallCumulusDensity = 0.25;
+            largeCumulusDensity = 0.75;
+            altostratusDensity = 0.1;
 
             uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.25;
+            clumpyFogDensity = 0.0;
+            clumpyFogCoverage = 0.0;
             break;
         }
         case 3: {
-            altostratusCoverage = 0.0;
-            largeCumulusCoverage = 1.1;
-            smallCumulusCoverage = 0.0;
+            // Clear, Lightly Cloudy, w/ Cloudy Fog
+            smallCumulusCoverage = 0.5;
+            largeCumulusCoverage = 0.5;
+            altostratusCoverage = 0.8;
 
-            altostratusDensity = 0.0;
-            largeCumulusDensity = 0.5;
-            smallCumulusDensity = 0.0;
+            smallCumulusDensity = 0.25;
+            largeCumulusDensity = 0.2;
+            altostratusDensity = 0.5;
 
             uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.0;
+            clumpyFogDensity = 0.4;
+            clumpyFogCoverage = 0.0;
             break;
         }
         case 4: {
-            altostratusCoverage = 1.5;
-            largeCumulusCoverage = 0.0;
-            smallCumulusCoverage = 1.0;
-
-            altostratusDensity = 0.25;
-            largeCumulusDensity = 0.1;
-            smallCumulusDensity = 0.1;
-
-            uniformFogDensity = 0.2;
-            clumpyFogDensity = 0.2;
-            break;
-        }
-        case 5 : {
+            // Lightly Overcast
+            smallCumulusCoverage = 0.0;
+            largeCumulusCoverage = 1.0;
             altostratusCoverage = 1.0;
-            largeCumulusCoverage = 0.1;
-            smallCumulusCoverage = 1.0;
 
-            altostratusDensity = 0.1;
-            largeCumulusDensity = 0.5;
-            smallCumulusDensity = 0.5;
+            smallCumulusDensity = 0.0;
+            largeCumulusDensity = 0.75;
+            altostratusDensity = 0.5;
 
             uniformFogDensity = 0.0;
             clumpyFogDensity = 0.0;
+            clumpyFogCoverage = 0.0;
+            break;
+        }
+        case 5: {
+            // Overcast w/ Cloudy Fog
+            smallCumulusCoverage = 1.0;
+            largeCumulusCoverage = 1.0;
+            altostratusCoverage = 0.0;
+
+            smallCumulusDensity = 0.5;
+            largeCumulusDensity = 0.5;
+            altostratusDensity = 0.0;
+
+            uniformFogDensity = 0.05;
+            clumpyFogDensity = 0.4;
+            clumpyFogCoverage = 0.0;
             break;
         }
         case 6: {
-            altostratusCoverage = 1.0;
-            largeCumulusCoverage = 0.0;
+            // Overcast, Foggy, w/ Distant Fog
             smallCumulusCoverage = 0.0;
+            largeCumulusCoverage = 0.0;
+            altostratusCoverage = 1.4;
 
-            altostratusDensity = 0.5;
-            largeCumulusDensity = 0.0;
             smallCumulusDensity = 0.0;
+            largeCumulusDensity = 0.0;
+            altostratusDensity = 0.5;
 
-            uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.0;
+            uniformFogDensity = 0.15;
+            clumpyFogDensity = 0.15;
+            clumpyFogCoverage = 0.5;
             break;
         }
         case 7: {
-            altostratusCoverage = 0.0;
-            largeCumulusCoverage = 1.9;
-            smallCumulusCoverage = 0.0;
+            // Dark Overcast
+            smallCumulusCoverage = 1.5;
+            largeCumulusCoverage = 0.0;
+            altostratusCoverage = 1.0;
 
-            altostratusDensity = 0.0;
-            largeCumulusDensity = 0.2;
-            smallCumulusDensity = 0.0;
+            smallCumulusDensity = 0.35;
+            largeCumulusDensity = 0.1;
+            altostratusDensity = 0.5;
 
-            uniformFogDensity = 0.0;
+            uniformFogDensity = 0.1;
             clumpyFogDensity = 0.0;
+            clumpyFogCoverage = 0.0;
             break;
         }
         case 8: {
-            altostratusCoverage = 0.0;
+            // Dark Overcast, w/ Spread Out Fog
+            smallCumulusCoverage = 1.6;
             largeCumulusCoverage = 0.0;
-            smallCumulusCoverage = 1.4;
+            altostratusCoverage = 1.0;
 
-            altostratusDensity = 0.0;
+            smallCumulusDensity = 0.55;
             largeCumulusDensity = 0.0;
-            smallCumulusDensity = 0.5;
+            altostratusDensity = 0.5;
 
-            uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.0;
+            uniformFogDensity = 0.2;
+            clumpyFogDensity = 0.5;
+            clumpyFogCoverage = 0.35;
             break;
         }
         case 9: {
-            altostratusCoverage = 2.0;
-            largeCumulusCoverage = 0.0;
-            smallCumulusCoverage = 0.0;
+            // Overcast, w/ Very Light Fog
+            smallCumulusCoverage = 0.8;
+            largeCumulusCoverage = 1.4;
+            altostratusCoverage = 0.0;
 
-            altostratusDensity = 0.3;
-            largeCumulusDensity = 0.0;
-            smallCumulusDensity = 0.0;
+            smallCumulusDensity = 0.2;
+            largeCumulusDensity = 0.25;
+            altostratusDensity = 0.0;
 
             uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.0;
+            clumpyFogDensity = 0.2;
+            clumpyFogCoverage = 0.2;
             break;
         }
         case 10: {
-            altostratusCoverage = 0.2;
-            largeCumulusCoverage = 0.5;
+            // Heavy Fog (Sea of Trees)
             smallCumulusCoverage = 1.0;
+            largeCumulusCoverage = 0.1;
+            altostratusCoverage = 1.0;
 
-            altostratusDensity = 0.2;
-            largeCumulusDensity = 0.2;
-            smallCumulusDensity = 0.4;
+            smallCumulusDensity = 0.1;
+            largeCumulusDensity = 0.5;
+            altostratusDensity = 0.5;
 
-            uniformFogDensity = 0.5;
-            clumpyFogDensity = 0.2;
+            uniformFogDensity = 0.15;
+            clumpyFogDensity = 0.7;
+            clumpyFogCoverage = 0.4;
             break;
         }
     }
@@ -255,6 +257,7 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity =   DAILY_PROFILE_1_LAYER2_DENSITY;
             uniformFogDensity = DAILY_PROFILE_1_UNIFORM_FOG;
             clumpyFogDensity = DAILY_PROFILE_1_CLUMPY_FOG;
+            clumpyFogCoverage = DAILY_PROFILE_1_CLUMPY_FOG_COVERAGE;
             break;
         }
     #if USE_CUSTOM_DAILY_WEATHER_PROFILE >= 2
@@ -267,6 +270,7 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity =   DAILY_PROFILE_2_LAYER2_DENSITY;
             uniformFogDensity = DAILY_PROFILE_2_UNIFORM_FOG;
             clumpyFogDensity = DAILY_PROFILE_2_CLUMPY_FOG;
+            clumpyFogCoverage = DAILY_PROFILE_2_CLUMPY_FOG_COVERAGE;
             break;
         }
     #endif
@@ -280,6 +284,7 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity =   DAILY_PROFILE_3_LAYER2_DENSITY;
             uniformFogDensity = DAILY_PROFILE_3_UNIFORM_FOG;
             clumpyFogDensity = DAILY_PROFILE_3_CLUMPY_FOG;
+            clumpyFogCoverage = DAILY_PROFILE_3_CLUMPY_FOG_COVERAGE;
             break;
         }
     #endif
@@ -293,6 +298,7 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity =   DAILY_PROFILE_4_LAYER2_DENSITY;
             uniformFogDensity = DAILY_PROFILE_4_UNIFORM_FOG;
             clumpyFogDensity = DAILY_PROFILE_4_CLUMPY_FOG;
+            clumpyFogCoverage = DAILY_PROFILE_4_CLUMPY_FOG_COVERAGE;
             break;
         }
     #endif
@@ -306,6 +312,7 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity =   DAILY_PROFILE_5_LAYER2_DENSITY;
             uniformFogDensity = DAILY_PROFILE_5_UNIFORM_FOG;
             clumpyFogDensity = DAILY_PROFILE_5_CLUMPY_FOG;
+            clumpyFogCoverage = DAILY_PROFILE_5_CLUMPY_FOG_COVERAGE;
             break;
         }
     #endif
@@ -319,83 +326,131 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity =   DAILY_PROFILE_6_LAYER2_DENSITY;
             uniformFogDensity = DAILY_PROFILE_6_UNIFORM_FOG;
             clumpyFogDensity = DAILY_PROFILE_6_CLUMPY_FOG;
+            clumpyFogCoverage = DAILY_PROFILE_6_CLUMPY_FOG_COVERAGE;
             break;
         }
     #endif
     }
 #endif
 
+#if TOD_FOG_AMOUNT > 0
+    vec4 timesOfDay = timesOfDay();
+    float todUniformFogDensity = dot(timesOfDay, vec4(Morning_Uniform_Fog, Noon_Uniform_Fog, Evening_Uniform_Fog, Night_Uniform_Fog));
+    float todClumpyFogDensity = dot(timesOfDay, vec4(Morning_Cloudy_Fog, Noon_Cloudy_Fog, Evening_Cloudy_Fog, Night_Cloudy_Fog));
+
+    // uniformFogDensity = mix(todUniformFogDensity * TOD_FOG_BOOST, uniformFogDensity, TOD_FOG_MIX);
+    // clumpyFogDensity = mix(todClumpyFogDensity * TOD_FOG_BOOST, clumpyFogDensity, TOD_FOG_MIX);
+    // clumpyFogCoverage = mix(todClumpyFogDensity * (TOD_FOG_BOOST * 0.5), clumpyFogDensity, TOD_FOG_MIX);
+    uniformFogDensity += todUniformFogDensity;
+    clumpyFogDensity += todClumpyFogDensity;
+    clumpyFogCoverage += (1.0 - todClumpyFogDensity) * 0.25;
+
+#endif
+
 if(rainStrength > 0.0001){
+    float weatherSmallCumulusCoverage = 0.0;
+    float weatherSmallCumulusDensity = 0.0;
+    float weatherLargeCumulusCoverage = 0.0;
+    float weatherLargeCumulusDensity  = 0.0;
+    float weatherAltostratusCoverage = 0.0;
+    float weatherAltostratusDensity = 0.0;
+    float weatherUniformFogDensity = 0.0;
+    float weatherClumpyFogDensity = 0.0;
+    float weatherClumpyFogCoverage = 0.0;
+
     #if USE_CUSTOM_DAILY_RAIN_PROFILE == 0
         int rainyWeatherProfile = int(RNG * 6.0);
 
         switch (rainyWeatherProfile){
             ///////////////////////// TEMPERATE WEATHER PROFILES
-            default : { // light rain
-                smallCumulusCoverage = 1.5;
-                smallCumulusDensity = 0.25;
-	            largeCumulusCoverage = 0.0;
-	            altostratusCoverage = 2.0;
-	            altostratusDensity = 0.1;
+            default: { 
+                // Light Rain
+                weatherSmallCumulusCoverage = 1.0;
+	            weatherLargeCumulusCoverage = 0.0;
+	            weatherAltostratusCoverage = 0.0;
 
-	            uniformFogDensity = 0.1;
-                clumpyFogDensity = 0.2;
+                weatherSmallCumulusDensity = 0.5;
+                weatherLargeCumulusDensity = 0.0;
+	            weatherAltostratusDensity = 0.0;
+
+	            weatherUniformFogDensity = 0.25;
+                weatherClumpyFogDensity = 0.15;
+                weatherClumpyFogCoverage = 0.75;
                 break;
             }
-            case 1: { // medium rain
-                smallCumulusCoverage = 0.0;
-	            largeCumulusCoverage = 1.5;
-                largeCumulusDensity = 0.25;
-	            altostratusCoverage = 1.5;
-	            altostratusDensity = 0.5;
+            case 1: {
+                // Light Rain
+                weatherSmallCumulusCoverage = 0.0;
+	            weatherLargeCumulusCoverage = 1.5;
+	            weatherAltostratusCoverage = 1.0;
 
-	            uniformFogDensity = 0.2;
-                clumpyFogDensity = 0.4;
+                weatherSmallCumulusDensity = 0.0;
+                weatherLargeCumulusDensity = 0.35;
+                weatherAltostratusDensity = 0.5;
+
+	            weatherUniformFogDensity = 0.1;
+                weatherClumpyFogDensity = 0.0;
+                weatherClumpyFogCoverage = 0.0;
                 break;
             }
-            case 2: { // heavy rain
-                smallCumulusCoverage = 1.5;
-                smallCumulusDensity = 0.25;
-	            largeCumulusCoverage = 1.5;
-                largeCumulusDensity = 0.25;
-	            altostratusCoverage = 1.3;
-	            altostratusDensity = 0.5;
+            case 2: {
+                // Medium Rain
+                weatherSmallCumulusCoverage = 1.5;
+	            weatherLargeCumulusCoverage = 1.0;
+	            weatherAltostratusCoverage = 1.2;
 
-	            uniformFogDensity = 0.4;
-                clumpyFogDensity = 0.3;
+                weatherSmallCumulusDensity = 0.65;
+                weatherLargeCumulusDensity = 0.6;
+	            weatherAltostratusDensity = 0.5;
+
+	            weatherUniformFogDensity = 0.2;
+                weatherClumpyFogDensity = 0.1;
+                weatherClumpyFogCoverage = 0.75;
                 break;
             }
-            case 3: { // heavy rain
-                smallCumulusCoverage = 1.5;
-                smallCumulusDensity = 0.25;
-	            largeCumulusCoverage = 1.5;
-                largeCumulusDensity = 0.25;
-	            altostratusCoverage = 1.3;
-	            altostratusDensity = 0.5;
+            case 3: {
+                // Medium Rain
+                weatherSmallCumulusCoverage = 0.0;
+	            weatherLargeCumulusCoverage = 1.2;
+	            weatherAltostratusCoverage = 1.5;
 
-	            uniformFogDensity = 0.1;
-                clumpyFogDensity = 0.8;
+                weatherSmallCumulusDensity = 0.0;
+                weatherLargeCumulusDensity = 1.0;
+	            weatherAltostratusDensity = 0.8;
+
+	            weatherUniformFogDensity = 0.1;
+                weatherClumpyFogDensity = 0.2;
+                weatherClumpyFogCoverage = 0.75;
                 break;
             }
-            case 4: { // medium rain
-                smallCumulusCoverage = 0.0;
-	            largeCumulusCoverage = 1.5;
-                largeCumulusDensity = 0.25;
-	            altostratusCoverage = 2.0;
-	            altostratusDensity = 0.3;
+            case 4: {
+                // Heavy Rain (this)
+                weatherSmallCumulusCoverage = 0.1;
+	            weatherLargeCumulusCoverage = 1.5;
+                weatherAltostratusCoverage = 1.8;
 
-	            uniformFogDensity = 0.2;
-                clumpyFogDensity = 0.2;
+                weatherSmallCumulusDensity = 0.8;
+                weatherLargeCumulusDensity = 0.8;
+	            weatherAltostratusDensity = 0.5;
+
+	            weatherUniformFogDensity = 0.25;
+                weatherClumpyFogDensity = 0.1;
+                weatherClumpyFogCoverage = 0.5;
                 break;
             }
-            case 5: { // light rain
-                smallCumulusCoverage = 0.0;
-	            largeCumulusCoverage = 1.8;
-                largeCumulusDensity = 0.1;
-	            altostratusCoverage = 0.0;
+            case 5: {
+                // Heavy Rain
+                weatherSmallCumulusCoverage = 1.7;
+	            weatherLargeCumulusCoverage = 1.0;
+	            weatherAltostratusCoverage = 1.0;
 
-	            uniformFogDensity = 0.1;
-                clumpyFogDensity = 0.3;
+                weatherSmallCumulusDensity = 0.8;
+	            weatherLargeCumulusDensity = 0.5;
+                weatherAltostratusDensity = 0.5;
+
+	            weatherUniformFogDensity = 0.25;
+                weatherClumpyFogDensity = 0.1;
+                weatherClumpyFogCoverage = 0.8;
                 break;
             }
         }
@@ -405,66 +460,84 @@ if(rainStrength > 0.0001){
 
         switch (customRainyWeatherProfile){
             default : {
-                smallCumulusCoverage = RAINY_PROFILE_1_LAYER0_COVERAGE;
-                largeCumulusCoverage = RAINY_PROFILE_1_LAYER1_COVERAGE;
-                altostratusCoverage =  RAINY_PROFILE_1_LAYER2_COVERAGE;
-                smallCumulusDensity =  RAINY_PROFILE_1_LAYER0_DENSITY;
-                largeCumulusDensity =  RAINY_PROFILE_1_LAYER1_DENSITY;
-                altostratusDensity =   RAINY_PROFILE_1_LAYER2_DENSITY;
+                weatherSmallCumulusCoverage = RAINY_PROFILE_1_LAYER0_COVERAGE;
+                weatherLargeCumulusCoverage = RAINY_PROFILE_1_LAYER1_COVERAGE;
+                weatherAltostratusCoverage =  RAINY_PROFILE_1_LAYER2_COVERAGE;
+                weatherSmallCumulusDensity =  RAINY_PROFILE_1_LAYER0_DENSITY;
+                weatherLargeCumulusDensity =  RAINY_PROFILE_1_LAYER1_DENSITY;
+                weatherAltostratusDensity =   RAINY_PROFILE_1_LAYER2_DENSITY;
+                weatherUniformFogDensity = RAINY_PROFILE_1_UNIFORM_FOG;
+                weatherClumpyFogDensity = RAINY_PROFILE_1_CLUMPY_FOG;
+                weatherClumpyFogCoverage = RAINY_PROFILE_1_CLUMPY_FOG_COVERAGE;
                 break;
             }
         #if USE_CUSTOM_DAILY_RAIN_PROFILE >= 2
             case 1: {
-                smallCumulusCoverage = RAINY_PROFILE_2_LAYER0_COVERAGE;
-                largeCumulusCoverage = RAINY_PROFILE_2_LAYER1_COVERAGE;
-                altostratusCoverage =  RAINY_PROFILE_2_LAYER2_COVERAGE;
-                smallCumulusDensity =  RAINY_PROFILE_2_LAYER0_DENSITY;
-                largeCumulusDensity =  RAINY_PROFILE_2_LAYER1_DENSITY;
-                altostratusDensity =   RAINY_PROFILE_2_LAYER2_DENSITY;
+                weatherSmallCumulusCoverage = RAINY_PROFILE_2_LAYER0_COVERAGE;
+                weatherLargeCumulusCoverage = RAINY_PROFILE_2_LAYER1_COVERAGE;
+                weatherAltostratusCoverage =  RAINY_PROFILE_2_LAYER2_COVERAGE;
+                weatherSmallCumulusDensity =  RAINY_PROFILE_2_LAYER0_DENSITY;
+                weatherLargeCumulusDensity =  RAINY_PROFILE_2_LAYER1_DENSITY;
+                weatherAltostratusDensity =   RAINY_PROFILE_2_LAYER2_DENSITY;
+                weatherUniformFogDensity = RAINY_PROFILE_2_UNIFORM_FOG;
+                weatherClumpyFogDensity = RAINY_PROFILE_2_CLUMPY_FOG;
+                weatherClumpyFogCoverage = RAINY_PROFILE_2_CLUMPY_FOG_COVERAGE;
                 break;
             }
         #endif
         #if USE_CUSTOM_DAILY_RAIN_PROFILE >= 3
             case 2: {
-                smallCumulusCoverage = RAINY_PROFILE_3_LAYER0_COVERAGE;
-                largeCumulusCoverage = RAINY_PROFILE_3_LAYER1_COVERAGE;
-                altostratusCoverage =  RAINY_PROFILE_3_LAYER2_COVERAGE;
-                smallCumulusDensity =  RAINY_PROFILE_3_LAYER0_DENSITY;
-                largeCumulusDensity =  RAINY_PROFILE_3_LAYER1_DENSITY;
-                altostratusDensity =   RAINY_PROFILE_3_LAYER2_DENSITY;
+                weatherSmallCumulusCoverage = RAINY_PROFILE_3_LAYER0_COVERAGE;
+                weatherLargeCumulusCoverage = RAINY_PROFILE_3_LAYER1_COVERAGE;
+                weatherAltostratusCoverage =  RAINY_PROFILE_3_LAYER2_COVERAGE;
+                weatherSmallCumulusDensity =  RAINY_PROFILE_3_LAYER0_DENSITY;
+                weatherLargeCumulusDensity =  RAINY_PROFILE_3_LAYER1_DENSITY;
+                weatherAltostratusDensity =   RAINY_PROFILE_3_LAYER2_DENSITY;
+                weatherUniformFogDensity = RAINY_PROFILE_3_UNIFORM_FOG;
+                weatherClumpyFogDensity = RAINY_PROFILE_3_CLUMPY_FOG;
+                weatherClumpyFogCoverage = RAINY_PROFILE_3_CLUMPY_FOG_COVERAGE;
                 break;
             }
         #endif
         #if USE_CUSTOM_DAILY_RAIN_PROFILE >= 4
             case 3: {
-                smallCumulusCoverage = RAINY_PROFILE_4_LAYER0_COVERAGE;
-                largeCumulusCoverage = RAINY_PROFILE_4_LAYER1_COVERAGE;
-                altostratusCoverage =  RAINY_PROFILE_4_LAYER2_COVERAGE;
-                smallCumulusDensity =  RAINY_PROFILE_4_LAYER0_DENSITY;
-                largeCumulusDensity =  RAINY_PROFILE_4_LAYER1_DENSITY;
-                altostratusDensity =   RAINY_PROFILE_4_LAYER2_DENSITY;
+                weatherSmallCumulusCoverage = RAINY_PROFILE_4_LAYER0_COVERAGE;
+                weatherLargeCumulusCoverage = RAINY_PROFILE_4_LAYER1_COVERAGE;
+                weatherAltostratusCoverage =  RAINY_PROFILE_4_LAYER2_COVERAGE;
+                weatherSmallCumulusDensity =  RAINY_PROFILE_4_LAYER0_DENSITY;
+                weatherLargeCumulusDensity =  RAINY_PROFILE_4_LAYER1_DENSITY;
+                weatherAltostratusDensity =   RAINY_PROFILE_4_LAYER2_DENSITY;
+                weatherUniformFogDensity = RAINY_PROFILE_4_UNIFORM_FOG;
+                weatherClumpyFogDensity = RAINY_PROFILE_4_CLUMPY_FOG;
+                weatherClumpyFogCoverage = RAINY_PROFILE_4_CLUMPY_FOG_COVERAGE;
                 break;
             }
         #endif
         #if USE_CUSTOM_DAILY_RAIN_PROFILE >= 5
             case 4: {
-                smallCumulusCoverage = RAINY_PROFILE_5_LAYER0_COVERAGE;
-                largeCumulusCoverage = RAINY_PROFILE_5_LAYER1_COVERAGE;
-                altostratusCoverage =  RAINY_PROFILE_5_LAYER2_COVERAGE;
-                smallCumulusDensity =  RAINY_PROFILE_5_LAYER0_DENSITY;
-                largeCumulusDensity =  RAINY_PROFILE_5_LAYER1_DENSITY;
-                altostratusDensity =   RAINY_PROFILE_5_LAYER2_DENSITY;
+                weatherSmallCumulusCoverage = RAINY_PROFILE_5_LAYER0_COVERAGE;
+                weatherLargeCumulusCoverage = RAINY_PROFILE_5_LAYER1_COVERAGE;
+                weatherAltostratusCoverage =  RAINY_PROFILE_5_LAYER2_COVERAGE;
+                weatherSmallCumulusDensity =  RAINY_PROFILE_5_LAYER0_DENSITY;
+                weatherLargeCumulusDensity =  RAINY_PROFILE_5_LAYER1_DENSITY;
+                weatherAltostratusDensity =   RAINY_PROFILE_5_LAYER2_DENSITY;
+                weatherUniformFogDensity = RAINY_PROFILE_5_UNIFORM_FOG;
+                weatherClumpyFogDensity = RAINY_PROFILE_5_CLUMPY_FOG;
+                weatherClumpyFogCoverage = RAINY_PROFILE_5_CLUMPY_FOG_COVERAGE;
                 break;
             }
         #endif
         #if USE_CUSTOM_DAILY_RAIN_PROFILE >= 6
             case 5 : {
-                smallCumulusCoverage = RAINY_PROFILE_6_LAYER0_COVERAGE;
-                largeCumulusCoverage = RAINY_PROFILE_6_LAYER1_COVERAGE;
-                altostratusCoverage =  RAINY_PROFILE_6_LAYER2_COVERAGE;
-                smallCumulusDensity =  RAINY_PROFILE_6_LAYER0_DENSITY;
-                largeCumulusDensity =  RAINY_PROFILE_6_LAYER1_DENSITY;
-                altostratusDensity =   RAINY_PROFILE_6_LAYER2_DENSITY;
+                weatherSmallCumulusCoverage = RAINY_PROFILE_6_LAYER0_COVERAGE;
+                weatherLargeCumulusCoverage = RAINY_PROFILE_6_LAYER1_COVERAGE;
+                weatherAltostratusCoverage =  RAINY_PROFILE_6_LAYER2_COVERAGE;
+                weatherSmallCumulusDensity =  RAINY_PROFILE_6_LAYER0_DENSITY;
+                weatherLargeCumulusDensity =  RAINY_PROFILE_6_LAYER1_DENSITY;
+                weatherAltostratusDensity =   RAINY_PROFILE_6_LAYER2_DENSITY;
+                weatherUniformFogDensity = RAINY_PROFILE_6_UNIFORM_FOG;
+                weatherClumpyFogDensity = RAINY_PROFILE_6_CLUMPY_FOG;
+                weatherClumpyFogCoverage = RAINY_PROFILE_6_CLUMPY_FOG_COVERAGE;
                 break;
             }
         #endif
@@ -487,56 +560,72 @@ if(rainStrength > 0.0001){
                 break;
             }
             #if USE_CUSTOM_HOT_BIOME_RAIN_PROFILE == 0
-                case 3: {  // clear
-	                uniformFogDensity = 0.0;
-                    clumpyFogDensity = 0.0;
+                case 3: {  // dust storm
+                    localUniformFogDensity = 0.025;
+                    localClumpyFogDensity = 0.15;
+                    localClumpyFogCoverage = 0.75;
+                    localFogColor = vec3(0.95, 0.65, 0.35);
+
+	                weatherUniformFogDensity = 0.0;
+                    weatherClumpyFogDensity = 0.0;
+                    weatherClumpyFogCoverage = 0.0;
                     break;
                 }
-                case 4: { // dust storm
-                    LocalUniformFogDensity = 0.03;
-                    LocalClumpyFogDensity = 0.2;
-                    localFogColor = vec3(1.0,0.5,0.3);
+                case 4: { // sand storm
+                    localUniformFogDensity = 0.05;
+                    localClumpyFogDensity = 0.5;
+                    localClumpyFogCoverage = 0.65;
+                    localFogColor = vec3(0.95, 0.65, 0.35);
 
-	                uniformFogDensity = 0.0;
-                    clumpyFogDensity = 0.0;
+	                weatherUniformFogDensity = 0.0;
+                    weatherClumpyFogDensity = 0.0;
+                    weatherClumpyFogCoverage = 0.0;
                     break;
                 }
-                case 5: { // sand storm
-                    LocalUniformFogDensity = 0.08;
-                    LocalClumpyFogDensity = 0.5;
-                    localFogColor = vec3(1.0,0.3,0.1)*2.0;
+                case 5: { // heavy sand storm
+                    localUniformFogDensity = 0.05;
+                    localClumpyFogDensity = 0.3;
+                    localClumpyFogCoverage = 0.95;
+                    localFogColor = vec3(0.95, 0.65, 0.35);
 
-	                uniformFogDensity = 0.0;
-                    clumpyFogDensity = 0.0;
+	                weatherUniformFogDensity = 0.0;
+                    weatherClumpyFogDensity = 0.0;
+                    weatherClumpyFogCoverage = 0.0;
                     break;
                 }
             #endif
             #if USE_CUSTOM_COLD_BIOME_RAIN_PROFILE == 0
                 case 6: { // light snow
-                    LocalUniformFogDensity = 0.0085;
-                    LocalClumpyFogDensity = 0.0;
-                    localFogColor = vec3(0.4,0.6,1.0) * 5.0;
+                    localUniformFogDensity = 0.1;
+                    localClumpyFogDensity = 0.2;
+                    localClumpyFogCoverage = 0.05;
+                    localFogColor = vec3(1.25, 1.25, 1.25);
 
-	                uniformFogDensity = 0.0;
-                    clumpyFogDensity = 0.0;
+	                weatherUniformFogDensity = 0.0;
+                    weatherClumpyFogDensity = 0.0;
+                    weatherClumpyFogCoverage = 0.0;
                     break;
                 }
                 case 7: { // snow storm
-                    LocalUniformFogDensity = 0.03;
-                    LocalClumpyFogDensity = 0.2;
-                    localFogColor = vec3(0.4,0.6,1.0) * 5.0;
+                    localUniformFogDensity = 0.1;
+                    localClumpyFogDensity = 0.5;
+                    localClumpyFogCoverage = 0.05;
+                    localFogColor = vec3(1.5, 1.5, 1.5);
 
-	                uniformFogDensity = 0.0;
-                    clumpyFogDensity = 0.0;
+	                weatherUniformFogDensity = 0.0;
+                    weatherClumpyFogDensity = 0.0;
+                    weatherClumpyFogCoverage = 0.0;
                     break;
                 }
                 case 8: { // blizzard
-                    LocalUniformFogDensity = 0.07;
-                    LocalClumpyFogDensity = 1.0;
-                    localFogColor = vec3(0.4,0.6,1.0) * 5.0;
+                    localUniformFogDensity = 0.25;
+                    localClumpyFogDensity = 0.5;
+                    localClumpyFogCoverage = 0.25;
+                    localFogColor = vec3(1.5, 1.5, 1.5);
 
-	                uniformFogDensity = 0.0;
-                    clumpyFogDensity = 0.0;
+	                weatherUniformFogDensity = 0.0;
+                    weatherClumpyFogDensity = 0.0;
+                    weatherClumpyFogCoverage = 0.0;
                     break;
                 }
             #endif
@@ -544,30 +633,34 @@ if(rainStrength > 0.0001){
     #endif
     #if USE_CUSTOM_HOT_BIOME_RAIN_PROFILE > 0
         if(isInHotArea && isInNoRainFallEnviornment){
-	        uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.0;
+	        weatherUniformFogDensity = uniformFogDensity;
+            weatherClumpyFogDensity = clumpyFogDensity;
+            weatherClumpyFogCoverage = clumpyFogCoverage;
 
             int customHotBiomeRainyWeatherProfile = int(RNG * USE_CUSTOM_HOT_BIOME_RAIN_PROFILE);
 
             switch (customHotBiomeRainyWeatherProfile){
                 default : {
-                    LocalUniformFogDensity = HOT_BIOME_RAINY_PROFILE_1_UNIFORM_FOG_DENSITY;
-                    LocalClumpyFogDensity = HOT_BIOME_RAINY_PROFILE_1_CLUMPY_FOG_DENSITY;
+                    localUniformFogDensity = HOT_BIOME_RAINY_PROFILE_1_UNIFORM_FOG_DENSITY;
+                    localClumpyFogDensity = HOT_BIOME_RAINY_PROFILE_1_CLUMPY_FOG_DENSITY;
+                    localClumpyFogCoverage = HOT_BIOME_RAINY_PROFILE_1_CLUMPY_FOG_COVERAGE;
                     localFogColor = vec3(HOT_BIOME_RAINY_PROFILE_1_FOG_COLOR_R, HOT_BIOME_RAINY_PROFILE_1_FOG_COLOR_G, HOT_BIOME_RAINY_PROFILE_1_FOG_COLOR_B);
                     break;
                 }
             #if USE_CUSTOM_HOT_BIOME_RAIN_PROFILE >= 2
                 case 1: {
-                    LocalUniformFogDensity = HOT_BIOME_RAINY_PROFILE_2_UNIFORM_FOG_DENSITY;
-                    LocalClumpyFogDensity = HOT_BIOME_RAINY_PROFILE_2_CLUMPY_FOG_DENSITY;
+                    localUniformFogDensity = HOT_BIOME_RAINY_PROFILE_2_UNIFORM_FOG_DENSITY;
+                    localClumpyFogDensity = HOT_BIOME_RAINY_PROFILE_2_CLUMPY_FOG_DENSITY;
+                    localClumpyFogCoverage = HOT_BIOME_RAINY_PROFILE_2_CLUMPY_FOG_COVERAGE;
                     localFogColor = vec3(HOT_BIOME_RAINY_PROFILE_2_FOG_COLOR_R, HOT_BIOME_RAINY_PROFILE_2_FOG_COLOR_G, HOT_BIOME_RAINY_PROFILE_2_FOG_COLOR_B);
                     break;
                 }
             #endif
             #if USE_CUSTOM_HOT_BIOME_RAIN_PROFILE >= 3
                 case 2: {
-                    LocalUniformFogDensity = HOT_BIOME_RAINY_PROFILE_3_UNIFORM_FOG_DENSITY;
-                    LocalClumpyFogDensity = HOT_BIOME_RAINY_PROFILE_3_CLUMPY_FOG_DENSITY;
+                    localUniformFogDensity = HOT_BIOME_RAINY_PROFILE_3_UNIFORM_FOG_DENSITY;
+                    localClumpyFogDensity = HOT_BIOME_RAINY_PROFILE_3_CLUMPY_FOG_DENSITY;
+                    localClumpyFogCoverage = HOT_BIOME_RAINY_PROFILE_3_CLUMPY_FOG_COVERAGE;
                     localFogColor = vec3(HOT_BIOME_RAINY_PROFILE_3_FOG_COLOR_R, HOT_BIOME_RAINY_PROFILE_3_FOG_COLOR_G, HOT_BIOME_RAINY_PROFILE_3_FOG_COLOR_B);
                     break;
                 }
@@ -577,30 +670,34 @@ if(rainStrength > 0.0001){
     #endif
     #if USE_CUSTOM_COLD_BIOME_RAIN_PROFILE > 0
         if(isInColdArea && isInSnowFallEnviornment){
-	        uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.0;
+	        weatherUniformFogDensity = uniformFogDensity;
+            weatherClumpyFogDensity = clumpyFogDensity;
+            weatherClumpyFogCoverage = clumpyFogCoverage;
 
             int customHotBiomeRainyWeatherProfile = int(RNG * USE_CUSTOM_COLD_BIOME_RAIN_PROFILE);
             
             switch (customHotBiomeRainyWeatherProfile){
                 default : {
-                    LocalUniformFogDensity = COLD_BIOME_RAINY_PROFILE_1_UNIFORM_FOG_DENSITY;
-                    LocalClumpyFogDensity = COLD_BIOME_RAINY_PROFILE_1_CLUMPY_FOG_DENSITY;
+                    localUniformFogDensity = COLD_BIOME_RAINY_PROFILE_1_UNIFORM_FOG_DENSITY;
+                    localClumpyFogDensity = COLD_BIOME_RAINY_PROFILE_1_CLUMPY_FOG_DENSITY;
+                    localClumpyFogCoverage = COLD_BIOME_RAINY_PROFILE_1_CLUMPY_FOG_COVERAGE;
                     localFogColor = vec3(COLD_BIOME_RAINY_PROFILE_1_FOG_COLOR_R, COLD_BIOME_RAINY_PROFILE_1_FOG_COLOR_G, COLD_BIOME_RAINY_PROFILE_1_FOG_COLOR_B);
                     break;
                 }
             #if USE_CUSTOM_COLD_BIOME_RAIN_PROFILE >= 2
                 case 1: {
-                    LocalUniformFogDensity = COLD_BIOME_RAINY_PROFILE_2_UNIFORM_FOG_DENSITY;
-                    LocalClumpyFogDensity = COLD_BIOME_RAINY_PROFILE_2_CLUMPY_FOG_DENSITY;
+                    localUniformFogDensity = COLD_BIOME_RAINY_PROFILE_2_UNIFORM_FOG_DENSITY;
+                    localClumpyFogDensity = COLD_BIOME_RAINY_PROFILE_2_CLUMPY_FOG_DENSITY;
+                    localClumpyFogCoverage = COLD_BIOME_RAINY_PROFILE_2_CLUMPY_FOG_COVERAGE;
                     localFogColor = vec3(COLD_BIOME_RAINY_PROFILE_2_FOG_COLOR_R, COLD_BIOME_RAINY_PROFILE_2_FOG_COLOR_G, HCOLDBIOME_RAINY_PROFILE_2_FOG_COLOR_B);
                     break;
                 }
             #endif
             #if USE_CUSTOM_COLD_BIOME_RAIN_PROFILE >= 3
                 case 2: {
-                    LocalUniformFogDensity = COLD_BIOME_RAINY_PROFILE_3_UNIFORM_FOG_DENSITY;
-                    LocalClumpyFogDensity = COLD_BIOME_RAINY_PROFILE_3_CLUMPY_FOG_DENSITY;
+                    localUniformFogDensity = COLD_BIOME_RAINY_PROFILE_3_UNIFORM_FOG_DENSITY;
+                    localClumpyFogDensity = COLD_BIOME_RAINY_PROFILE_3_CLUMPY_FOG_DENSITY;
+                    localClumpyFogCoverage = COLD_BIOME_RAINY_PROFILE_3_CLUMPY_FOG_COVERAGE;
                     localFogColor = vec3(HCOLDBIOME_RAINY_PROFILE_3_FOG_COLOR_R, COLD_BIOME_RAINY_PROFILE_3_FOG_COLOR_G, COLD_BIOME_RAINY_PROFILE_3_FOG_COLOR_B);
                     break;
                 }
@@ -608,54 +705,73 @@ if(rainStrength > 0.0001){
             }
         }
     #endif
+
+    // Blend
+
+    smallCumulusCoverage = mix(smallCumulusCoverage, weatherSmallCumulusCoverage, 0.8);
+    smallCumulusDensity = mix(smallCumulusDensity, weatherSmallCumulusDensity, 0.8);
+    largeCumulusCoverage = mix(largeCumulusCoverage, weatherLargeCumulusCoverage, 0.8);
+    largeCumulusDensity = mix(largeCumulusDensity, weatherLargeCumulusDensity, 0.8);
+    altostratusCoverage = mix(altostratusCoverage, weatherAltostratusCoverage, 0.8);
+    altostratusDensity = mix(altostratusDensity, weatherAltostratusDensity, 0.8);
+
+    uniformFogDensity = clamp(uniformFogDensity + weatherUniformFogDensity, 0.0, 1.0);
+    clumpyFogDensity = clamp(clumpyFogDensity + weatherClumpyFogDensity, 0.0, 1.0);
+    clumpyFogCoverage = clamp(clumpyFogCoverage + weatherClumpyFogCoverage, 0.0, 1.0);
 }
 
-uniformFogDensity = max(uniformFogDensity, dailyUniformFog);
-clumpyFogDensity = max(clumpyFogDensity, dailyClumpyFog);
-
-float swampBlend = biomeEdgeBlend(cameraPosition, swampEdgePos, isInSwampBiomes);
-float jungleBlend = biomeEdgeBlend(cameraPosition, jungleEdgePos, isInJungleBiomes);
-
 #if USE_CUSTOM_SWAMP_CATEGORY_PROFILE == 0
-    if(swampBlend > 0.0){
-	    uniformFogDensity = mix(uniformFogDensity, 0.0, swampBlend);
-        clumpyFogDensity = mix(clumpyFogDensity, 0.0, swampBlend);
+    if(isInSwampBiomes){
+	    // uniformFogDensity = mix(uniformFogDensity, 0.0, swampBlend);
+        // clumpyFogDensity = mix(clumpyFogDensity, 0.0, swampBlend);
+        // clumpyFogCoverage = mix(clumpyFogCoverage, 0.0, swampBlend);
 
-        LocalUniformFogDensity = mix(LocalUniformFogDensity, 0.0, swampBlend);
-        LocalClumpyFogDensity = mix(LocalClumpyFogDensity, 0.05, swampBlend);
-        localFogColor = mix(localFogColor, vec3(0.9,1.0,0.85), swampBlend);
+        localUniformFogDensity = 0.0;
+        localClumpyFogDensity = 0.05;
+        localClumpyFogCoverage = 0.5;
+        localFogColor = vec3(0.8,0.95,0.8);
     }
 #endif
 #if USE_CUSTOM_SWAMP_CATEGORY_PROFILE == 1
-    if(swampBlend > 0.0){
-	    uniformFogDensity = mix(uniformFogDensity, 0.0, swampBlend);
-        clumpyFogDensity = mix(clumpyFogDensity, 0.0, swampBlend);
+    if(isInSwampBiomes){
+	    // uniformFogDensity = mix(uniformFogDensity, 0.0, swampBlend);
+        // clumpyFogDensity = mix(clumpyFogDensity, 0.0, swampBlend);
+        // clumpyFogCoverage = mix(clumpyFogCoverage, 0.0, swampBlend);
 
-        LocalUniformFogDensity = mix(LocalUniformFogDensity, CUSTOM_SWAMP_PROFILE_1_UNIFORM_FOG_DENSITY, swampBlend);
-        LocalClumpyFogDensity = mix(LocalClumpyFogDensity, CUSTOM_SWAMP_PROFILE_1_CLUMPY_FOG_DENSITY, swampBlend);
-        localFogColor = mix(localFogColor, vec3(CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_R, CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_G, CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_B), swampBlend);
+        localUniformFogDensity = CUSTOM_SWAMP_PROFILE_1_UNIFORM_FOG_DENSITY;
+        localClumpyFogDensity = CUSTOM_SWAMP_PROFILE_1_CLUMPY_FOG_DENSITY;
+        localClumpyFogCoverage = CUSTOM_SWAMP_PROFILE_1_CLUMPY_FOG_COVERAGE;
+        localFogColor = vec3(CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_R, CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_G, CUSTOM_SWAMP_PROFILE_1_FOG_COLOR_B);
     }
 #endif
 #if USE_CUSTOM_JUNGLE_CATEGORY_PROFILE == 0
-    if(jungleBlend > 0.0){
-	    uniformFogDensity = mix(uniformFogDensity, 0.01, jungleBlend);
-        clumpyFogDensity = mix(clumpyFogDensity, 0.02, jungleBlend);
+    if(isInJungleBiomes){
+	    // uniformFogDensity = mix(uniformFogDensity, 0.0, jungleBlend);
+        // clumpyFogDensity = mix(clumpyFogDensity, 0.0, jungleBlend);
+        // clumpyFogCoverage = mix(clumpyFogCoverage, 0.0, jungleBlend);
         
-        LocalUniformFogDensity = mix(LocalUniformFogDensity, 0.01, jungleBlend);
-        LocalClumpyFogDensity = mix(LocalClumpyFogDensity, 0.02, jungleBlend);
-        localFogColor = mix(localFogColor, vec3(0.8,1.0,0.85), jungleBlend);
+        localUniformFogDensity = 0.015;
+        localClumpyFogDensity = 0.3;
+        localClumpyFogCoverage = 0.0;
+        localFogColor = vec3(0.39, 0.6, 0.55);
     }
 #endif
 #if USE_CUSTOM_JUNGLE_CATEGORY_PROFILE == 1
-    if(jungleBlend > 0.0){
-	    uniformFogDensity = mix(uniformFogDensity, 0.1, jungleBlend);
-        clumpyFogDensity = mix(clumpyFogDensity, 0.1, jungleBlend);
+    if(isInJungleBiomes){
+	    // uniformFogDensity = mix(uniformFogDensity, 0.0, jungleBlend);
+        // clumpyFogDensity = mix(clumpyFogDensity, 0.0, jungleBlend);
+        // clumpyFogCoverage = mix(clumpyFogCoverage, 0.0, jungleBlend);
 
-        LocalUniformFogDensity = mix(LocalUniformFogDensity, CUSTOM_JUNGLE_PROFILE_1_UNIFORM_FOG_DENSITY, jungleBlend);
-        LocalClumpyFogDensity = mix(LocalClumpyFogDensity, CUSTOM_JUNGLE_PROFILE_1_CLUMPY_FOG_DENSITY, jungleBlend);
-        localFogColor = mix(localFogColor, vec3(CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_R, CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_G, CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_B), jungleBlend);
+        localUniformFogDensity = CUSTOM_JUNGLE_PROFILE_1_UNIFORM_FOG_DENSITY;
+        localClumpyFogDensity = CUSTOM_JUNGLE_PROFILE_1_CLUMPY_FOG_DENSITY;
+        localClumpyFogCoverage = CUSTOM_JUNGLE_PROFILE_1_CLUMPY_FOG_COVERAGE;
+        localFogColor = vec3(CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_R, CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_G, CUSTOM_JUNGLE_PROFILE_1_FOG_COLOR_B);
     }
 #endif
+
+if(localClumpyFogCoverage < 0.0) {
+    localClumpyFogCoverage = clumpyFogCoverage;
+}
 
 
 #define WRITE_CUSTOM_SCENE_CONTROLLER_PROFILES
@@ -668,8 +784,8 @@ flat varying struct sceneController {
   vec2 smallCumulus;
   vec2 largeCumulus;
   vec2 altostratus;
-  vec2 fog;
-  vec2 localFog;
+  vec3 fog;
+  vec3 localFog;
   vec3 localFogColor;
 } parameters;
 
@@ -678,8 +794,8 @@ vec3 writeSceneControllerParameters(
     vec2 smallCumulus,
 	vec2 largeCumulus,
 	vec2 altostratus,
-	vec2 fog,
-    vec2 localFog,
+	vec3 fog,
+    vec3 localFog,
     vec3 localFogColor
 ){
 
@@ -701,8 +817,8 @@ vec3 writeSceneControllerParameters(
 
     if(topLeft) data = vec3(smallCumulus.xy, largeCumulus.x);
     if(topMiddle) data = vec3(largeCumulus.y, altostratus.xy);
-    if(topRight) data = vec3(fog.xy, localFog.x);
-    if(middleLeft) data = vec3(localFog.y, 0.0, 0.0);
+    if(topRight) data = vec3(fog.xyz);
+    if(middleLeft) data = vec3(localFog.xy, localFog.z);
     if(middleMiddle) data = vec3(localFogColor.rgb);
     
 
@@ -722,8 +838,8 @@ void readSceneControllerParameters(
 	out vec2 smallCumulus,
 	out vec2 largeCumulus,
 	out vec2 altostratus,
-	out vec2 fog,
-    out vec2 localFog,
+	out vec3 fog,
+    out vec3 localFog,
     out vec3 localFogColor
 ){
     
@@ -732,14 +848,14 @@ void readSceneControllerParameters(
 	vec3 data1 = texelFetch2D(colortex,ivec2(1,3),0).rgb/150.0;
 	vec3 data2 = texelFetch2D(colortex,ivec2(2,3),0).rgb/150.0;
 	vec3 data3 = texelFetch2D(colortex,ivec2(3,3),0).rgb/150.0;
-	float data4 = texelFetch2D(colortex,ivec2(1,2),0).r/150.0;
+	vec3 data4 = texelFetch2D(colortex,ivec2(1,2),0).rgb/150.0;
 	vec3 data5 = texelFetch2D(colortex,ivec2(2,2),0).rgb/150.0; // this samples a color
 
 	smallCumulus = vec2(data1.x,data1.y);
 	largeCumulus = vec2(data1.z,data2.x);
 	altostratus = vec2(data2.y,data2.z);
-	fog = vec2(data3.x, data3.y);
-    localFog = vec2(data3.z, data4);
+	fog = vec3(data3.x, data3.y, data3.z);
+    localFog = vec3(data4.x, data4.y, data4.z);
     localFogColor = vec3(data5.r,data5.g,data5.b);
 }
 #endif

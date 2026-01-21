@@ -184,8 +184,8 @@ void main() {
 		parameters.smallCumulus.x, parameters.smallCumulus.y, 
 		parameters.largeCumulus.x, parameters.largeCumulus.y,
 		parameters.altostratus.x, parameters.altostratus.y,
-		parameters.fog.x, parameters.fog.y, 
-		parameters.localFog.x, parameters.localFog.y, parameters.localFogColor.rgb
+		parameters.fog.x, parameters.fog.y, parameters.fog.z,
+		parameters.localFog.x, parameters.localFog.y, parameters.localFog.z, parameters.localFogColor.rgb
 	);
 
 //////////////////////////////
