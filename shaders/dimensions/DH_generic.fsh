@@ -38,12 +38,7 @@ void main() {
 		float falloff = exp(-10.0 * (1.0-clamp(1.0 - playerPos.y/5000.0,0.0,1.0)));
 
 		#ifdef DH_OVERDRAW_PREVENTION
-			#if OVERDRAW_MAX_DISTANCE == 0
-				float overdrawDistance = 0.0;
-			#else
-				float overdrawDistance = OVERDRAW_MAX_DISTANCE - 16.0;
-			#endif
-
+			float overdrawDistance = 16.0;
 			float lodFadeLength = min(16.0, far);
 			float lodStart = far - lodFadeLength;
 			float drawStart = max(lodStart - overdrawDistance, 0.0);
@@ -56,6 +51,7 @@ void main() {
 			if (viewDist < drawStart + lodFadeLength) {
 				float dither = interleaved_gradientNoise();
 				float fade = clamp((viewDist - drawStart) / max(lodFadeLength, 0.0001), 0.0, 1.0);
+
 				if (dither > fade) {
 					discard;
 					return;
