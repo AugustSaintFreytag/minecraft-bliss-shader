@@ -5,6 +5,7 @@
 
 varying vec4 pos;
 varying vec4 gcolor;
+varying vec3 vNormal;
 
 uniform vec2 texelSize;
 uniform mat4 gbufferModelViewInverse;
@@ -14,6 +15,7 @@ uniform vec3 cameraPosition;
 uniform sampler2D colortex4;
 
 flat varying vec3 averageSkyCol_Clouds;
+flat varying vec3 lightSourceColor;
 
 
 #if DOF_QUALITY == 5
@@ -56,8 +58,10 @@ void main() {
 	
 	pos = viewPos;
 	gcolor = gl_Color;
+	vNormal = normalize(gl_NormalMatrix * gl_Normal);
 	
-	averageSkyCol_Clouds = texelFetch2D(colortex4,ivec2(0,37),0).rgb;
+	averageSkyCol_Clouds = texelFetch2D(colortex4, ivec2(0, 37), 0).rgb;
+	lightSourceColor = texelFetch2D(colortex4, ivec2(6, 37), 0).rgb;
 	
 	#if DOF_QUALITY == 5
 		vec2 jitter = clamp(jitter_offsets[frameCounter % 64], -1.0, 1.0);
