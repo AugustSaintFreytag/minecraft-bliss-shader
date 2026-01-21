@@ -340,6 +340,8 @@ vec2 SSRT_Shadows(vec3 viewPos, bool depthCheck, vec3 lightDir, float noise, boo
 	if (depthCheck) {
 		_near = LOD_NEARPLANE;
 		_far = LOD_FARPLANE;
+
+		samples = 32; // Bump samples to catch DH geometry at higher, imprecise distances.
 	}
     
     vec3 position = toClipSpace3_DH(viewPos, depthCheck) ;
@@ -348,7 +350,7 @@ vec2 SSRT_Shadows(vec3 viewPos, bool depthCheck, vec3 lightDir, float noise, boo
 	float rayLength = ((viewPos.z + lightDir.z * _far * sqrt(3.)) > -_near) ? (-_near - viewPos.z) / lightDir.z : _far * sqrt(3.);
 
     vec3 direction = toClipSpace3_DH(viewPos + lightDir*rayLength, depthCheck) - position;
-    direction.xyz = direction.xyz / max(max(abs(direction.x)/0.0005, abs(direction.y)/0.0005),400.0);	//fixed step size
+    direction.xyz = direction.xyz / max(max(abs(direction.x) / 0.0005, abs(direction.y) / 0.0005), 400.0);	// fixed step size
 	direction *= 6.0;
 
 	position.xy *= RENDER_SCALE;
@@ -366,13 +368,17 @@ vec2 SSRT_Shadows(vec3 viewPos, bool depthCheck, vec3 lightDir, float noise, boo
 		
 		#ifdef USING_LOD_MOD
 			float sampleDepth = 0.0;
+
 			if(depthCheck){
-				sampleDepth = texelFetch2D(LOD_DEPTHTEX1, ivec2(newPos.xy/texelSize),0).x;
-			}else{
-				sampleDepth = convertHandDepth_2(texelFetch2D(depthtex1, ivec2(newPos.xy/texelSize),0).x,hand);
+				float dhDepthOpaque = texelFetch2D(LOD_DEPTHTEX1, ivec2(newPos.xy/texelSize), 0).x;
+				float dhDepthAny = texelFetch2D(LOD_DEPTHTEX0, ivec2(newPos.xy/texelSize), 0).x;
+
+				sampleDepth = min(dhDepthOpaque, dhDepthAny);
+			} else {
+				sampleDepth = convertHandDepth_2(texelFetch2D(depthtex1, ivec2(newPos.xy/texelSize), 0).x, hand);
 			}
 		#else
-			float sampleDepth = convertHandDepth_2(texelFetch2D(depthtex1, ivec2(newPos.xy/texelSize),0).x,hand);
+			float sampleDepth = convertHandDepth_2(texelFetch2D(depthtex1, ivec2(newPos.xy/texelSize), 0).x, hand);
 		#endif
 
 		if(sampleDepth < newPos.z){
