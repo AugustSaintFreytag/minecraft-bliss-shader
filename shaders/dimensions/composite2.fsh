@@ -635,7 +635,8 @@ void main() {
 
 #ifdef OVERWORLD_SHADER
 	float sunVisibility = godrayTest(viewPos0, normalize(sunVec * lightCol.a), BN.x, z0);
-	directLightColorVL *= clamp(sunVisibility, 0.0, 1.0);
+	float sunEdgeAttenuation = mix(0.5, 1.0, smoothstep(0.0, 0.08, abs(sunElevation)));
+	directLightColorVL *= clamp(sunVisibility, 0.0, 1.0) * sunEdgeAttenuation;
 #endif
 	
 	// #ifdef DISTANT_HORIZONS
