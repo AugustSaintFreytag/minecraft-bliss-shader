@@ -559,7 +559,16 @@ void main() {
   // ensure that bloomy fog mask in this VLBehindTranslucents.a does not darken outside of glass areas.
   if(TranslucentShader.a > 0.0 &&  TranslucentShader.a < 1.0) color.rgb = color.rgb * VLBehindTranslucents.a + VLBehindTranslucents.rgb;
   // to avoid bloomy fog applying to the surface of water, and the clouds, swap between high and low quality VL buffers.
-  bloomyFogMult *= isWater ? temporallyFilteredVL.a * 0.75 + 0.25 : (TranslucentShader.a < 0.9995 ? VLBehindTranslucents.a * 0.75 + 0.25 : 1.0);
+  float vlAlphaBase = temporallyFilteredVL.a * 0.75 + 0.25;
+  float vlAlphaBehindTranslucents = VLBehindTranslucents.a * 0.75 + 0.25;
+  if(isWater) {
+    bloomyFogMult *= vlAlphaBase;
+  } else if(TranslucentShader.a < 0.9995) {
+    bloomyFogMult *= vlAlphaBehindTranslucents;
+  } else {
+    // opaque forward objects (DH generic) should still receive bloomy fog
+    bloomyFogMult *= vlAlphaBase;
+  }
 
   // blend border fog. be sure to blend before and after forward rendered color blends.
   #if defined BorderFog && defined OVERWORLD_SHADER
