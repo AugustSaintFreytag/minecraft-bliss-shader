@@ -10,6 +10,7 @@
 #include "/lib/entities.glsl"
 #include "/lib/items.glsl"
 #include "/lib/TAA_jitter.glsl"
+#include "/lib/waving_utils.glsl"
 
 #if defined HAND
 	#undef POM
@@ -60,7 +61,7 @@ uniform float frameTimeCounter;
 
 uniform sampler2D noisetex;//depth
 
-const float PI48 = 150.796447372*WAVY_SPEED;
+float PI48 = 150.796447372*getWavySpeed();
 float pi2wt = PI48*frameTimeCounter;
 
 #if defined HAND
@@ -86,7 +87,6 @@ vec4 toClipSpace3(vec3 viewSpacePosition) {
 }
 
 vec2 calcWave(in vec3 pos) {
-
     float magnitude = abs(sin(dot(vec4(frameTimeCounter, pos),vec4(1.0,0.005,0.005,0.005)))*0.5+0.72)*0.013;
 	vec2 ret = (sin(pi2wt*vec2(0.0063,0.0015)*4. - pos.xz + pos.y*0.05)+0.1)*magnitude;
 
@@ -94,13 +94,20 @@ vec2 calcWave(in vec3 pos) {
 }
 
 vec3 calcMovePlants(in vec3 pos) {
-    vec2 move1 = calcWave(pos );
-	float move1y = -length(move1);
-   return vec3(move1.x,move1y,move1.y)*5.*WAVY_STRENGTH;
+    vec2 move1 = calcWave(pos);
+    float move1y = -length(move1);
+
+    return vec3(move1.x,move1y,move1.y)*5.*getWavyStrength();
+}
+
+vec3 __original_calcWaveLeaves(in vec3 pos, in float fm, in float mm, in float ma, in float f0, in float f1, in float f2, in float f3, in float f4, in float f5) {
+    float magnitude = abs(sin(dot(vec4(frameTimeCounter, pos),vec4(1.0,0.005,0.005,0.005)))*0.5+0.72)*0.013;
+	vec3 ret = (sin(pi2wt*vec3(0.0063,0.0224,0.0015)*1.5 - pos))*magnitude;
+
+    return ret;
 }
 
 vec3 calcWaveLeaves(in vec3 pos, in float fm, in float mm, in float ma, in float f0, in float f1, in float f2, in float f3, in float f4, in float f5) {
-
     float magnitude = abs(sin(dot(vec4(frameTimeCounter, pos),vec4(1.0,0.005,0.005,0.005)))*0.5+0.72)*0.013;
 	vec3 ret = (sin(pi2wt*vec3(0.0063,0.0224,0.0015)*1.5 - pos))*magnitude;
 
@@ -108,8 +115,19 @@ vec3 calcWaveLeaves(in vec3 pos, in float fm, in float mm, in float ma, in float
 }
 
 vec3 calcMoveLeaves(in vec3 pos, in float f0, in float f1, in float f2, in float f3, in float f4, in float f5, in vec3 amp1, in vec3 amp2) {
-    vec3 move1 = calcWaveLeaves(pos      , 0.0054, 0.0400, 0.0400, 0.0127, 0.0089, 0.0114, 0.0063, 0.0224, 0.0015) * amp1;
-    return move1*5.*WAVY_STRENGTH;
+    vec3 blockPos = floor(pos) + vec3(0.5);
+
+    // Stable per-block hash and a simple checkerboard stagger.
+    float hash = fract(sin(dot(blockPos, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float stagger = mod(blockPos.x + blockPos.z, 2.0) * 2.0 - 1.0; // -1 or +1
+
+    vec3 move1 = calcWaveLeaves(pos, 0.0054, 0.0400, 0.0400, 0.0127, 0.0089, 0.0114, 0.0063, 0.0224, 0.0015) * amp1;
+
+    // Very small static offset to reduce z-fighting/overlap.
+    vec3 jitter = vec3(fract(hash * 1.3) - 0.5, fract(hash * 2.1) - 0.5, fract(hash * 3.7) - 0.5);
+    vec3 staticOffset = jitter * 0.0025 + vec3(0.0, stagger * 0.0015, 0.0);
+
+    return move1 * 5.0 * getWavyStrength() + staticOffset;
 }
 
 float densityAtPos(in vec3 pos){
