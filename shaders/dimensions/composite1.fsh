@@ -1114,6 +1114,16 @@ void main() {
 			
 			#ifdef SCREENSPACE_CONTACT_SHADOWS
 				vec2 SS_directLight = SSRT_Shadows(toScreenSpace_DH(texcoord/RENDER_SCALE, z, DH_depth1), isDHrange, normalize(WsunVec*mat3(gbufferModelViewInverse)), ig_noise, sunSSS_density > 0.0 && shadowMapFalloff2 < 1.0, hand);
+				
+				if (!isDHrange) {
+					float sssFar = farPlane > 0.0 ? min(far, farPlane) : far;
+					float sssFadeStart = max(sssFar - 148.0, 0.0);
+					float sssFadeEnd = sssFar;
+					float sssDist = length(feetPlayerPos);
+					float sssDistanceAtten = smoothstep(sssFadeStart, sssFadeEnd, sssDist);
+					ShadowBlockerDepth = max(ShadowBlockerDepth, sssDistanceAtten * 0.2);
+				}
+				
 				// combine shadowmap with screenspace shadows.
 				shadowColor *= SS_directLight.r;
 			#else
