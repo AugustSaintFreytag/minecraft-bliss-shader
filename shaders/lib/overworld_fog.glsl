@@ -172,7 +172,7 @@ vec3 sampleShadowmapVL(vec3 start, vec3 shadowMapRayStartPos, vec3 shadowMapRayP
 			shadowColor = vec3(shadow2D(shadowtex0, shadowPos).x);
 
 			if(shadow2D(shadowtex1, shadowPos).x > shadowPos.z && shadowColor.x < 1.0){
-				vec4 translucentShadow = texture2D(shadowcolor0, shadowPos.xy);
+				vec4 translucentShadow = texture(shadowcolor0, shadowPos.xy);
 				if(translucentShadow.a < 0.9) shadowColor = normalize(translucentShadow.rgb+0.0001);
 			}
 		#else
@@ -303,6 +303,10 @@ vec4 GetVolumetricFog(
 		rayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + d*rayStartPos;
 		localRayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + d*localRayStartPos;
 		
+		#ifdef FAKE_PLANET
+			LightColor = getPlanetAbsorb(rayProgress, WsunVec, colortex4);
+		#endif
+
 		vec3 shadows = getShadows(mix(rayProgress, localRayProgress, localFogExists), sunVector, d, start, shadowMapRayStartPos, shadowMapRayProgress, flatPhase, sunPhase);
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL

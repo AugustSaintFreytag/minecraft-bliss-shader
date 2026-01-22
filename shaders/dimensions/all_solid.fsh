@@ -30,7 +30,7 @@ flat varying float EMISSIVE;
 flat varying int LIGHTNING;
 flat varying int PORTAL;
 flat varying int SIGN;
-flat varying float HELD_ITEM_BRIGHTNESS;
+// flat varying float HELD_ITEM_BRIGHTNESS;
 
 uniform sampler2D texture;
 uniform sampler2D normals;
@@ -40,7 +40,7 @@ uniform sampler2D depthtex0;
 uniform sampler2D noisetex;//depth
 
 uniform vec2 texelSize;
-
+uniform float alphaTestRef;
 uniform float near;
 uniform float far;
 uniform float wetness;
@@ -105,9 +105,9 @@ float R2_dither(){
 
 float blueNoise(){
 	#if TAA_MODE > 0
-  		return fract(texelFetch2D(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887 * frameCounter);
+  		return fract(texelFetch(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887 * frameCounter);
 	#else
-		return fract(texelFetch2D(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887);
+		return fract(texelFetch(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887);
 	#endif
 }
 
@@ -228,7 +228,7 @@ vec4 texture2D_POMSwitch(
 	if(ifPOM){
 		return texture2DGradARB(sampler, lightmapCoord, dcdxdcdy.xy, dcdxdcdy.zw);
 	}else{
-		return texture2D(sampler, lightmapCoord, LOD);
+		return texture(sampler, lightmapCoord, LOD);
 	}
 }
 
@@ -291,34 +291,6 @@ void main() {
 	#endif
 
 	vec3 worldpos = playerpos + cameraPosition;
-
-	float torchlightmap = lmtexcoord.z;
-
-	#if defined Hand_Held_lights && !defined LPV_ENABLED
-		#ifdef IS_IRIS
-			vec3 playerCamPos = eyePosition;
-		#else
-			vec3 playerCamPos = cameraPosition;
-		#endif
-
-		#ifdef VIVECRAFT
-        	if (vivecraftIsVR) { 
-				playerCamPos = cameraPosition - vivecraftRelativeMainHandPos;
-			}
-		#endif
-
-		// if(HELD_ITEM_BRIGHTNESS > 0.0) torchlightmap = max(torchlightmap, HELD_ITEM_BRIGHTNESS * clamp( pow(max(1.0-length(worldpos-playerCamPos)/HANDHELD_LIGHT_RANGE,0.0),1.5),0.0,1.0));
-		if(HELD_ITEM_BRIGHTNESS > 0.0){ 
-			
-			float pointLight = clamp(1.0-(length(worldpos-playerCamPos)-1)/HANDHELD_LIGHT_RANGE,0.0,1.0);
-			
-			torchlightmap = mix(torchlightmap, HELD_ITEM_BRIGHTNESS, pointLight);
-		}
-
-		#ifdef HAND
-			torchlightmap *= 0.9;
-		#endif
-	#endif
 	
 	float lightmap = clamp( (lmtexcoord.w-0.9) * 10.0,0.,1.);
 	vec2 adjustedTexCoord = lmtexcoord.xy;
@@ -401,7 +373,9 @@ void main() {
 	////////////////////////////////	ALBEDO		////////////////////////////////
 	//////////////////////////////// 				//////////////////////////////// 
 	float textureLOD = bias();
-	vec4 Albedo = texture2D_POMSwitch(texture, adjustedTexCoord.xy, vec4(dcdx,dcdy), ifPOM, textureLOD) * color;
+	vec4 Albedo = texture2D_POMSwitch(texture, adjustedTexCoord.xy, vec4(dcdx,dcdy), ifPOM, textureLOD);
+	Albedo *= color;
+	// if(Albedo.a < max(alphaTestRef,0.1)){discard; return;}else{}
 
 	#if defined HAND
 		if (Albedo.a < 0.1) discard;
@@ -448,7 +422,7 @@ void main() {
 			float verticalGradient = (i + blueNoise())/steps ;
 			float verticalGradient2 = exp(-7*(1-verticalGradient*verticalGradient));
 		
-			float density = max(max(verticalGradient - texture2D(noisetex, uv/256.0 + animation.xy).b*0.5,0.0) - (1.0-texture2D(noisetex, uv/32.0 + animation.xx).r) * (0.4 + 0.1 * (texture2D(noisetex, uv/10.0 - animation.yy).b)),0.0);
+			float density = max(max(verticalGradient - texture(noisetex, uv/256.0 + animation.xy).b*0.5,0.0) - (1.0-texture(noisetex, uv/32.0 + animation.xx).r) * (0.4 + 0.1 * (texture(noisetex, uv/10.0 - animation.yy).b)),0.0);
 		
 			float volumeCoeff = exp(-density*(i+1));
 			
@@ -616,7 +590,7 @@ void main() {
 	#endif
 
 	#ifdef WORLD
-		vec2 PackLightmaps = vec2(torchlightmap, lmtexcoord.w);
+		vec2 PackLightmaps = vec2(lmtexcoord.z, lmtexcoord.w);
 		
 		// special curve to give more precision on high/low values of the gradient. this curve will be inverted after sampling and decoding.
 		// PackLightmaps = pow(1.0-pow(1.0-PackLightmaps,vec2(0.5)),vec2(0.5));

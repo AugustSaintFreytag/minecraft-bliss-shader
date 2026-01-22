@@ -58,7 +58,7 @@ float interleaved_gradientNoise(){
 }
 
 float blueNoise(){
-  return fract(texelFetch2D(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887 * frameCounter);
+  return fract(texelFetch(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887 * frameCounter);
 }
 
 float convertHandDepth_2(in float depth, bool hand) {
@@ -119,7 +119,7 @@ vec3 doMotionBlur(vec2 texcoord, float depth, float noise, bool hand){
 	for (int i = 0; i < int(samples); i++) {
 
     texcoord += velocity;
-    color += texture2D(colortex7, clamp(texcoord, screenEdges, 1.0-screenEdges)).rgb;
+    color += texture(colortex7, clamp(texcoord,screenEdges,1.0-screenEdges)).rgb;
 
   }
 
@@ -143,10 +143,11 @@ float doVignette( in vec2 texcoord, in float noise){
 
 void main() {
   
-  float noise = blueNoise();
+  float noise = interleaved_gradientNoise();
+  vec2 texcoord_offset = texcoord;
 
-    float depth = texture2D(depthtex0, texcoord*RENDER_SCALE).r;
   #if MOTION_BLUR_AMOUNT > 0
+    float depth = texture(depthtex0, texcoord_offset*RENDER_SCALE).r;
     bool hand = depth < 0.56;
     float depth2 = convertHandDepth_2(depth, hand);
 

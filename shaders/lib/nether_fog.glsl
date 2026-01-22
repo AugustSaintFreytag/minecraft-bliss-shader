@@ -8,7 +8,7 @@ float densityAtPosFog(in vec3 pos){
 	f = (f*f) * (3.-2.*f);
 	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0,193.0);
 	vec2 coord =  uv / 512.0;
-	vec2 xy = texture2D(noisetex, coord).yx;
+	vec2 xy = texture(noisetex, coord).yx;
 	return mix(xy.r,xy.g, f.y);
 }
 
@@ -17,7 +17,7 @@ float cloudVol(in vec3 pos){
 
     float Wind = pow(max(pos.y-30,0.0) / 15.0,2.1);
 
-	float Plumes = texture2D(noisetex, (samplePos.xz + Wind)/256.0).b;
+	float Plumes = texture(noisetex, (samplePos.xz + Wind)/256.0).b;
 	float floorPlumes = clamp(0.3 - exp(Plumes * -6),0,1);
 	Plumes *= Plumes;
 
@@ -115,21 +115,21 @@ vec4 GetVolumetricFog(
 			color += (ceilingSmoke - ceilingSmoke*ceilingSmokeVolumeCoeff) * (absorbance*0.5+0.5);
 			absorbance *= ceilingSmokeVolumeCoeff;
 
-			#if defined FLASHLIGHT && defined FLASHLIGHT_FOG_ILLUMINATION
-				vec3 shiftedViewPos = mat3(gbufferModelView)*(progressW-cameraPosition) + vec3(-0.25, 0.2, 0.0);
-				vec3 shiftedPlayerPos = mat3(gbufferModelViewInverse) * shiftedViewPos;
-				vec2 scaledViewPos = shiftedViewPos.xy / max(-shiftedViewPos.z - 0.5, 1e-7);
-				float linearDistance = length(shiftedPlayerPos);
-				float shiftedLinearDistance = length(scaledViewPos);
+			// #if defined FLASHLIGHT && defined FLASHLIGHT_FOG_ILLUMINATION
+			// 	vec3 shiftedViewPos = mat3(gbufferModelView)*(progressW-cameraPosition) + vec3(-0.25, 0.2, 0.0);
+			// 	vec3 shiftedPlayerPos = mat3(gbufferModelViewInverse) * shiftedViewPos;
+			// 	vec2 scaledViewPos = shiftedViewPos.xy / max(-shiftedViewPos.z - 0.5, 1e-7);
+			// 	float linearDistance = length(shiftedPlayerPos);
+			// 	float shiftedLinearDistance = length(scaledViewPos);
 
-				float lightFalloff = 1.0 - clamp(1.0-linearDistance/FLASHLIGHT_RANGE, -0.999,1.0);
-				lightFalloff = max(exp(-30.0 * lightFalloff),0.0);
-				float projectedCircle = clamp(1.0 - shiftedLinearDistance*FLASHLIGHT_SIZE,0.0,1.0);
+			// 	float lightFalloff = 1.0 - clamp(1.0-linearDistance/FLASHLIGHT_RANGE, -0.999,1.0);
+			// 	lightFalloff = max(exp(-30.0 * lightFalloff),0.0);
+			// 	float projectedCircle = clamp(1.0 - shiftedLinearDistance*FLASHLIGHT_SIZE,0.0,1.0);
 
-				vec3 flashlightGlow = vec3(FLASHLIGHT_R,FLASHLIGHT_G,FLASHLIGHT_B) * lightFalloff * projectedCircle * 0.5;
+			// 	vec3 flashlightGlow = vec3(FLASHLIGHT_R,FLASHLIGHT_G,FLASHLIGHT_B) * lightFalloff * projectedCircle * 0.5;
 
-				color += (flashlightGlow - flashlightGlow * exp(-max(plumeDensity,0.005)*dd*dL)) * absorbance;
-			#endif
+			// 	color += (flashlightGlow - flashlightGlow * exp(-max(plumeDensity,0.005)*dd*dL)) * absorbance;
+			// #endif
 	}
 	return vec4(color, absorbance);
 }

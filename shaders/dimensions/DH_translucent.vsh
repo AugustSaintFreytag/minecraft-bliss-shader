@@ -63,9 +63,9 @@ void main() {
 	
 	// worldpos.y -= length(worldpos)/(16*2);
 
-	#ifdef PLANET_CURVATURE
+	#if CURVATURE_AMOUNT !=  0
 		float curvature = length(worldpos) / (16*8);
-		worldpos.y -= curvature*curvature * CURVATURE_AMOUNT;
+		worldpos.y -= curvature*curvature * (float(CURVATURE_AMOUNT)/10.0f);
 	#endif
 	position = mat3(gbufferModelView) * worldpos + gbufferModelView[3].xyz;
 
@@ -96,10 +96,10 @@ void main() {
 	lightmapCoords = gl_MultiTexCoord1.xy;
 
 
-	lightCol.rgb = texelFetch2D(colortex4,ivec2(6,37),0).rgb;
+	lightCol.rgb = texelFetch(colortex4,ivec2(6,37),0).rgb;
 	lightCol.a = float(sunElevation > 1e-5)*2.0 - 1.0;
 
-	averageSkyCol_Clouds = texelFetch2D(colortex4,ivec2(0,37),0).rgb;
+	averageSkyCol_Clouds = texelFetch(colortex4,ivec2(0,37),0).rgb;
 	
 	#ifdef OVERWORLD_SHADER
 		#define READ_SCENE_CONTROLLER_PARAMETERS

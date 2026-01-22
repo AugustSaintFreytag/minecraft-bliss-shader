@@ -138,11 +138,16 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 			if(!hand && (spos.x < 0 || spos.x > 1 || spos.y < 0 || spos.y > 1)) return vec3(1.1);
 		#endif
 
-		float sampleDepth = sqrt(texelFetch2D(colortex4, ivec2(spos.xy/texelSize/4.0),0).a/65000.0);
+		float sampleDepth = sqrt(texelFetch(colortex4, ivec2(spos.xy/texelSize/4.0),0).a/65000.0);
+		
 		float sp = invLinZ(sampleDepth);
+
 
 		if(sp < max(minZ, maxZ) && sp > min(minZ, maxZ)) {
 			hitPos = vec3(spos.xy/RENDER_SCALE, sp);
+			#ifdef TERRIBLE_SSR_LOD_FALLBACK
+				if(sp > 0.99999) hitPos = reflectedTC;
+			#endif
 			break;
 		}
 		
@@ -185,7 +190,11 @@ vec4 screenSpaceReflections(
 
 	vec3 raytracePos = rayTraceSpeculars(reflectedVector, viewPos, noise, quality, isHand, reflectionLength);
 	
-	if (raytracePos.z > 1.0 || distance(gl_FragCoord.xy*texelSize, raytracePos.xy) < 0.002) return reflection;
+	if (raytracePos.z > 1.0 
+	#ifdef SSR_SELF_REFLECT_FIX
+	|| distance(gl_FragCoord.xy*texelSize, raytracePos.xy) < 0.002
+	#endif
+	) return reflection;
 
 	// use higher LOD as the reflection goes on, to blur it. this helps denoise a little.
 	reflectionLength = min(max(reflectionLength - 0.1, 0.0)/0.9, 1.0);
@@ -209,8 +218,8 @@ vec4 screenSpaceReflections(
 			// vec2 clampedRes = max(vec2(viewWidth,viewHeight),vec2(1920.0,1080.));
 			// vec2 resScale = vec2(1920.,1080.)/clampedRes;
 			// vec2 bloomTileUV = (((previousPosition.xy/texelSize)*2.0 + 0.5)*texelSize/2.0) / clampedRes*vec2(1920.,1080.);
-			// reflection.rgb = texture2D(colortex6, bloomTileUV / 4.0).rgb;
-			reflection.rgb = texture2D(colortex5, previousPosition.xy).rgb;
+			// reflection.rgb = texture(colortex6, bloomTileUV / 4.0).rgb;
+			reflection.rgb = texture(colortex5, previousPosition.xy).rgb;
 		#else
 			reflection.rgb = texture2DLod(colortex5, previousPosition.xy, LOD).rgb;
 		#endif
@@ -232,7 +241,7 @@ vec4 screenSpaceReflections(
 // );
 // // reflectLength = pow(1-pow(1-reflectLength,2),5) * 6;
 // reflectLength = (exp(-4*(1-reflectLength))) * 6;
-// Reflections.rgb = texture2D(colortex6, bloomTileoffsetUV[0]).rgb;
+// Reflections.rgb = texture(colortex6, bloomTileoffsetUV[0]).rgb;
 
 	return reflection;
 }
@@ -305,7 +314,12 @@ vec3 specularReflections(
 	, inout float reflectanceForAlpha
 	#endif
 	
-	,in vec4 flashLight_stuff
+	// ,in vec4 flashLight_stuff
+	// ,in vec3 handHeldLightColor
+	,in vec3 mainHandPos
+	,in vec3 mainHandCol
+	,in vec3 offHandPos
+	,in vec3 offHandCol
 
 ){
 	lightmap = min(max(lightmap-0.9,0.0)/0.1,1.0); 
@@ -412,9 +426,18 @@ vec3 specularReflections(
 		specularReflections += lightSourceReflection;
 	#endif
 
-	#if defined FLASHLIGHT_SPECULAR && (defined DEFERRED_SPECULAR || defined FORWARD_SPECULAR)
-		vec3 flashLightReflection = vec3(FLASHLIGHT_R,FLASHLIGHT_G,FLASHLIGHT_B) * flashLight_stuff.a * GGX(normal, -flashLight_stuff.xyz, -flashLight_stuff.xyz, roughness, reflectance, metalAlbedoTint);
-		specularReflections += flashLightReflection;
+	#if defined HANDHELD_LIGHTSOURCE_SPECULAR && (HANDHELD_LIGHTSOURCE_MODE > 0 && (defined DEFERRED_SPECULAR || defined FORWARD_SPECULAR))
+		vec3 mainHandLightReflection = vec3(0.0);
+		vec3 offHandLightReflection = vec3(0.0);
+		
+    	#if HANDHELD_LIGHTSOURCE_MODE == 3
+			mainHandLightReflection = mainHandCol * GGX(normal, -mainHandPos, -mainHandPos, roughness, reflectance, metalAlbedoTint);
+		#else
+			if(heldBlockLightValue > 0) mainHandLightReflection = mainHandCol * GGX(normal, -mainHandPos, -mainHandPos, roughness, reflectance, metalAlbedoTint);
+    		if(heldBlockLightValue2 > 0) offHandLightReflection = offHandCol * GGX(normal, -offHandPos, -offHandPos, roughness, reflectance, metalAlbedoTint);
+    	#endif
+		
+		specularReflections += mainHandLightReflection + offHandLightReflection;
 	#endif
 
 	return specularReflections;

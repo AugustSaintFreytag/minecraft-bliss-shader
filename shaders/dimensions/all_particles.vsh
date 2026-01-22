@@ -42,7 +42,6 @@ uniform ivec2 eyeBrightnessSmooth;
 
 uniform int heldItemId;
 uniform int heldItemId2;
-flat varying float HELD_ITEM_BRIGHTNESS;
 
 #include "/lib/TAA_jitter.glsl"
 
@@ -73,7 +72,7 @@ vec4 toClipSpace3(vec3 viewSpacePosition) {
 
 void main() {
 
-	lmtexcoord.xy = (gl_MultiTexCoord0).xy;
+	lmtexcoord.xy = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
 	vec2 lmcoord = gl_MultiTexCoord1.xy / 240.0;
 	lmtexcoord.zw = lmcoord;
 
@@ -88,14 +87,6 @@ void main() {
 		
 		normalMat = vec4(normalize(gl_NormalMatrix * gl_Normal), 1.0);
 	#endif
-
-
-	HELD_ITEM_BRIGHTNESS = 0.0;
-
-	#ifdef Hand_Held_lights
-		if(heldItemId > 999 || heldItemId2 > 999) HELD_ITEM_BRIGHTNESS = 0.9;
-	#endif
-
 
 	#if defined WEATHER || defined LINES
 		vec3 position = mat3(gl_ModelViewMatrix) * vec3(gl_Vertex) + gl_ModelViewMatrix[3].xyz;
@@ -112,9 +103,9 @@ void main() {
 			}
 		#endif
 		
-		#if defined LINES && defined PLANET_CURVATURE
+		#if defined LINES && CURVATURE_AMOUNT != 0
 			float curvature = length(worldpos) / (16*8);
-			worldpos.y -= curvature*curvature * CURVATURE_AMOUNT;
+			worldpos.y -= curvature*curvature * (float(CURVATURE_AMOUNT)/10.0f);
 		#endif
 
 		position = mat3(gbufferModelView) * worldpos + gbufferModelView[3].xyz;
@@ -132,9 +123,9 @@ void main() {
 	#endif
 	
 	#ifdef OVERWORLD_SHADER
-		lightCol.rgb = texelFetch2D(colortex4,ivec2(6,37),0).rgb;
+		lightCol.rgb = texelFetch(colortex4,ivec2(6,37),0).rgb;
 		lightCol.a = float(sunElevation > 1e-5)*2.0 - 1.0;
-		averageSkyCol_Clouds = texelFetch2D(colortex4,ivec2(0,37),0).rgb;
+		averageSkyCol_Clouds = texelFetch(colortex4,ivec2(0,37),0).rgb;
 		WsunVec = lightCol.a * normalize(mat3(gbufferModelViewInverse) * sunPosition);
 
 		#define READ_SCENE_CONTROLLER_PARAMETERS

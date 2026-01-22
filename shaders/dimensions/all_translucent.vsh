@@ -78,7 +78,6 @@ uniform float screenBrightness;
 
 uniform int heldItemId;
 uniform int heldItemId2;
-flat varying float HELD_ITEM_BRIGHTNESS;
 
 uniform vec2 texelSize;
 
@@ -95,8 +94,8 @@ vec4 toClipSpace3(vec3 viewSpacePosition) {
 
 
 float getWave (vec3 pos, float range){
-	// return pow(1.0-texture2D(noisetex, (pos.xz + frameTimeCounter * WATER_WAVE_SPEED)/150.0).b,2.0) * WATER_WAVE_STRENGTH * range;
-	return pow(1.0-texture2D(noisetex, (pos.xz + frameTimeCounter * WATER_WAVE_SPEED)/125.0).r,5.0) * WATER_WAVE_STRENGTH * range;
+	// return pow(1.0-texture(noisetex, (pos.xz + frameTimeCounter * WATER_WAVE_SPEED)/150.0).b,2.0) * WATER_WAVE_STRENGTH * range;
+	return pow(1.0-texture(noisetex, (pos.xz + frameTimeCounter * WATER_WAVE_SPEED)/125.0).r,5.0) * WATER_WAVE_STRENGTH * range;
 }
 
 vec3 getWaveNormal(vec3 posxz, float range){
@@ -171,9 +170,9 @@ void main() {
 	
    	vec3 worldpos = mat3(gbufferModelViewInverse) * position + gbufferModelViewInverse[3].xyz;
 	
-	#ifdef PLANET_CURVATURE
+	#if CURVATURE_AMOUNT !=  0
 		float curvature = length(worldpos) / (16*8);
-		worldpos.y -= curvature*curvature * CURVATURE_AMOUNT;
+		worldpos.y -= curvature*curvature * (float(CURVATURE_AMOUNT)/10.0f);
 	#endif
 
 	position = mat3(gbufferModelView) * worldpos + gbufferModelView[3].xyz;
@@ -182,12 +181,6 @@ void main() {
  		gl_Position = toClipSpace3(position);
 	#endif
 
-	HELD_ITEM_BRIGHTNESS = 0.0;
-	
-	#ifdef Hand_Held_lights
-		if(heldItemId > 999 || heldItemId2 > 999) HELD_ITEM_BRIGHTNESS = 0.9;
-	#endif
-	
 	// 1.0 = water mask
 	// 0.9 = entity mask
 	// 0.8 = reflective entities
@@ -237,10 +230,10 @@ void main() {
 	color = vec4(gl_Color.rgb, 1.0);
 
 	#ifdef OVERWORLD_SHADER
-		lightCol.rgb = texelFetch2D(colortex4,ivec2(6,37),0).rgb;
+		lightCol.rgb = texelFetch(colortex4,ivec2(6,37),0).rgb;
 		lightCol.a = float(sunElevation > 1e-5)*2.0 - 1.0;
 	
-		averageSkyCol_Clouds = texelFetch2D(colortex4,ivec2(0,37),0).rgb;
+		averageSkyCol_Clouds = texelFetch(colortex4,ivec2(0,37),0).rgb;
 	
 		// WsunVec = lightCol.a * normalize(mat3(gbufferModelViewInverse) * sunPosition);
 		
