@@ -16,7 +16,7 @@ option.LIGHTLEAKFIX_MODE = "lightleak fix" mode
     value.LIGHTLEAKFIX_MODE.1 = gap fill/zoom. §cmakes shadows blocky§r
     value.LIGHTLEAKFIX_MODE.2 = use sky lightmap levels. §cno sunlight will shine in low lightmap levels§r
 
-option.colortype = coloring mode
+option.colortype = Coloring Mode
     value.colortype.1 = RGB color (above)
         option.sunColorR = Sun Color: Red
         option.sunColorG = Sun Color: Green
@@ -26,9 +26,9 @@ option.colortype = coloring mode
         option.moonColorB = Moon Color: Blue
 
     value.colortype.2 = Kelvin temperature (below)
-        option.Sun_temp = Sun temperature
+        option.Sun_temp = Sun Temperature
         suffix.Sun_temp = K
-        option.Moon_temp = moon temperature
+        option.Moon_temp = Moon Temperature
         suffix.Moon_temp = K
 
 screen.Mod_support = Settings For Supported Mods
@@ -702,15 +702,18 @@ screen.Resource_Pack_Support = Materials / Resource Pack Support
 
     screen.Subsurface_Scattering = Sub-Surface Scattering
         option.LabSSS_Curve = LabSSS Curve
-        option.MISC_BLOCK_SSS = SSS for random blocks
-        option.MOB_SSS = SSS for mobs
-        option.Ambient_SSS = SSS from the sky
+        option.sss_density_multiplier = SSS Density Multiplier
+        option.sss_absorbance_multiplier = SSS Absorbance Multiplier
+        option.MISC_BLOCK_SSS = SSS for Random Blocks
+        option.MOB_SSS = SSS for Mobs
+        option.Ambient_SSS = Sky SSS (Ambient Light)
         option.ambientsss_brightness = Sky SSS Brightness
         option.SSS_TYPE = Mode
             value.SSS_TYPE.0 = None
             value.SSS_TYPE.1 = Hardcoded only
             value.SSS_TYPE.2 = Hardcoded + LabSSS
             value.SSS_TYPE.3 = LabSSS only
+        option.SCREENSPACE_DIRECT_SSS_BLENDING = Direct Light SSS Blending
 
 screen.POM = Parallax Occlusion Mapping / POM
     option.POM = Parallax Occlusion Mapping
@@ -1016,14 +1019,25 @@ option.OVERDRAW_MAX_DISTANCE = Max distance for overdraw prevention
     value.OVERDRAW_MAX_DISTANCE.240 = 15 Chunks
     value.OVERDRAW_MAX_DISTANCE.256 = 16 Chunks
 
-option.DH_AMBIENT_OCCLUSION = ambient occlusion on LOD chunks
-option.DH_SUBSURFACE_SCATTERING = sub-surface scattering on LOD chunks
-option.DH_SCREENSPACE_REFLECTIONS = screen-space reflections on LOD chunks
+option.DH_AMBIENT_OCCLUSION = Ambient Occlusion (DH)
+option.DH_SUBSURFACE_SCATTERING = Sub-Surface Scattering (DH)
+option.DH_SCREENSPACE_REFLECTIONS = Screen-Space Reflections (DH)
+option.DH_TAA_JITTER = TAA Jitter (DH)
+option.DH_NOISE_TEXTURE = Noise Texture (DH)
+option.NOISE_RESOLUTION = Noise Texture Resolution (DH)
+option.NOISE_INTENSITY = Noise Texture Intensity (DH)
+option.NOISE_DROPOFF = Noise Texture Drop-off Distance (DH)
 
-option.DISTANT_HORIZONS_SHADOWMAP = §c(DO NOT USE IF YOU DO NOT KNOW WHAT THIS IS)§r DH shadowmap support
-option.DISTANT_HORIZONS_SHADOWMAP.comment =  §cTHIS SETTING WILL DESTROY PERFORMANCE THIS WILL MAKE SHADOWS LOOK BLOCKY, FLICKERY, AND LOW DETAIL§r. set shadow distance to 32 chunks (or more). set shadow resolution to 4096 (or more)
-option.TOGGLE_VL_FOG = Toggle Volumetric Fog
-option.TOGGLE_VL_FOG.comment = one big button to just turn all the fog off.
+option.DISTANT_HORIZONS_SHADOWMAP = Shadowmap (DH)
+option.DISTANT_HORIZONS_SHADOWMAP.comment =  Enables full shadow mapping on vanilla and Distant Horizons terrain. §cTHIS SETTING WILL DESTROY PERFORMANCE THIS WILL MAKE SHADOWS LOOK BLOCKY, FLICKERY, AND LOW DETAIL§r. set shadow distance to 32 chunks (or more). set shadow resolution to 4096 (or more)
+option.TOGGLE_VL_FOG = Volumetric Fog (DH)
+option.TOGGLE_VL_FOG.comment = Disable volumetric fog on Distant Horizon terrain.
+option.DH_SSS_OCCLUSION_SAMPLES = SSS Occlusion Samples (DH)
+option.DH_SSS_OCCLUSION_SAMPLES.comment = Number of samples taken when calculating sub-surface scattering occlusion on Distant Horizons terrain. §aPERFORMANCE COST:§r medium
+option.DH_SSS_OCCLUSION_STEP = SSS Occlusion Step Size (DH)
+option.DH_SSS_OCCLUSION_STEP.comment = Step size when calculating sub-surface scattering occlusion on Distant Horizons terrain. §aPERFORMANCE COST:§r very low
+option.DH_VOLUMETRIC_OCCLUSION = Volumetric Occlusion (DH)
+option.DH_VOLUMETRIC_OCCLUSION.comment = Uses Distant Horizons depth buffer when sampling for sun-produced volumetrics. Allows DH terrain to obscure sunlight. §aPERFORMANCE COST:§r medium
 
 option.TRANSLUCENT_COLORED_SHADOWS.comment = §bWhat is this?§r This effect allows translucent things like stained glass to color the sunlight as it passes through it. §aPERFORMANCE COST:§r medium
 option.MINIMUM_WATER_ABSORBANCE.comment = §bWhat is this?§r This controls how "clear" the water is in shallow areas. AUTO allows water to be clear outdoors, but adjust to be at a minimum value of 7 when indoors, to make it clearly visible. §dTHIS SETTING DOES NOT IMPACT UNDER-WATER VISUALS.        

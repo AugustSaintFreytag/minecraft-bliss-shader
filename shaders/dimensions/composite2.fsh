@@ -405,11 +405,9 @@ float swapperlinZ(float depth, float _near, float _far) {
 
 #if defined DISTANT_HORIZONS
 float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanilladepth){
-
-	// return 1.0;1
-
 	float godrays = 0.0;
 	float samples = 8.0;
+	float stepSize = 60.0;
 
 	float _near = near; 
 	float _far = far * 4.0;
@@ -424,13 +422,13 @@ float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanillad
     float lightRange = pow(clamp(-dot(normalize(viewPos), lightDir)+0.65,0.0,1.0),2.0);
     vec3 position = toClipSpace3_DH(viewPos, depthCheck);
 	
-	//prevents the ray from going behind the camera
+	// Prevent ray from going behind camera.
 	float rayLength = ((viewPos.z + lightDir.z * _far * sqrt(3.)) > -_near) ? (-_near - viewPos.z) / lightDir.z : _far * sqrt(3.);
 
     vec3 direction = toClipSpace3_DH(viewPos + lightDir*rayLength, depthCheck) - position;
 
-	direction.xyz = direction.xyz / max(max(abs(direction.x)/0.0005, abs(direction.y)/0.0005),500.0);	//fixed step size
-	direction *= 60.0;
+	direction.xyz = direction.xyz / max(max(abs(direction.x)/0.0005, abs(direction.y)/0.0005), 500.0);	//fixed step size
+	direction *= stepSize;
 	
 	position.xy *= RENDER_SCALE;
 	direction.xy *= RENDER_SCALE;
@@ -440,12 +438,23 @@ float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanillad
   	vec2 screenEdges = 2.0/vec2(viewWidth, viewHeight);
 
 	for (int i = 0; i < int(samples); i++) { 
-		newPos.xy = clamp(newPos.xy, screenEdges, 1.0-screenEdges);
+		newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
 
-		float sampleDepth = texelFetch2D(LOD_DEPTHTEX1, ivec2(newPos.xy/texelSize),0).x;
-		float linDepth = swapperlinZ(sampleDepth, _near, _far);
+		#if defined DH_VOLUMETRIC_OCCLUSION
+			float sampleDepth = texelFetch2D(LOD_DEPTHTEX1, ivec2(newPos.xy/texelSize), 0).x;
+			float linearDepth = swapperlinZ(sampleDepth, _near, _far);
 
-		godrays += (linDepth >= 1.0 ? 1.0 : lightRange);
+			godrays += (linearDepth >= 1.0 ? 1.0 : lightRange);
+		#else
+			float sampleDepth = invLinZ(sqrt(texelFetch2D(colortex4, ivec2(newPos.xy / texelSize / 4.0), 0).a / 65000.0));
+
+			if(depthCheck) {
+				sampleDepth = texelFetch2D(dhDepthTex1, ivec2(newPos.xy / texelSize), 0).x;
+			}
+
+			godrays += (swapperlinZ(sampleDepth, _near, _far) > 1.0 ? 1.0 : lightRange);
+		#endif
+
 		newPos += direction;
 	}
 
@@ -633,8 +642,9 @@ void main() {
 	
 	float cloudPlaneDistance = 0.0;
 
-#ifdef OVERWORLD_SHADER
+#if defined OVERWORLD_SHADER && defined DH_VOLUMETRIC_OCCLUSION
 	float sunVisibility = godrayTest(viewPos0, normalize(sunVec * lightCol.a), BN.x, z0);
+	// TODO: Check if `sunElevation` is actually what we expect here.
 	float sunEdgeAttenuation = mix(0.5, 1.0, smoothstep(0.0, 0.08, abs(sunElevation)));
 	directLightColorVL *= clamp(sunVisibility, 0.0, 1.0) * sunEdgeAttenuation;
 #endif
