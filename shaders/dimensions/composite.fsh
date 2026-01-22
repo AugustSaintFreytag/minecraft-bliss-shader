@@ -176,11 +176,6 @@ vec2 R2_samples(int n){
 
 
 
-
-
-
-
-
 vec3 viewToWorld(vec3 viewPos) {
     vec4 pos;
     pos.xyz = viewPos;
@@ -292,7 +287,6 @@ vec2 SSAO(
 
 		if (offsetUV.x >= 0 && offsetUV.y >= 0 && offsetUV.x < viewWidth*RENDER_SCALE.x && offsetUV.y < viewHeight*RENDER_SCALE.y ) {
 			
-
 			#ifdef USING_LOD_MOD
 				float sampleDHDepth = 1.0;
 				float sampleDepth = 1.0;
@@ -464,17 +458,12 @@ void main() {
 	#ifdef BASIC_SHADOW_FILTER
 		if (LabSSS > 0.0 && NdotL < 0.001){  
 			minshadowfilt = 50;
-		//  maxshadowfilt = 50;
-		 }
+		}
 	#endif
-
-	// if (z < 1.0){
 
 		gl_FragData[0] = vec4(minshadowfilt, 0.0, 0.0, 0.0);
 
 		#ifdef Variable_Penumbra_Shadows
-			// if (LabSSS > -1) {
-				
 				vec3 feetPlayerPos = mat3(gbufferModelViewInverse) * viewPos + gbufferModelViewInverse[3].xyz;
 				
 				#if LIGHTLEAKFIX_MODE == 1
@@ -542,8 +531,6 @@ void main() {
 						}
 
 				}
-			// }
 		#endif
-	// }
 #endif
 }
