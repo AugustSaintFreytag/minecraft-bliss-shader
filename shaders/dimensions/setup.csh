@@ -50,8 +50,10 @@ const ivec3 workGroups = ivec3(6, 6, 1);
             vec4(lumSat.r + satZero.xyy, 0.0),
             vec4(lumSat.g + satZero.yxy, 0.0),
             vec4(lumSat.b + satZero.yyx, 0.0),
-            vec4(0.0, 0.0, 0.0, 1.0));
+            vec4(0.0, 0.0, 0.0, 1.0)
+        );
     }
+
 #endif
 
 
@@ -653,7 +655,7 @@ void main() {
 
         if (blockId == BLOCK_REDSTONE_TORCH_LIT || blockId == ITEM_REDSTONE_TORCH) {
             lightColor = LightColor_RedstoneTorch;
-            lightRange = 7.0;
+            lightRange = 5.0;
             mixWeight = 0.9;
         }
 
@@ -863,12 +865,12 @@ void main() {
 
         // extras
 
-        if (blockId == BLOCK_BLUEISH_LIGHT) {
+        if (blockId == BLOCK_BIOLUMINESCENT_FUNGUS) {
             lightColor = vec3(0.08, 0.09, 0.12);
             lightRange = 10.0;
         }
 
-        if (blockId == BLOCK_PINKISH_LIGHT) {
+        if (blockId == BLOCK_PINK_SALT) {
             lightColor = vec3(0.14, 0.08, 0.09);
             lightRange = 8.0;
         }
@@ -1181,12 +1183,13 @@ void main() {
         if (lightRange > 0.0) lightRange += 1.0;
 
         // apply saturation changes to light color
-        const float saturationF = LPV_SATURATION / 100.0;
+        float saturationF = LPV_SATURATION / 100.0;
+
         mat4 matSaturation = GetSaturationMatrix(saturationF);
         lightColor = (matSaturation * vec4(lightColor, 1.0)).rgb;
 
         // apply saturation changes to tint color
-        const float tintSaturationF = LPV_TINT_SATURATION / 100.0;
+        float tintSaturationF = LPV_TINT_SATURATION / 100.0;
         mat4 matTintSaturation = GetSaturationMatrix(tintSaturationF);
         tintColor = (matTintSaturation * vec4(tintColor, 1.0)).rgb;
 

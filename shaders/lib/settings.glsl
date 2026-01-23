@@ -797,11 +797,9 @@
 //#define LPV_NOSHADOW_HACK
 
 #ifdef LPV_ENABLED
-	#ifdef IRIS_FEATURE_CUSTOM_IMAGES
-		#define IS_LPV_ENABLED
+    #define IS_LPV_ENABLED
 
-		const float voxelDistance = 64.0;
-	#endif
+    const float voxelDistance = 64.0;
 #endif
 
 // ruining parts of the effect to make it more like vanilla floodfill
@@ -888,6 +886,10 @@
 #endif
 #ifdef RENDER_PLAYER_SHADOWS
 #endif
+#ifdef LPV_SATURATION
+#endif
+#ifdef LPV_TINT_SATURATION
+#endif
 #ifdef LPV_VL_FOG_ILLUMINATION
 #endif
 #ifdef OLD_CAVE_DETECTION
@@ -955,4 +957,12 @@
 #ifdef HANDHELD_LIGHTSOURCE_SPECULAR
 #endif
 #ifdef HANDHELD_LIGHTSOURCE_SSRT_SHADOWS
+#endif
+#ifdef TORCH_AMOUNT
+#endif
+#ifdef TORCH_R
+#endif
+#ifdef TORCH_G
+#endif
+#ifdef TORCH_B
 #endif

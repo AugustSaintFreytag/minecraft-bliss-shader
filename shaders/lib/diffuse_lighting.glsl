@@ -1,57 +1,36 @@
-// #ifdef IS_LPV_ENABLED
-//     vec3 GetHandLight(const in int itemId, const in vec3 playerPos, const in vec3 normal) {
-//         vec3 lightFinal = vec3(0.0);
-//         vec3 lightColor = vec3(0.0);
-//         float lightRange = 0.0;
-
-//         uvec2 blockData = texelFetch(texBlockData, itemId, 0).rg;
-//         vec4 lightColorRange = unpackUnorm4x8(blockData.r);
-//         lightColor = srgbToLinear(lightColorRange.rgb);
-//         lightRange = lightColorRange.a * 255.0;
-
-//         // if (lightRange > 0.0) {
-//         //     float lightDist = length(playerPos);
-//         //     vec3 lightDir = playerPos / lightDist;
-//         //     float NoL = 1.0;//max(dot(normal, lightDir), 0.0);
-//         //     float falloff = pow(1.0 - lightDist / lightRange, 3.0);
-//         //     lightFinal = lightColor * NoL * max(falloff, 0.0);
-//         // }
-
-//         return lightColor;
-//     }
-// #endif
-
 vec3 doBlockLightLighting(
     vec3 lightColor, float lightmap,
     vec3 playerPos, vec3 lpvPos
 ){
-    lightmap = clamp(lightmap,0.0,1.0);
+    lightmap = clamp(lightmap, 0.0, 1.0);
 
-    float lightmapBrightspot = min(max(lightmap-0.7,0.0)*3.3333,1.0);
+    float lightmapBrightspot = min(max(lightmap - 0.7, 0.0) * 3.3333, 1.0);
     lightmapBrightspot *= lightmapBrightspot*lightmapBrightspot;
 
     float lightmapLight = 1.0-sqrt(1.0-lightmap);
     lightmapLight *= lightmapLight;
 
     float lightmapCurve = mix(lightmapLight, 2.5, lightmapBrightspot);
-    // lightmapCurve = lightmap;
     vec3 blockLight = lightmapCurve * lightColor;
     
     #if defined IS_LPV_ENABLED && defined MC_GL_ARB_shader_image_load_store
         vec4 lpvSample = SampleLpvLinear(lpvPos);
+
         #ifdef VANILLA_LIGHTMAP_MASK
             lpvSample.rgb *= lightmapCurve;
         #endif
+
         vec3 lpvBlockLight = GetLpvBlockLight(lpvSample);
+        float highLightBoost = 2.5 * min(max(lightmap - 0.999, 0.0) / (1.0 - 0.999), 1.0);
 
         // create a smooth falloff at the edges of the voxel volume.
-        float fadeLength = 10.0; // in meters
-        vec3 cubicRadius = clamp( min(((LpvSize3-1.0) - lpvPos)/fadeLength,      lpvPos/fadeLength) ,0.0,1.0);
-        float voxelRangeFalloff = cubicRadius.x*cubicRadius.y*cubicRadius.z;
-        voxelRangeFalloff = 1.0 - pow(1.0-pow(voxelRangeFalloff,1.5),3.0);
+        float fadeLength = 64.0; // in meters
+        vec3 cubicRadius = clamp(min(((LpvSize3 - 1.0) - lpvPos) / fadeLength, lpvPos / fadeLength), 0.0, 1.0);
+        float voxelRangeFalloff = cubicRadius.x * cubicRadius.y * cubicRadius.z;
+        voxelRangeFalloff = 1.0 - pow(1.0 - pow(voxelRangeFalloff, 1.5), 3.0);
         
         // outside the voxel volume, lerp to vanilla lighting as a fallback
-        blockLight = mix(blockLight, lpvSample.rgb + lightColor * 2.5 * min(max(lightmap-0.999,0.0)/(1.0-0.999),1.0), voxelRangeFalloff);
+        blockLight = mix(blockLight, lpvSample.rgb * lightColor + highLightBoost, voxelRangeFalloff);
     #endif
 
     return blockLight * TORCH_AMOUNT;
@@ -94,20 +73,20 @@ uniform bool firstPersonCamera;
 #endif
 
 #ifdef IS_LPV_ENABLED
-    vec4 getHandheldLightData(int ID){
+    vec4 getHandheldLightData(int itemId) {
+        uvec4 blockData = texelFetch(texBlockData, itemId, 0);
 
-        uvec2 blockData = texelFetch(texBlockData, ID, 0).rg;
-        vec4 lightColorRange = unpackUnorm4x8(blockData.r);
-        vec3 lightColor = srgbToLinear(lightColorRange.rgb);
-        float lightRange = lightColorRange.a * 255.0;
+        uint lightData = blockData.r;
+        vec4 lightUnorm = unpackUnorm4x8(lightData);
+
+        vec3 lightColor = srgbToLinear(lightUnorm.rgb);
+        float lightRange = lightUnorm.a * 255.0;
 
         return vec4(lightColor, lightRange);
     }
 #endif
 
 float createHandheldPointLightFalloff(in float linearDistance, in float range){
-    
-    // float gradient = 1.0 - clamp(linearDistance/range, 0.0, 1.0);
     float gradient = 1.0 - clamp(1.0 - linearDistance/range, -0.999,1.0);
     gradient = max(exp(-10.0 * gradient),0.0);
 
@@ -115,9 +94,7 @@ float createHandheldPointLightFalloff(in float linearDistance, in float range){
 }
 
 float createHandheldPointlight(in vec3 position, in vec3 normal, in float range){
-
     float NdotL = clamp(dot(-normal, normalize(position)),0.0,1.0);
-    
     float falloff = createHandheldPointLightFalloff(length(position), range);
     
     return NdotL * falloff;
@@ -125,12 +102,9 @@ float createHandheldPointlight(in vec3 position, in vec3 normal, in float range)
 
 void calculateFinishedPointLight(
     in vec3 viewPos, in vec3 normal, 
-
     float lightLevel, int heldItemId, vec3 handOffset, 
-
     inout vec3 handPos, inout vec3 lighting
 ){
-    
     if(lightLevel > 1e-6){
         // in third person, mirror positions when backfacing third person is used.
         float headViewDir = max((mat3(gbufferModelView) * playerLookVector).z,0);
@@ -151,26 +125,26 @@ void calculateFinishedPointLight(
         // get color and stuff
         #ifdef IS_LPV_ENABLED
             vec4 sampledLightColor = getHandheldLightData(heldItemId);
-            lighting = sampledLightColor.rgb;
             float lightRange = sampledLightColor.a;
+
+            lighting = sampledLightColor.rgb;
+            // lighting = vec3(0.1, 0.9, 0.1);
             
             // ensure that there is color if no light item is held. or if the light item is not listed.
-            #if HANDHELD_LIGHTSOURCE_MODE == 3
-                if(heldItemId < 1){
+            if(heldItemId < 1) {
+                #if HANDHELD_LIGHTSOURCE_MODE == 3    
                     lighting = vec3(HANDHELD_LIGHTSOURCE_R, HANDHELD_LIGHTSOURCE_G, HANDHELD_LIGHTSOURCE_B);
                     lightRange = 15.0;
-                }
-            #else
-                if(heldItemId < 1){
+                #else
                     lighting = vec3(HANDHELD_LIGHTSOURCE_R, HANDHELD_LIGHTSOURCE_G, HANDHELD_LIGHTSOURCE_B);
                     lightRange = lightLevel;
-                    lighting *= lightRange/15.0;
-                }
-            #endif
+                    lighting *= lightRange / 15.0;
+                #endif
+            }
         #else
             lighting = vec3(HANDHELD_LIGHTSOURCE_R, HANDHELD_LIGHTSOURCE_G, HANDHELD_LIGHTSOURCE_B);
             float lightRange = lightLevel;
-            lighting *= lightRange/15.0;
+            lighting *= lightRange / 15.0;
         #endif
 
         #if HANDHELD_LIGHTSOURCE_RANGE > 0
@@ -196,7 +170,7 @@ void calculateFinishedPointLight(
             float bounce = clamp(1.0 - length(handPos)/max(lightRange,16), 0.0,1.0);
 
             // mask to point light
-    	    lighting *= pow(1.0-pow(1.0-projectedCircle,2),2) * lenseShape * FLASHLIGHT_BRIGHTNESS_MULT + bounce*0.005;
+    	    lighting *= pow(1.0 - pow(1.0 - projectedCircle, 2), 2) * lenseShape * FLASHLIGHT_BRIGHTNESS_MULT + bounce * 0.005;
 
             //#if defined FLASHLIGHT_SPECULAR && (defined DEFERRED_SPECULAR || defined FORWARD_SPECULAR)
             //  float flashLightSpecular = lightFalloff * exp2(-7.0*shiftedLinearDistance*shiftedLinearDistance) * FLASHLIGHT_BRIGHTNESS_MULT;
