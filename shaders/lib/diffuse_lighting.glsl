@@ -216,17 +216,15 @@ void calculateFinishedPointLight(
 }
 
 void doHandHeldLight(
-    in vec3 viewPos, in vec3 normal
-    ,inout vec3 passMainHandPos, inout vec3 passMainHandCol, inout vec3 passOffHandPos, inout vec3 passOffHandCol 
+    in vec3 viewPos, in vec3 normal, inout vec3 passMainHandPos, inout vec3 passmainHandColor, inout vec3 passOffHandPos, inout vec3 passoffHandColor 
 ){
-
     #if HANDHELD_LIGHTSOURCE_MODE == 3
-        calculateFinishedPointLight(viewPos, normal, 16.0, heldItemId, vec3(-0.25, 0.1-playerLookVector.y*0.2, 0.1), passMainHandPos, passMainHandCol);
+        calculateFinishedPointLight(viewPos, normal, 16.0, heldItemId, vec3(-0.25, 0.1 - playerLookVector.y * 0.2, 0.1), passMainHandPos, passmainHandColor);
     #else
-        calculateFinishedPointLight(viewPos, normal, float(heldBlockLightValue), heldItemId, vec3(-0.25, 0.1-playerLookVector.y*0.2, 0.1), passMainHandPos, passMainHandCol);
-        calculateFinishedPointLight(viewPos, normal, float(heldBlockLightValue2), heldItemId2, vec3( 0.25, 0.1-playerLookVector.y*0.2, 0.1), passOffHandPos, passOffHandCol);
+        calculateFinishedPointLight(viewPos, normal, float(heldBlockLightValue), heldItemId, vec3(-0.25, 0.1 - playerLookVector.y * 0.2, 0.1), passMainHandPos, passmainHandColor);
+        calculateFinishedPointLight(viewPos, normal, float(heldBlockLightValue2), heldItemId2, vec3( 0.25, 0.1 - playerLookVector.y * 0.2, 0.1), passOffHandPos, passoffHandColor);
     #endif
 
-    passMainHandCol *= HANDHELD_LIGHTSOURCE_BRIGHTNESS;
-    passOffHandCol *= HANDHELD_LIGHTSOURCE_BRIGHTNESS;
+    passmainHandColor *= HANDHELD_LIGHTSOURCE_BRIGHTNESS;
+    passoffHandColor *= HANDHELD_LIGHTSOURCE_BRIGHTNESS;
 }

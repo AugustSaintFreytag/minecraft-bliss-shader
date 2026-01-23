@@ -314,12 +314,10 @@ vec3 specularReflections(
 	, inout float reflectanceForAlpha
 	#endif
 	
-	// ,in vec4 flashLight_stuff
-	// ,in vec3 handHeldLightColor
 	,in vec3 mainHandPos
-	,in vec3 mainHandCol
+	,in vec3 mainHandColor
 	,in vec3 offHandPos
-	,in vec3 offHandCol
+	,in vec3 offHandColor
 
 ){
 	lightmap = min(max(lightmap-0.9,0.0)/0.1,1.0); 
@@ -396,10 +394,10 @@ vec3 specularReflections(
 			#endif
 
 			#if DEFERRED_SSR_QUALITY > 0 || FORWARD_SSR_QUALITY > 0
-				vec4 enviornmentReflection = screenSpaceReflections(mat3(gbufferModelView) * reflectedVector_L, viewPos, noise.z, isHand, roughness, backgroundReflectMask);
+				vec4 environmentReflection = screenSpaceReflections(mat3(gbufferModelView) * reflectedVector_L, viewPos, noise.z, isHand, roughness, backgroundReflectMask);
 				
 				// darkening for metals.
-				vec3 DarkenedDiffuseLighting = isMetal ? diffuseLighting * (1.0-enviornmentReflection.a) * (1.0-lightmap) : diffuseLighting;
+				vec3 DarkenedDiffuseLighting = isMetal ? diffuseLighting * (1.0-environmentReflection.a) * (1.0-lightmap) : diffuseLighting;
 			#else
 				// darkening for metals.
 				vec3 DarkenedDiffuseLighting = isMetal ? diffuseLighting * (1.0-lightmap) : diffuseLighting;
@@ -410,7 +408,7 @@ vec3 specularReflections(
 				specularReflections = mix(DarkenedDiffuseLighting, backgroundReflection, backgroundReflectMask);
 			#endif
 			#if DEFERRED_SSR_QUALITY > 0 || FORWARD_SSR_QUALITY > 0
-				specularReflections = mix(specularReflections, enviornmentReflection.rgb, enviornmentReflection.a);
+				specularReflections = mix(specularReflections, environmentReflection.rgb, environmentReflection.a);
 			#endif
 
 			specularReflections = mix(DarkenedDiffuseLighting, specularReflections, F0);
@@ -431,10 +429,18 @@ vec3 specularReflections(
 		vec3 offHandLightReflection = vec3(0.0);
 		
     	#if HANDHELD_LIGHTSOURCE_MODE == 3
-			mainHandLightReflection = mainHandCol * GGX(normal, -mainHandPos, -mainHandPos, roughness, reflectance, metalAlbedoTint);
+			mainHandLightReflection = mainHandColor * GGX(normal, -mainHandPos, -mainHandPos, roughness, reflectance, metalAlbedoTint);
 		#else
-			if(heldBlockLightValue > 0) mainHandLightReflection = mainHandCol * GGX(normal, -mainHandPos, -mainHandPos, roughness, reflectance, metalAlbedoTint);
-    		if(heldBlockLightValue2 > 0) offHandLightReflection = offHandCol * GGX(normal, -offHandPos, -offHandPos, roughness, reflectance, metalAlbedoTint);
+			float heldBlockLightValueSum = length(mainHandColor);
+			float heldBlockLightValue2Sum = length(offHandColor);
+
+			if(heldBlockLightValueSum > 0) {
+				mainHandLightReflection = mainHandColor * GGX(normal, -mainHandPos, -mainHandPos, roughness, reflectance, metalAlbedoTint);
+			}
+
+    		if(heldBlockLightValue2Sum > 0) {
+				offHandLightReflection = offHandColor * GGX(normal, -offHandPos, -offHandPos, roughness, reflectance, metalAlbedoTint);
+			}
     	#endif
 		
 		specularReflections += mainHandLightReflection + offHandLightReflection;

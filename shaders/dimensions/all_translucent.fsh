@@ -700,17 +700,17 @@ if (gl_FragCoord.x * texelSize.x < 1.0  && gl_FragCoord.y * texelSize.y < 1.0 )	
 	Indirect_lighting += doBlockLightLighting( vec3(TORCH_R,TORCH_G,TORCH_B), lightmap.x, feetPlayerPos, lpvPos);
 	
 	vec3 mainHandPos = vec3(0.0);
-	vec3 mainHandCol = vec3(0.0);
+	vec3 mainHandColor = vec3(0.0);
 	vec3 offHandPos = vec3(0.0);
-	vec3 offHandCol = vec3(0.0);
+	vec3 offHandColor = vec3(0.0);
 
 	#if HANDHELD_LIGHTSOURCE_MODE > 0
 		doHandHeldLight(
 			viewPos, worldSpaceNormal
-			,mainHandPos, mainHandCol, offHandPos, offHandCol
+			,mainHandPos, mainHandColor, offHandPos, offHandColor
 		);
 
-		Indirect_lighting += mainHandCol + offHandCol;
+		Indirect_lighting += mainHandColor + offHandColor;
 	#endif
 
 	#if defined LIGHTNING_FLASH
@@ -768,7 +768,7 @@ if (gl_FragCoord.x * texelSize.x < 1.0  && gl_FragCoord.y * texelSize.y < 1.0 )	
 				float Shadows = 0.0;
 			#endif
 			
-			vec3 specularReflections = specularReflections(viewPos, normalize(feetPlayerPos), WsunVec, vec3(blueNoise(), vec2(interleaved_gradientNoise_temporal())), worldSpaceNormal, roughness, f0, Albedo, FinalColor*gl_FragData[0].a, DirectLightColor * Shadows, lightmap.y, isHand, isWater, reflectance, normalize(mainHandPos), mainHandCol, normalize(offHandPos), offHandCol);
+			vec3 specularReflections = specularReflections(viewPos, normalize(feetPlayerPos), WsunVec, vec3(blueNoise(), vec2(interleaved_gradientNoise_temporal())), worldSpaceNormal, roughness, f0, Albedo, FinalColor*gl_FragData[0].a, DirectLightColor * Shadows, lightmap.y, isHand, isWater, reflectance, normalize(mainHandPos), mainHandColor, normalize(offHandPos), offHandColor);
 			
 			gl_FragData[0].a = gl_FragData[0].a + (1.0-gl_FragData[0].a) * reflectance;
 		

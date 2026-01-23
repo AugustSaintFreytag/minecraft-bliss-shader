@@ -15,7 +15,7 @@
 	#ifdef SEASONS_VSH
 
 		uniform int worldDay;  
-		uniform float NoRainFallEnviornmentSmooth;
+		uniform float NoRainFallEnvironmentSmooth;
 
 	    void YearCycleColor (
 	        inout vec3 FinalColor,
@@ -83,7 +83,7 @@
 			// 	// this is to make snow only exist in winter
 	    	// 	float FallToWinter_snowfall = mix(0.0, 1.0, AutumnTime);
 	    	// 	float WinterToSpring_snowfall = mix(FallToWinter_snowfall, 0.0, WinterTime);
-			// 	// SnowySeason = clamp(pow(sin(WinterToSpring_snowfall*SeasonLength)*0.5+0.5,5),0,1)  * WinterToSpring_snowfall * NoRainFallEnviornmentSmooth;
+			// 	// SnowySeason = clamp(pow(sin(WinterToSpring_snowfall*SeasonLength)*0.5+0.5,5),0,1)  * WinterToSpring_snowfall * NoRainFallEnvironmentSmooth;
 			// #else
 			// 	// SnowySeason = 0.0;
 			// #endif

@@ -96,7 +96,7 @@
 // So dont worry about overlapping profiles! just be aware of the order of operations!
 //
 // when a custom profile is active, it will overwrite any of bliss's pre-existing profiles
-// That includes daily weather, rainy weather, and biome specific enviornments
+// That includes daily weather, rainy weather, and biome specific environments
 --------------------------------------
 */
 

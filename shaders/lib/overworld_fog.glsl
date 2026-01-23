@@ -91,7 +91,7 @@ float applyFogTurbulence(float baseNoise, vec3 pos){
 #endif
 }
 
-uniform bool isInSpecialEnviornment;
+uniform bool isInSpecialEnvironment;
 uniform vec3 exitedBiomePos;
 
 float getLocalEffectDensity(

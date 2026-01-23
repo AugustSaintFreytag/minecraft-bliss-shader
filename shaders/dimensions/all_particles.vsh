@@ -28,7 +28,7 @@ uniform sampler2D colortex4;
 #endif
 	
 
-uniform bool isInRainFallEnviornment;
+uniform bool isInRainFallEnvironment;
 uniform vec3 sunPosition;
 uniform float sunElevation;
 
@@ -96,7 +96,7 @@ void main() {
 			worldpos += cameraPosition;
 			bool istopv = (worldpos.y > cameraPosition.y + 5.0 && lmtexcoord.w > 0.99);
 
-			if(!istopv && isInRainFallEnviornment){
+			if(!istopv && isInRainFallEnvironment){
 				worldpos.xyz -= cameraPosition - vec3(2.0,0.0,2.0) * min(max(clamp(eyeBrightnessSmooth.y/240.0,0,1)-0.95,0)/0.05,1);
 			}else{
 				worldpos.xyz -= cameraPosition;

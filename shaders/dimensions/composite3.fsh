@@ -411,12 +411,12 @@ void blendAllFogTypes( inout vec3 color, inout float bloomyFogMult, vec4 volumet
 
   // blend vanilla fogs (blindness, darkness, lava, powdered snow)
   if(isEyeInWater > 1 || blindness > 0 || darknessFactor > 0){
-    float enviornmentFogDensity = 1.0 - clamp(linearDistance/fogEnd,0,1);
-    enviornmentFogDensity = 1.0 - enviornmentFogDensity*enviornmentFogDensity;
-    enviornmentFogDensity *= enviornmentFogDensity;
-    enviornmentFogDensity =  mix(enviornmentFogDensity, 1.0, min(darknessLightFactor*2.0,1));
+    float environmentFogDensity = 1.0 - clamp(linearDistance/fogEnd,0,1);
+    environmentFogDensity = 1.0 - environmentFogDensity*environmentFogDensity;
+    environmentFogDensity *= environmentFogDensity;
+    environmentFogDensity =  mix(environmentFogDensity, 1.0, min(darknessLightFactor*2.0,1));
 
-    color = mix(color, toLinear(fogColor), enviornmentFogDensity);
+    color = mix(color, toLinear(fogColor), environmentFogDensity);
   }
 }
 

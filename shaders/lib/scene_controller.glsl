@@ -9,10 +9,10 @@ uniform bool isInColdArea;
 uniform bool isInHotArea;
 uniform bool isInJungleBiomes;
 uniform bool isInSwampBiomes;
-uniform bool isInSpecialEnviornment;
-uniform bool isInSnowFallEnviornment;
-uniform bool isInRainFallEnviornment;
-uniform bool isInNoRainFallEnviornment;
+uniform bool isInSpecialEnvironment;
+uniform bool isInSnowFallEnvironment;
+uniform bool isInRainFallEnvironment;
+uniform bool isInNoRainFallEnvironment;
 
 uniform int worldTime;
 
@@ -545,14 +545,14 @@ if(rainStrength > 0.0001){
     #endif
 
     #if USE_CUSTOM_HOT_BIOME_RAIN_PROFILE == 0 || USE_CUSTOM_COLD_BIOME_RAIN_PROFILE == 0
-        // simply shift the index ahead for enviornment switching
+        // simply shift the index ahead for environment switching
         int biomeRainyWeatherProfile = int(RNG * 3.0);
         
         #if USE_CUSTOM_HOT_BIOME_RAIN_PROFILE == 0
-            if(isInHotArea && isInNoRainFallEnviornment) biomeRainyWeatherProfile += 3;
+            if(isInHotArea && isInNoRainFallEnvironment) biomeRainyWeatherProfile += 3;
         #endif
         #if USE_CUSTOM_COLD_BIOME_RAIN_PROFILE == 0
-            if(isInColdArea && isInSnowFallEnviornment) biomeRainyWeatherProfile += 6;
+            if(isInColdArea && isInSnowFallEnvironment) biomeRainyWeatherProfile += 6;
         #endif
 
         switch (biomeRainyWeatherProfile){
@@ -632,7 +632,7 @@ if(rainStrength > 0.0001){
         }
     #endif
     #if USE_CUSTOM_HOT_BIOME_RAIN_PROFILE > 0
-        if(isInHotArea && isInNoRainFallEnviornment){
+        if(isInHotArea && isInNoRainFallEnvironment){
 	        weatherUniformFogDensity = uniformFogDensity;
             weatherClumpyFogDensity = clumpyFogDensity;
             weatherClumpyFogCoverage = clumpyFogCoverage;
@@ -669,7 +669,7 @@ if(rainStrength > 0.0001){
         }
     #endif
     #if USE_CUSTOM_COLD_BIOME_RAIN_PROFILE > 0
-        if(isInColdArea && isInSnowFallEnviornment){
+        if(isInColdArea && isInSnowFallEnvironment){
 	        weatherUniformFogDensity = uniformFogDensity;
             weatherClumpyFogDensity = clumpyFogDensity;
             weatherClumpyFogCoverage = clumpyFogCoverage;
@@ -849,8 +849,8 @@ void readSceneControllerParameters(
 	vec3 data1 = texelFetch(colortex,ivec2(1,3),0).rgb/150.0;
 	vec3 data2 = texelFetch(colortex,ivec2(2,3),0).rgb/150.0;
 	vec3 data3 = texelFetch(colortex,ivec2(3,3),0).rgb/150.0;
-	float data4 = texelFetch(colortex,ivec2(1,2),0).r/150.0;
-	vec3 data5 = texelFetch(colortex,ivec2(2,2),0).rgb/150.0; // this samples a color
+	vec3 data4 = texelFetch(colortex,ivec2(1,2),0).rgb/150.0;
+	vec3 data5 = texelFetch(colortex,ivec2(2,2),0).rgb/150.0;
 
 	smallCumulus = vec2(data1.x,data1.y);
 	largeCumulus = vec2(data1.z,data2.x);

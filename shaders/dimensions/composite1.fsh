@@ -134,12 +134,6 @@ uniform int heldBlockLightValue2;
 uniform int heldItemId;
 uniform int heldItemId2;
 
-// // #ifdef IS_LPV_ENABLED
-// 	uniform int heldItemId;
-// 	uniform int heldItemId2;
-// 	uniform int heldBlockLightValue;
-// 	uniform int heldBlockLightValue2;
-// #endif
 
 uniform float waterEnteredAltitude;
 
@@ -1239,17 +1233,13 @@ void main() {
 			float skylight = 1.0;
 		
 			#if indirect_effect == VANILLA_AO || indirect_effect == SSAO_FILTERED || indirect_effect == SSAO_HQ || indirect_effect == GTAO
-
 				vec3 indirectNormal = slopednormal / dot(abs(slopednormal),vec3(1.0));
-
 				float SkylightDir = indirectNormal.y;
 
 				if(isGrass) SkylightDir = 1.0;
+
 				SkylightDir = clamp(SkylightDir*0.7+0.3, 0.0, pow(1-pow(1-SSAO_SSS.x, 0.5),4.0) * 0.7 + 0.3);
-
 				skylight = mix(0.08 + 0.92*(1.0-lightmap.y), 1.0, SkylightDir);
-
-				// skylight = 1.0;
 			#endif
 
 			#if indirect_effect == SSRT_AO || indirect_effect == SSRT_AO_GI
@@ -1300,46 +1290,42 @@ void main() {
 			const vec3 lpvPos = vec3(0.0);
 		#endif
 
-		vec3 blockLightColor = doBlockLightLighting( vec3(TORCH_R,TORCH_G,TORCH_B), lightmap.x, feetPlayerPos, lpvPos);
+		vec3 blockLightColor = doBlockLightLighting(vec3(TORCH_R, TORCH_G, TORCH_B), lightmap.x, feetPlayerPos, lpvPos);
 		Indirect_lighting += blockLightColor;
 		
 		vec3 mainHandPos = vec3(0.0);
-		vec3 mainHandCol = vec3(0.0);
+		vec3 mainHandColor = vec3(0.0);
 		vec3 offHandPos = vec3(0.0);
-		vec3 offHandCol = vec3(0.0);
+		vec3 offHandColor = vec3(0.0);
 
 		#if HANDHELD_LIGHTSOURCE_MODE > 0
 			vec3 handheldViewPos = viewPos;
 			if(hand) handheldViewPos.z += 0.7;
 
-			doHandHeldLight(
-				handheldViewPos, slopednormal
-				,mainHandPos, mainHandCol, offHandPos, offHandCol
-			);
+			doHandHeldLight(handheldViewPos, slopednormal, mainHandPos, mainHandColor, offHandPos, offHandColor);
 
 			#if HANDHELD_LIGHTSOURCE_SSRT_SHADOWS > 0
 				// make sure not to calculate ssrt shadows if there is no light being held.
 				#if HANDHELD_LIGHTSOURCE_SSRT_SHADOWS == 1
-					if(!hand && (heldBlockLightValue > 0 || heldBlockLightValue2 > 0)){
+					if(!hand && (heldBlockLightValue > 0 || heldBlockLightValue2 > 0)) {
 				#elif HANDHELD_LIGHTSOURCE_SSRT_SHADOWS == 2
 					if((firstPersonCamera && !hand) && (heldBlockLightValue > 0 || heldBlockLightValue2 > 0)){
 				#endif
 
 					// whichever held light is brighter gets the shadows
 					vec3 shadowHandPos = heldBlockLightValue > heldBlockLightValue2 ? mainHandPos : offHandPos;
-
 					float handHeldLightShadow = handHeldLight_SSRT_Shadows(viewPos, shadowHandPos, ig_noise);
 
 					// whichever held light is brighter gets the shadows 2x
 					if(heldBlockLightValue < heldBlockLightValue2){
-						offHandCol *= handHeldLightShadow;
-					}else{
-						mainHandCol *= handHeldLightShadow;
+						offHandColor *= handHeldLightShadow;
+					} else {
+						mainHandColor *= handHeldLightShadow;
 					}
 				}
 			#endif
 
-			Indirect_lighting += mainHandCol + offHandCol;
+			Indirect_lighting += mainHandColor + offHandColor;
 		#endif
 
 		#if defined LIGHTNING_FLASH
@@ -1442,7 +1428,7 @@ void main() {
 		#if defined DEFERRED_SPECULAR	
 			vec3 specularNoises = vec3(vec2(blueNoise(), ig_noise), ig_noise);
     		// vec3 specularNormal = normal;
-			FINAL_COLOR = specularReflections(viewPos, feetPlayerPos_normalized, WsunVec, specularNoises, normal, SpecularTex.r, SpecularTex.g, albedo, FINAL_COLOR, DirectLightColor*shadowColor, lightmap.y, hand, mainHandPos, mainHandCol, offHandPos, offHandCol);
+			FINAL_COLOR = specularReflections(viewPos, feetPlayerPos_normalized, WsunVec, specularNoises, normal, SpecularTex.r, SpecularTex.g, albedo, FINAL_COLOR, DirectLightColor*shadowColor, lightmap.y, hand, mainHandPos, mainHandColor, offHandPos, offHandColor);
 		#endif
 
 		gl_FragData[0].rgb = FINAL_COLOR;
