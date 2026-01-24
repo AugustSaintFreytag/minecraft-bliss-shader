@@ -145,9 +145,6 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 
 		if(sp < max(minZ, maxZ) && sp > min(minZ, maxZ)) {
 			hitPos = vec3(spos.xy/RENDER_SCALE, sp);
-			#ifdef TERRIBLE_SSR_LOD_FALLBACK
-				if(sp > 0.99999) hitPos = reflectedTC;
-			#endif
 			break;
 		}
 		
@@ -190,26 +187,69 @@ vec4 screenSpaceReflections(
 
 	vec3 raytracePos = rayTraceSpeculars(reflectedVector, viewPos, noise, quality, isHand, reflectionLength);
 	
-	if (raytracePos.z > 1.0 
+	bool isDH = false;
+	
+	if (raytracePos.z > 0.99999) {
+		#if defined DISTANT_HORIZONS || defined VOXY
+			ivec2 dhCoord = ivec2(raytracePos.xy * RENDER_SCALE / texelSize / 4.0);
+			float dhVal = texelFetch(colortex12, dhCoord, 0).a;
+			
+			if (dhVal < 64900.0) isDH = true;
+		#endif
+	}
+
+	bool invalidHit = raytracePos.z > 1.0;
+
 	#ifdef SSR_SELF_REFLECT_FIX
-	|| distance(gl_FragCoord.xy*texelSize, raytracePos.xy) < 0.002
+		if (distance(gl_FragCoord.xy*texelSize, raytracePos.xy) < 0.002) {
+			invalidHit = true;
+		}
 	#endif
-	) return reflection;
+
+	if (isDH) {
+		#if defined DISTANT_HORIZONS || defined VOXY
+			// Get linearized DH depth (output of `DH_linZ`)
+			ivec2 dhCoord = ivec2(raytracePos.xy * RENDER_SCALE / texelSize / 4.0);
+			float dhLinZ_val = sqrt(texelFetch(colortex12, dhCoord, 0).a / 65000.0);
+
+			// Convert to eye distance
+			// z_eye = (f * y) / (2 - y) 
+			// Derived from y = 2n / (f+n - d(f-n)) and z = nf / (f - d(f-n))
+			float eyeDist = (LOD_FARPLANE * dhLinZ_val) / (2.0 - dhLinZ_val);
+
+			// Convert eye distance to vanilla depth space (0..1)
+			// d = (f/(f-n)) * (1 - n/z)
+			raytracePos.z = (far * (1.0 - near / eyeDist)) / (far - near);
+		#endif
+	}
+
+	if (!isDH && invalidHit) {
+		return reflection;
+	}
 
 	// use higher LOD as the reflection goes on, to blur it. this helps denoise a little.
 	reflectionLength = min(max(reflectionLength - 0.1, 0.0)/0.9, 1.0);
 	float LOD = mix(0.0, 6.0*(1.0-exp(-15.0*sqrt(roughness))), 1.0-pow(1.0-reflectionLength,5.0));
 
-	vec3 previousPosition = mat3(gbufferModelViewInverse) * toScreenSpace(raytracePos) + gbufferModelViewInverse[3].xyz + (cameraPosition - previousCameraPosition);
+	vec3 previousPosition = mat3(gbufferModelViewInverse) * toScreenSpace(raytracePos);
+	previousPosition += gbufferModelViewInverse[3].xyz + (cameraPosition - previousCameraPosition);
+
 	previousPosition = mat3(gbufferPreviousModelView) * previousPosition + gbufferPreviousModelView[3].xyz;
 	previousPosition.xy = projMAD(gbufferPreviousProjection, previousPosition).xy / -previousPosition.z * 0.5 + 0.5;
 
 	if (previousPosition.x > 0.0 && previousPosition.y > 0.0 && previousPosition.x < 1.0 && previousPosition.y < 1.0) {
-		
-		if(raytracePos.z > 0.999999) backgroundReflectMask = 1.0;
+		if(raytracePos.z > 0.999999 && !isDH) {
+			backgroundReflectMask = 1.0;
+		}
 
 		#if defined OVERWORLD_SHADER 
-			reflection.a = raytracePos.z > 0.999999 ? (isHand || isEyeInWater == 1 ? 1.0 : 0.0) : 1.0;
+			bool isSky = raytracePos.z > 0.999999 && !isDH;
+			
+			if (isSky) {
+				reflection.a = (isHand || isEyeInWater == 1) ? 1.0 : 0.0;
+			} else {
+				reflection.a = 1.0;
+			}
 		#else
 			reflection.a = 1.0;
 		#endif
@@ -320,9 +360,9 @@ vec3 specularReflections(
 	,in vec3 offHandColor
 
 ){
-	lightmap = min(max(lightmap-0.9,0.0)/0.1,1.0); 
-	lightmap *= lightmap;	lightmap = 1.0-lightmap;
-	lightmap *= lightmap;	lightmap = 1.0-lightmap;
+	lightmap = min(max(lightmap - 0.9, 0.0) / 0.1, 1.0); 
+	lightmap *= lightmap;	lightmap = 1.0 - lightmap;
+	lightmap *= lightmap;	lightmap = 1.0 - lightmap;
 
 	roughness = 1.0 - roughness; 
 	roughness *= roughness;

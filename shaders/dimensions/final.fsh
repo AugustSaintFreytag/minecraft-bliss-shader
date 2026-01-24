@@ -1,12 +1,25 @@
 #define GAMEPLAY_EFFECTS_RELATED_SETTINGS
 #define ANTIALIASING_RELATED_SETTINGS
 #define POST_PROCESSING_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
 
-uniform sampler2D colortex7;
-uniform sampler2D colortex5;
-uniform sampler2D colortex6;
-uniform sampler2D colortex14;
+uniform sampler2D colortex0;    // Sky, Clouds
+uniform sampler2D colortex1;    // Scene Albedo (RGB), Material (A)
+uniform sampler2D colortex2;    // Scene Translucents
+uniform sampler2D colortex3;    // Shadow Map (VPS)
+uniform sampler2D colortex4;    // LUT (RGB), Depth (A, Quarter Res)
+uniform sampler2D colortex5;    // TAA
+uniform sampler2D colortex6;    // Mip Maps
+uniform sampler2D colortex7;    // Water
+uniform sampler2D colortex8;    // Specular A
+uniform sampler2D colortex9;    // Specular B
+uniform sampler2D colortex10;   // Distant Sky (LOD?)
+uniform sampler2D colortex11;   // Translucency/Refraction?
+uniform sampler2D colortex12;   // Volumetrics A
+uniform sampler2D colortex13;   // Volumetrics B
+uniform sampler2D colortex14;   // Light Map
+uniform sampler2D colortex15;   // Normal (RGB), Vanilla AO (A)
 uniform sampler2D depthtex0;
 uniform sampler2D depthtex1;
 uniform sampler2D depthtex2;
@@ -37,6 +50,7 @@ uniform mat4 gbufferPreviousModelView;
 
 uniform float near;
 uniform float far;
+
 float ld(float dist) {
     return (2.0 * near) / (far + near - dist * (far - near));
 }
@@ -153,7 +167,7 @@ void main() {
 
     vec3 COLOR = doMotionBlur(texcoord, depth2, noise, hand);
   #else
-    vec3 COLOR = texture2D(colortex7,texcoord).rgb;
+    vec3 COLOR = texture2D(colortex7, texcoord).rgb;
   #endif
   
   #if defined LOW_HEALTH_EFFECT || defined DAMAGE_TAKEN_EFFECT || defined WATER_ON_CAMERA_EFFECT  
@@ -176,16 +190,19 @@ void main() {
     // float zoom = 0.1;
     // shadowUV = ((shadowUV-0.5) - (shadowUV-0.5)*zoom) + 0.5;
 
-    if(shadowUV.x < 1.0 && shadowUV.y < 1.0 && hideGUI == 1) COLOR = texture2D(shadowcolor1,shadowUV).rgb;
+    if(shadowUV.x < 1.0 && shadowUV.y < 1.0 && hideGUI == 1) {
+      COLOR = texture2D(shadowcolor1, shadowUV).rgb;
+    }
   #endif
   #if DEBUG_VIEW == debug_DEPTHTEX0
-    COLOR = vec3(ld(texture2D(depthtex0, texcoord*RENDER_SCALE).r));
+    COLOR = vec3(ld(texture2D(depthtex0, texcoord * RENDER_SCALE).r));
   #endif
   #if DEBUG_VIEW == debug_DEPTHTEX1
-    // COLOR = vec3(ld(texture2D(depthtex1, texcoord*RENDER_SCALE).r));
-    COLOR = vec3(ld(texture2D(LOD_DEPTHTEX0, texcoord*RENDER_SCALE).r));
+    COLOR = vec3(ld(texture2D(depthtex1, texcoord * RENDER_SCALE).r));
   #endif
-
+  #if DEBUG_VIEW == debug_SKYTEX
+    COLOR = texture2D(colortex4, texcoord).rgb / 1200;
+  #endif
 
   gl_FragColor.rgb = COLOR;
 }

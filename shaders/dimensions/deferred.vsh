@@ -1,22 +1,22 @@
-#define DEPTH_OF_FIELD_RELATED_SETTINGS
+#define NETHER_RELATED_SETTINGS
+#define END_RELATED_SETTINGS
 #define ATMOSPHERE_COEFF_RELATED_SETTINGS
 #define SUN_AND_MOON_RELATED_SETTINGS
-#define EXPOSURE_RELATED_SETTINGS
+#define SKY_RELATED_SETTINGS
 #define SHADOWMAP_CONSTANT_RELATED_SETTINGS
+#define AMBIENT_LIGHT_RELATED_SETTINGS
 #define SEASONS_RELATED_SETTINGS
+#define VOLUMETRIC_CLOUD_RELATED_SETTINGS
 #define VOLUMETRIC_FOG_RELATED_SETTINGS
 #define SCENE_CONTROLLER_RELATED_SETTINGS
 #define ANTIALIASING_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
 #include "/lib/res_params.glsl"
-
-// uniform int dhRenderDistance;
-uniform float frameTimeCounter;
 #include "/lib/Shadow_Params.glsl"
 
-
-
 flat varying vec3 averageSkyCol_Clouds;
+
 flat varying vec3 averageSkyCol;
 
 flat varying vec3 sunColor;
@@ -24,6 +24,7 @@ flat varying vec3 sunColor2;
 flat varying vec3 moonColor;
 flat varying vec3 lightSourceColor;
 flat varying vec3 zenithColor;
+flat varying vec3 WsunVec;
 
 
 flat varying float exposure;
@@ -48,9 +49,9 @@ uniform float eyeAltitude;
 uniform float rainStrength;
 uniform float nightVision;
 uniform float near;
-// uniform float far;
 uniform float frameTime;
 uniform int frameCounter;
+uniform float frameTimeCounter;
 
 vec3 sunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);
 
@@ -92,9 +93,11 @@ float hash11(float p)
 
 void main() {
 
-	gl_Position = ftransform()*0.5+0.5;
-	gl_Position.xy = gl_Position.xy*vec2(18.+258*2,258.)*texelSize;
-	gl_Position.xy = gl_Position.xy*2.-1.0;
+	gl_Position = ftransform();
+	gl_Position.xy *= vec2(SKY_CLOUD_ATLAS_OFFSET_X + SKY_CLOUD_ATLAS_SIZE + 1.0, SKY_CLOUD_ATLAS_SIZE + 1.0) / 2048.0;
+	gl_Position.xy = gl_Position.xy * 2.0 - 1.0;
+
+	WsunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);
 
 #ifdef OVERWORLD_SHADER
 
