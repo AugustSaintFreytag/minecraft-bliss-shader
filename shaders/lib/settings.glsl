@@ -300,11 +300,6 @@
 		#ifdef FORWARD_ROUGH_REFLECTION
 		#endif
 	#endif
-
-	// #define SSR_SELF_REFLECT_FIX
-	#if defined VOXY || defined DISTANT_HORIZONS
-		#define TERRIBLE_SSR_LOD_FALLBACK
-	#endif
 #endif
 
 #if defined SUB_SURFACE_SCATTERING_RELATED_SETTINGS
@@ -952,8 +947,6 @@
 #endif
 #ifdef LABEL_1
 #define LABEL_1 0 // [0]
-#endif
-#ifdef TERRIBLE_SSR_LOD_FALLBACK
 #endif
 #ifdef HANDHELD_LIGHTSOURCE_SPECULAR
 #endif
