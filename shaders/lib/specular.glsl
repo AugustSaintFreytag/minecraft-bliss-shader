@@ -106,15 +106,15 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 	float biasAmount = 0.000075;
 
 	vec3 clipPosition = toClipSpace3(position);
-	float rayLength = ((position.z + dir.z * far*sqrt(3.)) > -near) ? (-near -position.z) / dir.z : far*sqrt(3.);
-	vec3 direction = toClipSpace3(position + dir*rayLength) - clipPosition;  //convert to clip space
-	vec3 reflectedTC = vec3((direction.xy + clipPosition.xy) * RENDER_SCALE, 0.999999);
+	float rayLength = ((position.z + dir.z * far * sqrt(3.0)) > -near) ? (-near -position.z) / dir.z : far * sqrt(3.0);
+	vec3 direction = toClipSpace3(position + dir * rayLength) - clipPosition;
+	vec3 reflectedPosition = vec3((direction.xy + clipPosition.xy) * RENDER_SCALE, 0.999999);
 
 	#if FORWARD_SSR_QUALITY == 1
-		return reflectedTC;
+		return reflectedPosition;
 	#endif
 
-	//get at which length the ray intersects with the edge of the screen
+	// Get at which length the ray intersects with the edge of the screen.
 	vec3 maxLengths = (step(0.0, direction) - clipPosition) / direction;
 	float mult = min(min(maxLengths.x, maxLengths.y), maxLengths.z);
 	vec3 stepv = direction * mult / quality;
@@ -122,11 +122,11 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 	clipPosition.xy *= RENDER_SCALE;
 	stepv.xy *= RENDER_SCALE;
 
-	vec3 spos = clipPosition + stepv*(dither*0.5+0.5);
-	spos += vec3(0.5*texelSize,0.0); // small offsets to reduce artifacts from precision differences.
+	vec3 spos = clipPosition + stepv * (dither * 0.5 + 0.5);
+	spos += vec3(0.5 * texelSize, 0.0); // small offsets to reduce artifacts from precision differences.
 	
 	#if defined DEFERRED_SPECULAR && TAA_MODE > 0
-		spos.xy += taaJitter*texelSize*0.5/RENDER_SCALE;
+		spos.xy += taaJitter * texelSize * 0.5 / RENDER_SCALE;
 	#endif
 
 	float minZ = spos.z - 0.00025 / linZ(spos.z);
@@ -138,13 +138,12 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 			if(!hand && (spos.x < 0 || spos.x > 1 || spos.y < 0 || spos.y > 1)) return vec3(1.1);
 		#endif
 
-		float sampleDepth = sqrt(texelFetch(colortex4, ivec2(spos.xy/texelSize/4.0),0).a/65000.0);
-		
+		float sampleDepth = sqrt(texelFetch(colortex4, ivec2(spos.xy / texelSize / 4.0), 0).a / 65000.0);
 		float sp = invLinZ(sampleDepth);
 
 
 		if(sp < max(minZ, maxZ) && sp > min(minZ, maxZ)) {
-			hitPos = vec3(spos.xy/RENDER_SCALE, sp);
+			hitPos = vec3(spos.xy / RENDER_SCALE, sp);
 			break;
 		}
 		
@@ -158,10 +157,12 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 
 
 	#if DEFERRED_SSR_QUALITY == 1
-		return reflectedTC;
+		return reflectedPosition;
 	#endif
 
-	if(hand) return reflectedTC;
+	if(hand) {
+		return reflectedPosition;
+	}
 	return hitPos;
 }
 
@@ -176,37 +177,40 @@ vec4 screenSpaceReflections(
 ){
 	vec4 reflection = vec4(0.0);
 	float reflectionLength = 0.0;
-
 	float quality = 1.0f;
+
 	#if defined FORWARD_SPECULAR
 		quality = float(FORWARD_SSR_QUALITY);
 	#endif
+
 	#if defined DEFERRED_SPECULAR
 		quality = float(DEFERRED_SSR_QUALITY);
 	#endif
 
 	vec3 raytracePos = rayTraceSpeculars(reflectedVector, viewPos, noise, quality, isHand, reflectionLength);
 	
-	bool isDH = false;
+	bool isLODHit = false;
 	
 	if (raytracePos.z > 0.99999) {
 		#if defined DISTANT_HORIZONS || defined VOXY
 			ivec2 dhCoord = ivec2(raytracePos.xy * RENDER_SCALE / texelSize / 4.0);
 			float dhVal = texelFetch(colortex12, dhCoord, 0).a;
 			
-			if (dhVal < 64900.0) isDH = true;
+			if (dhVal < 64900.0) {
+				isLODHit = true;
+			}
 		#endif
 	}
 
-	bool invalidHit = raytracePos.z > 1.0;
+	bool isInvalidHit = raytracePos.z > 1.0;
 
 	#ifdef SSR_SELF_REFLECT_FIX
-		if (distance(gl_FragCoord.xy*texelSize, raytracePos.xy) < 0.002) {
-			invalidHit = true;
+		if (distance(gl_FragCoord.xy * texelSize, raytracePos.xy) < 0.002) {
+			isInvalidHit = true;
 		}
 	#endif
 
-	if (isDH) {
+	if (isLODHit) {
 		#if defined DISTANT_HORIZONS || defined VOXY
 			// Get linearized DH depth (output of `DH_linZ`)
 			ivec2 dhCoord = ivec2(raytracePos.xy * RENDER_SCALE / texelSize / 4.0);
@@ -223,13 +227,13 @@ vec4 screenSpaceReflections(
 		#endif
 	}
 
-	if (!isDH && invalidHit) {
+	if (!isLODHit && isInvalidHit) {
 		return reflection;
 	}
 
-	// use higher LOD as the reflection goes on, to blur it. this helps denoise a little.
-	reflectionLength = min(max(reflectionLength - 0.1, 0.0)/0.9, 1.0);
-	float LOD = mix(0.0, 6.0*(1.0-exp(-15.0*sqrt(roughness))), 1.0-pow(1.0-reflectionLength,5.0));
+	// Use higher LOD as the reflection goes on to produce minor blur effect.
+	reflectionLength = min(max(reflectionLength - 0.1, 0.0) / 0.9, 1.0);
+	float LOD = mix(0.0, 6.0 * (1.0 - exp(-15.0 * sqrt(roughness))), 1.0 - pow(1.0 - reflectionLength, 5.0));
 
 	vec3 previousPosition = mat3(gbufferModelViewInverse) * toScreenSpace(raytracePos);
 	previousPosition += gbufferModelViewInverse[3].xyz + (cameraPosition - previousCameraPosition);
@@ -237,13 +241,15 @@ vec4 screenSpaceReflections(
 	previousPosition = mat3(gbufferPreviousModelView) * previousPosition + gbufferPreviousModelView[3].xyz;
 	previousPosition.xy = projMAD(gbufferPreviousProjection, previousPosition).xy / -previousPosition.z * 0.5 + 0.5;
 
-	if (previousPosition.x > 0.0 && previousPosition.y > 0.0 && previousPosition.x < 1.0 && previousPosition.y < 1.0) {
-		if(raytracePos.z > 0.999999 && !isDH) {
+	bool previousInBounds = previousPosition.x > 0.0 && previousPosition.y > 0.0 && previousPosition.x < 1.0 && previousPosition.y < 1.0;
+
+	if (previousInBounds) {
+		if(raytracePos.z > 0.999999 && !isLODHit) {
 			backgroundReflectMask = 1.0;
 		}
 
 		#if defined OVERWORLD_SHADER 
-			bool isSky = raytracePos.z > 0.999999 && !isDH;
+			bool isSky = raytracePos.z > 0.999999 && !isLODHit;
 			
 			if (isSky) {
 				reflection.a = (isHand || isEyeInWater == 1) ? 1.0 : 0.0;
@@ -255,44 +261,25 @@ vec4 screenSpaceReflections(
 		#endif
 		
 		#ifdef FORWARD_SPECULAR
-			// vec2 clampedRes = max(vec2(viewWidth,viewHeight),vec2(1920.0,1080.));
-			// vec2 resScale = vec2(1920.,1080.)/clampedRes;
-			// vec2 bloomTileUV = (((previousPosition.xy/texelSize)*2.0 + 0.5)*texelSize/2.0) / clampedRes*vec2(1920.,1080.);
-			// reflection.rgb = texture(colortex6, bloomTileUV / 4.0).rgb;
 			reflection.rgb = texture(colortex5, previousPosition.xy).rgb;
 		#else
 			reflection.rgb = texture2DLod(colortex5, previousPosition.xy, LOD).rgb;
 		#endif
 	}
 
-	// reflection.rgb = vec3(LOD/6);
-
-// vec2 clampedRes = max(vec2(viewWidth,viewHeight),vec2(1920.0,1080.));
-// vec2 resScale = vec2(1920.,1080.)/clampedRes;
-// vec2 bloomTileUV = (((previousPosition.xy/texelSize)*2.0 + 0.5)*texelSize/2.0) / clampedRes*vec2(1920.,1080.);
-
-// vec2 bloomTileoffsetUV[6] = vec2[](
-//  	bloomTileUV / 4.,
-//  	bloomTileUV / 8.   + vec2(0.25*resScale.x+2.5*texelSize.x, 		.0),
-//  	bloomTileUV / 16.  + vec2(0.375*resScale.x+4.5*texelSize.x, 	.0),
-//  	bloomTileUV / 32.  + vec2(0.4375*resScale.x+6.5*texelSize.x, 	.0),
-//  	bloomTileUV / 64.  + vec2(0.46875*resScale.x+8.5*texelSize.x,  	.0),
-//  	bloomTileUV / 128. + vec2(0.484375*resScale.x+10.5*texelSize.x,	.0)
-// );
-// // reflectLength = pow(1-pow(1-reflectLength,2),5) * 6;
-// reflectLength = (exp(-4*(1-reflectLength))) * 6;
-// Reflections.rgb = texture(colortex6, bloomTileoffsetUV[0]).rgb;
-
 	return reflection;
 }
 
 float getReflectionVisibility(float f0, float roughness){
+	// The goal is to determine if the reflection is even visible. 
+	// If it reaches a point in smoothness or reflectance where it is not visible, 
+	// allow it to interpolate to diffuse lighting.
 
-	// the goal is to determine if the reflection is even visible. 
-	// if it reaches a point in smoothness or reflectance where it is not visible, allow it to interpolate to diffuse lighting.
 	float thresholdValue = ROUGHNESS_TRESHOLD;
 
-	if(thresholdValue < 0.01) return 0.0;
+	if(thresholdValue < 0.01) {
+		return 0.0;
+	}
 
 	// the visibility gradient should only happen for dialectric materials. because metal is always shiny i guess or something
 	float dialectrics = max(f0*255.0 - 26.0,0.0)/229.0;
