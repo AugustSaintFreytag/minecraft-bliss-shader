@@ -713,22 +713,20 @@ void applyPuddles(
 	*/
 	vec3 unchangedNormals = normals;
 
-	float halfWet = min(wetnessAmount,1.0);
-	float fullWet = clamp(wetnessAmount - 2.0,0.0,1.0);
-	// halfWet = 1.0;
- 	// fullWet = 0.0;
+	float halfWet = min(wetnessAmount, 1.0);
+	float fullWet = clamp(wetnessAmount - 2.0, 0.0, 1.0);
 
-	vec2 driprate = vec2(0.0,frameTimeCounter)*0.05;
+	vec2 driprate = vec2(0.0,frameTimeCounter) * 0.05;
 
-	vec2 UV = mix(worldPos.xz, worldPos.xy*vec2(2.0, 0.5)+driprate, abs(flatNormals.z));
-	UV = mix(UV, worldPos.zy*vec2(2.0, 0.5)+driprate, abs(flatNormals.x));
+	vec2 UV = mix(worldPos.xz, worldPos.xy*vec2(2.0, 0.5) + driprate, abs(flatNormals.z));
+	UV = mix(UV, worldPos.zy*vec2(2.0, 0.5) + driprate, abs(flatNormals.x));
 
 	float noise = texture(noisetex, UV * 0.02).b;
 
-	float lightmapMax = min(max(lightmap - 0.9,0.0) * 10.0,1.0) ;
-	float lightmapMin = min(max(lightmap - 0.8,0.0) * 5.0,1.0) ;
-	lightmap = clamp(lightmapMax + noise*lightmapMin*2.0,0.0,1.0);
-	lightmap = pow(1.0-pow(1.0-lightmap,3.0),2.0);
+	float lightmapMax = min(max(lightmap - 0.9, 0.0) * 10.0, 1.0) ;
+	float lightmapMin = min(max(lightmap - 0.8, 0.0) * 5.0, 1.0) ;
+	lightmap = clamp(lightmapMax + noise * lightmapMin * 2.0, 0.0, 1.0);
+	lightmap = pow(1.0 - pow(1.0 - lightmap, 3.0), 2.0);
 	
 	#if PUDDLE_MODE == 1
 		float puddles = max(halfWet - noise,0.0);
@@ -743,13 +741,13 @@ void applyPuddles(
 		puddles = clamp(halfWet - exp(-25.0 * puddles*puddles*puddles*puddles*puddles),0.0,1.0);
 	
 		float wetnessStages = puddles * lightmap;
-		float wetnessDarkening = wetnessStages;
+		float wetnessDarkening = wetnessStages * 0.7;
 	#endif
 
 	#if PUDDLE_MODE == 3
 		float puddles = 0.0;
 		float wetnessStages = fullWet * lightmap;
-		float wetnessDarkening = wetnessStages*0.5;
+		float wetnessDarkening = wetnessStages * 0.3;
 	#endif
 
 	if(isWater) wetnessStages = 0.0;
@@ -757,7 +755,9 @@ void applyPuddles(
 	normals = mix(normals, flatNormals, puddles * lightmap * clamp(flatNormals.y,0.0,1.0));
 	roughness = mix(roughness, 1.0, wetnessStages);
 
-	if(f0 < 229.5/255.0 ) albedo = pow(albedo * (1.0 - 0.08*wetnessDarkening), vec3(1.0 + 0.7*wetnessDarkening));
+	if(f0 < 229.5/255.0) {
+		albedo = pow(albedo * (1.0 - 0.08 * wetnessDarkening), vec3(1.0 + 0.7 * wetnessDarkening));
+	}
 
 	//////////////// snow
 	
