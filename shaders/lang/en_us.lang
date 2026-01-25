@@ -1109,6 +1109,12 @@ screen.MOD_SETTINGS = Supported Mods
     option.DH_SSS_OCCLUSION_SAMPLES = SSS Occlusion Samples (DH)
     option.DH_SSS_OCCLUSION_STEP = SSS Occlusion Step Size (DH)
     option.DH_VOLUMETRIC_OCCLUSION = Volumetric Occlusion (DH)
+    option.DH_VOLUMETRIC_SUN_OCCLUSION = Volumetric Sun Occlusion (DH)
+        value.DH_VOLUMETRIC_SUN_OCCLUSION.0 = §cOFF
+    option.DH_VOLUMETRIC_LIGHT_OCCLUSION = Volumetric Light Occlusion (DH)
+        value.DH_VOLUMETRIC_LIGHT_OCCLUSION.0 = §cOFF
+    option.DH_VOLUMETRIC_OCCLUSION_SAMPLES = Volumetric Occlusion Samples
+        value.DH_VOLUMETRIC_OCCLUSION_SAMPLES.0 = §cOFF
 
     screen.PHYSICS_MOD_OCEAN = Physics Mod §c⚠ READ DESCRIPTION§r
 
@@ -1120,6 +1126,7 @@ screen.MOD_SETTINGS = Supported Mods
 
     option.DH_SSS_OCCLUSION_SAMPLES.comment = Number of samples taken when calculating sub-surface scattering occlusion on Distant Horizons terrain. §a⚠ PERFORMANCE COST:§r medium
     option.DH_SSS_OCCLUSION_STEP.comment = Step size when calculating sub-surface scattering occlusion on Distant Horizons terrain. §a⚠ PERFORMANCE COST:§r very low
+    option.DH_VOLUMETRIC_OCCLUSION_SAMPLES.comment = Number of depth samples taken when evaluating DH volumetric occlusion. Higher values produce smoother masking at the cost of slightly more work.
     option.DH_VOLUMETRIC_OCCLUSION.comment = Uses Distant Horizons depth buffer when sampling for sun-produced volumetrics. Allows DH terrain to obscure sunlight. §a⚠ PERFORMANCE COST:§r medium
     
  ###################################################### ↓↓↓ THIS SUBMENU'S LABELS

@@ -364,10 +364,6 @@ float DH_SSS_SunVisibility(vec3 viewPos, vec3 lightDir, float noise) {
 
 	return visibility / samples;
 }
-#else
-float DH_SSS_SunVisibility(vec3 viewPos, vec3 lightDir, float noise) {
-	return 1.0;
-}
 #endif
 
 vec2 SSRT_Shadows(vec3 viewPos, bool depthCheck, vec3 lightDir, float noise, bool isSSS, bool hand){
@@ -1167,11 +1163,11 @@ void main() {
 				// 	ShadowBlockerDepth = max(ShadowBlockerDepth, sssDistanceAtten * 0.2);
 				// }
 				
-				// combine shadowmap with screenspace shadows.
+				// Combine shadowmap with screenspace shadows.
 				shadowColor *= SS_directLight.r;
 			#else
 				vec2 SS_directLight = vec2(1,0);
-				ShadowBlockerDepth = max(ShadowBlockerDepth, (1.0-shadowMapFalloff2) * 10.0);
+				ShadowBlockerDepth = max(ShadowBlockerDepth, (1.0 - shadowMapFalloff2) * 10.0);
 			#endif
 			
 			#ifdef TRANSLUCENT_COLORED_SHADOWS
@@ -1185,7 +1181,7 @@ void main() {
 			#ifdef DISTANT_HORIZONS
 				if (sunSSS_density > 0.0) {
 					float dhSSSVisibility = DH_SSS_SunVisibility(viewPos, normalize(WsunVec*mat3(gbufferModelViewInverse)), ig_noise);
-					SSSColor *= clamp(dhSSSVisibility, 0.0, 1.0);
+					SSSColor *= dhSSSVisibility;
 				}
 			#endif
 			
@@ -1198,8 +1194,7 @@ void main() {
 	
 		float cloudShadows = GetCloudShadow(feetPlayerPos.xyz + cameraPosition, WsunVec);
 		shadowColor *= cloudShadows;
-		SSSColor *= cloudShadow*cloudShadows;
-	
+		SSSColor *= cloudShadow * cloudShadows;
 	#endif
 
 	#ifdef END_SHADER

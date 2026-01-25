@@ -769,6 +769,7 @@
 	#define DH_SSS_OCCLUSION_SAMPLES 16.0 // [0.0 2.0 4.0 6.0 8.0 12.0 16.0 24.0 32.0 48.0 64.0]
 	#define DH_SSS_OCCLUSION_STEP 60.0 // [20.0 30.0 40.0 50.0 60.0 80.0 100.0 120.0 160.0 180.0 200.0]
 	#define DH_VOLUMETRIC_OCCLUSION
+	#define DH_VOLUMETRIC_OCCLUSION_SAMPLES 16 // [0 4 8 12 16 20 24 32 36 48 54 64 72 84 96 128 256]
 #endif
 
 ///////////////////////////////
@@ -863,14 +864,6 @@
 // fix settings
 #ifdef ISOLATE_RESOURCEPACK_SKY
 #endif
-#ifdef DH_TAA_JITTER
-#endif
-#ifdef DH_SCREENSPACE_REFLECTIONS
-#endif
-#ifdef DH_SUBSURFACE_SCATTERING
-#endif
-#ifdef DH_VOLUMETRIC_OCCLUSION
-#endif
 #ifdef TRANSLUCENT_ENTITIES
 #endif
 #ifdef RENDER_ENTITY_SHADOWS
@@ -882,8 +875,6 @@
 #ifdef LIGHTNING_FLASH
 #endif
 #if SHADER_VERSION_LABEL > 0
-#endif
-#if DH_KNOWN_ISSUES == 0
 #endif
 #ifdef PARTICLE_RENDERING_FIX
 #endif
@@ -979,4 +970,15 @@
 #ifdef INDIRECT_FOG_G
 #endif
 #ifdef INDIRECT_FOG_B
+#endif
+
+#ifdef DH_TAA_JITTER
+#endif
+#ifdef DH_SCREENSPACE_REFLECTIONS
+#endif
+#ifdef DH_SUBSURFACE_SCATTERING
+#endif
+#ifdef DH_VOLUMETRIC_OCCLUSION
+#endif
+#ifdef DH_KNOWN_ISSUES
 #endif
