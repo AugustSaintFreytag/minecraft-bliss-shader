@@ -429,8 +429,17 @@ float swapperlinZ(float depth, float _near, float _far) {
 			for (int i = 0; i < samples; i++) { 
 				newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
 
-				float sampleDepth = texelFetch(LOD_DEPTHTEX1, ivec2(newPos.xy/texelSize), 0).x;
+				// prefer vanilla depth samples before falling back to DH LOD depth
+				ivec2 vanillaDepthCoord = ivec2(newPos.xy / texelSize / 4.0);
+				float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, vanillaDepthCoord, 0).a / 65000.0));
 				float linearDepth = swapperlinZ(sampleDepth, _near, _far);
+
+				// once vanilla depth is exhausted, fall back to the DH LOD depth buffer
+				if (linearDepth >= 1.0) {
+					ivec2 dhDepthCoord = ivec2(newPos.xy / texelSize);
+					float dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
+					linearDepth = swapperlinZ(dhSampleDepth, _near, _far);
+				}
 
 				godrays += (linearDepth >= 1.0 ? 1.0 : lightRange);
 			}

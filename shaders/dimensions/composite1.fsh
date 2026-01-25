@@ -803,8 +803,8 @@ void main() {
 		bool isDHrange = z >= 1.0;
 
 		#ifdef USING_LOD_MOD
-			float DH_mixedLinearZ = sqrt(texture(colortex12,texcoord).a/65000.0);
-			float DH_depth0 = texture(LOD_DEPTHTEX0,texcoord).x;
+			float DH_mixedLinearZ = sqrt(texture(colortex12,texcoord).a / 65000.0);
+			float DH_depth0 = texture(LOD_DEPTHTEX0, texcoord).x;
 			float DH_depth1 = texture(LOD_DEPTHTEX1 ,texcoord).x;
 
 			float depthOpaque = z;
