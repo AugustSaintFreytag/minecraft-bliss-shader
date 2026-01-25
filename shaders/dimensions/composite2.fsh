@@ -630,9 +630,12 @@ void main() {
 	vec3 totEpsilon = vec3(Water_Absorb_R, Water_Absorb_G, Water_Absorb_B);
 	vec3 scatterCoef = dirtAmount * vec3(Dirt_Scatter_R, Dirt_Scatter_G, Dirt_Scatter_B) / 3.14;
 
-	vec3 directLightColor = lightCol.rgb / 2400.0;
-	vec3 directLightColorVL = directLightColor;
-	vec3 indirectLightColor = averageSkyCol / 1200.0;
+	vec3 baseDirectLightColor = vec3(DIRECTLIGHT_FOG_R, DIRECTLIGHT_FOG_G, DIRECTLIGHT_FOG_B);
+	vec3 baseIndirectLightColor = vec3(INDIRECTLIGHT_FOG_R, INDIRECTLIGHT_FOG_G, INDIRECTLIGHT_FOG_B);
+
+	vec3 directLightColor = baseDirectLightColor * lightCol.rgb / 2400.0;
+
+	vec3 indirectLightColor = baseIndirectLightColor * averageSkyCol / 1200.0;
 	vec3 indirectLightColor_dynamic = averageSkyCol_Clouds / 1200.0;
 	
     vec3 indirectLight = indirectLightColor_dynamic * skyLightLevelSmooth * ambient_brightness; 
