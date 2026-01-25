@@ -4,7 +4,7 @@
 
 uniform int worldDay;
 uniform int worldTime;
-float cloud_movement = (worldTime  + mod(worldDay,100)*24000.0) / 24.0 * Cloud_Speed;
+float cloud_movement = (worldTime + mod(worldDay, 100) * 24000.0) / 24.0 * Cloud_Speed;
 
 float densityAtPos(in vec3 pos){
 	pos /= 18.;
@@ -434,10 +434,9 @@ vec3 getRayOrigin(
 	vec3 rayStartPos,
 	vec3 cameraPos,
 	float dither,
-	
 	float minHeight,
-	float maxHeight
-	,int samples
+	float maxHeight,
+	int samples
 ){
 
 	vec3 cloudDist = vec3(1.0); 
@@ -688,7 +687,8 @@ vec4 GetVolumetricClouds(
 	color = blendedCloudColor.rgb;
 	totalAbsorbance = blendedCloudColor.a;
 
-	// return vec4(vec3(cloudPlaneDistance/1500.0), 0.0);
+	float saturationIntensity = SdotV * 2.0;
+	color = saturateColor(color, clamp(saturationIntensity, 0.5, 1.0));
 
 	return vec4(color, totalAbsorbance);
 }

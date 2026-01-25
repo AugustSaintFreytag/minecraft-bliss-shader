@@ -320,17 +320,20 @@ void main() {
 			mixhistory = 1.0;
 		}
 
-		vec2 p = clamp((floor(gl_FragCoord.xy-vec2(SKY_CLOUD_ATLAS_OFFSET_X, SKY_ATLAS_OFFSET_Y)) + 0.5)/SKY_CLOUD_ATLAS_SIZE,0.0,1.0);
+		vec2 p = clamp((floor(gl_FragCoord.xy - vec2(SKY_CLOUD_ATLAS_OFFSET_X, SKY_ATLAS_OFFSET_Y)) + 0.5) / SKY_CLOUD_ATLAS_SIZE, 0.0, 1.0);
 		
 		vec3 viewVector = cartToSphere(p);
-		vec3 viewPos = mat3(gbufferModelView)*viewVector*1024.0;
+		vec3 viewPos = mat3(gbufferModelView) * viewVector * 1024.0;
 		float noise = interleaved_gradientNoise_temporal();
 
 		vec3 WsunVec_local = normalize(mat3(gbufferModelViewInverse) * sunPosition + gbufferModelViewInverse[3].xyz);
 		vec3 WmoonVec_local = normalize(mat3(gbufferModelViewInverse) * moonPosition + gbufferModelViewInverse[3].xyz);
 
-		if(dot(-WmoonVec_local, WsunVec_local) < 0.9999) WmoonVec_local = -WmoonVec_local;
-		WsunVec_local = mix(WmoonVec_local, WsunVec_local, clamp(float(sunElevation > 1e-5)*2.0-1.0 ,0,1));
+		if(dot(-WmoonVec_local, WsunVec_local) < 0.9999) {
+			WmoonVec_local = -WmoonVec_local;
+		}
+
+		WsunVec_local = mix(WmoonVec_local, WsunVec_local, clamp(float(sunElevation > 1e-5) * 2.0 - 1.0 , 0, 1));
 
 		vec3 skyColBase = texelFetch(colortex4, ivec2(gl_FragCoord.xy) - ivec2(int(SKY_CLOUD_ATLAS_OFFSET_X - SKY_ATLAS_OFFSET_X),0),0).rgb / 150.0;	
 		skyColBase = mix(averageSkyCol_Clouds * AmbientLightTint * 0.25, skyColBase, pow(clamp(viewVector.y + 1.0, 0.0, 1.0), 5.0));
@@ -342,8 +345,10 @@ void main() {
 		#endif
 
 		float cloudPlaneDistance = 0.0;
-		vec4 volumetricClouds = GetVolumetricClouds(viewPos, vec2(noise, 1.0-noise), WsunVec_local, suncol*2.5, skyGroundCol/30.0, cloudPlaneDistance);
-		vec4 volumetricFog = GetVolumetricFog(viewPos,vec2(noise, 1.0-noise),  WsunVec_local,    suncol*2.5, skyGroundCol/30.0, averageSkyCol_Clouds*5.0, cloudPlaneDistance);
+		float volumetricFogLightBoost = 2.5;
+
+		vec4 volumetricClouds = GetVolumetricClouds(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, cloudPlaneDistance);
+		vec4 volumetricFog = GetVolumetricFog(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, averageSkyCol_Clouds * 5.0, cloudPlaneDistance);
 
 		vec3 finalSky = skyColBase * volumetricClouds.a + volumetricClouds.rgb / 5.0;
 		finalSky = finalSky * volumetricFog.a + volumetricFog.rgb / 5.0;
@@ -454,10 +459,13 @@ void main() {
 	gl_FragData[0].rgb = clamp(mix(frameHistory, currentFrame, clamp(mixhistory, 0.0, 1.0)), 0.0, 65000.0);
 
 	// Exposure values
-	if (gl_FragCoord.x > 10. && gl_FragCoord.x < 11.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 )
-	gl_FragData[0] = vec4(exposure, avgBrightness, avgL2,1.0);
-	if (gl_FragCoord.x > 14. && gl_FragCoord.x < 15.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 )
-	gl_FragData[0] = vec4(rodExposure, centerDepth,0.0, 1.0);
+	if (gl_FragCoord.x > 10. && gl_FragCoord.x < 11.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ) {
+		gl_FragData[0] = vec4(exposure, avgBrightness, avgL2,1.0);
+	}
+
+	if (gl_FragCoord.x > 14. && gl_FragCoord.x < 15.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ) {
+		gl_FragData[0] = vec4(rodExposure, centerDepth,0.0, 1.0);
+	}
 
 	// gl_FragData[0] = vec4(vec3(1.0, 0.0, 0.0) * 1200, 65000.0);
 }

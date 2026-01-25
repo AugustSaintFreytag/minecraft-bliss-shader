@@ -13,6 +13,7 @@
 
 #include "/lib/settings.glsl"
 #include "/lib/macro_lod_mod.glsl"
+#include "/lib/util.glsl"
 
 #define EXCLUDE_WRITE_TO_LUT
 
@@ -424,7 +425,8 @@ float swapperlinZ(float depth, float _near, float _far) {
 		vec2 screenEdges = 2.0 / vec2(viewWidth, viewHeight);
 
 		#if defined DH_VOLUMETRIC_OCCLUSION
-			for (int i = 0; i < DH_VOLUMETRIC_OCCLUSION_SAMPLES; i++) { 
+		int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
+			for (int i = 0; i < samples; i++) { 
 				newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
 
 				float sampleDepth = texelFetch(LOD_DEPTHTEX1, ivec2(newPos.xy/texelSize), 0).x;
@@ -432,6 +434,8 @@ float swapperlinZ(float depth, float _near, float _far) {
 
 				godrays += (linearDepth >= 1.0 ? 1.0 : lightRange);
 			}
+
+			return godrays / float(samples);
 		#else
 			int samples = 16;
 			for (int i = 0; i < samples; i++) { 
@@ -444,9 +448,9 @@ float swapperlinZ(float depth, float _near, float _far) {
 
 				godrays += (swapperlinZ(sampleDepth, _near, _far) > 1.0 ? 1.0 : lightRange);
 			}
-		#endif
 
-		return godrays / float(samples);
+			return godrays / float(samples);
+		#endif
 	}
 #else
 	float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanilladepth){
@@ -520,7 +524,7 @@ vec4 waterVolumetrics_alt( vec3 rayStart, vec3 rayEnd, float estEndDepth, float 
 
 					if(shadow2D(shadowtex1, pos).x > pos.z && sh.x < 1.0){
 						vec4 translucentShadow = texture(shadowcolor0, pos.xy);
-						if(translucentShadow.a < 0.9) sh = normalize(translucentShadow.rgb+0.0001);
+						if(translucentShadow.a < 0.9) sh = normalize(translucentShadow.rgb + 0.0001);
 					}
 				#else
 					sh = vec3(shadow2D(shadow, pos).x);
