@@ -478,30 +478,30 @@ float convertHandDepth(float depth) {
     return ndcDepth * 0.5 + 0.5;
 }
 
-float swapperlinZ(float depth, float _near, float _far) {
-    return (2.0 * _near) / (_far + _near - depth * (_far - _near));
+float swapperlinZ(float depth, float nearPlane, float farPlane) {
+    return (2.0 * nearPlane) / (farPlane + nearPlane - depth * (farPlane - nearPlane));
 }
 
 #if defined DISTANT_HORIZONS
-	float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanilladepth){
+	float sampleVolumetricOcclusion( in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
 		float godrays = 0.0;
 		float stepSize = 60.0;
 
-		float _near = near; 
-		float _far = far * 4.0;
+		float nearPlane = near; 
+		float farPlane = far * 4.0;
 
 		bool depthCheck = true;
 
 		if (depthCheck) {
-			_near = dhNearPlane;
-			_far = dhFarPlane;
+			nearPlane = dhNearPlane;
+			farPlane = dhFarPlane;
 		}
 		
 		float lightRange = pow(clamp(-dot(normalize(viewPos), lightDir) + 0.65, 0.0, 1.0), 2.0);
 		vec3 position = toClipSpace3_DH(viewPos, depthCheck);
 		
 		// Prevent ray from going behind camera.
-		float rayLength = ((viewPos.z + lightDir.z * _far * sqrt(3.0)) > - _near) ? (-_near - viewPos.z) / lightDir.z : _far * sqrt(3.0);
+		float rayLength = ((viewPos.z + lightDir.z * farPlane * sqrt(3.0)) > - nearPlane) ? (-nearPlane - viewPos.z) / lightDir.z : farPlane * sqrt(3.0);
 
 		vec3 direction = toClipSpace3_DH(viewPos + lightDir * rayLength, depthCheck) - position;
 
@@ -516,39 +516,49 @@ float swapperlinZ(float depth, float _near, float _far) {
 
 		#if defined DH_VOLUMETRIC_OCCLUSION
 			int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
+			int samplesProcessed = 0;
 			
-			const float depthFarThreshold = 0.99999;
-			const float occlusionDistanceCutoff = 1024.0;
-
-			float marchDistance = 0.0;
+			float depthFarThreshold = 0.99;
+			float occlusionDistanceCutoff = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
+			float occlusionDistanceCutoffSq = occlusionDistanceCutoff * occlusionDistanceCutoff;
 
 			for (int i = 0; i < samples; i++) { 
 				newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
 
-				if (marchDistance >= occlusionDistanceCutoff) {
-					// Stop ray marching once we reach cutoff distance, stop hitting DH depth.
+				vec4 sampleClip = vec4(newPos * 2.0 - 1.0, 1.0);
+				vec4 sampleViewHomogeneous = LOD_PROJECTION_INVERSE * sampleClip;
+				vec3 sampleViewPos = sampleViewHomogeneous.xyz / sampleViewHomogeneous.w;
+				
+				if (dot(sampleViewPos, sampleViewPos) > occlusionDistanceCutoffSq) {
 					break;
 				}
 
 				// Prefer vanilla depth samples before falling back to DH LOD depth.
 				ivec2 vanillaDepthCoord = ivec2(newPos.xy / texelSize / 4.0);
 				float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, vanillaDepthCoord, 0).a / 65000.0));
-				float linearDepth = clamp(swapperlinZ(sampleDepth, _near, _far), 0.0, 1.0);
+				float linearDepth = clamp(swapperlinZ(sampleDepth, nearPlane, farPlane), 0.0, 1.0);
 
 				// Once vanilla depth is exhausted, continue in LOD depth buffer.
 				if (linearDepth >= depthFarThreshold) {
 					ivec2 dhDepthCoord = ivec2(newPos.xy / texelSize);
 					float dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
-					linearDepth = clamp(swapperlinZ(dhSampleDepth, _near, _far), 0.0, 1.0);
+					linearDepth = clamp(swapperlinZ(dhSampleDepth, nearPlane, farPlane), 0.0, 1.0);
 				}
 
 				godrays += (linearDepth >= depthFarThreshold ? 1.0 : lightRange);
-				marchDistance += stepSize;
+				newPos += direction;
+				samplesProcessed ++;
+			}
+
+			if (samplesProcessed == 0) {
+				return 1.0;
 			}
 
 			return godrays / float(samples);
 		#else
 			int samples = 16;
+			int samplesProcessed = 0;
+
 			for (int i = 0; i < samples; i++) { 
 				newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
 				float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, ivec2(newPos.xy / texelSize / 4.0), 0).a / 65000.0));
@@ -557,14 +567,19 @@ float swapperlinZ(float depth, float _near, float _far) {
 					sampleDepth = texelFetch(dhDepthTex1, ivec2(newPos.xy / texelSize), 0).x;
 				}
 
-				godrays += (swapperlinZ(sampleDepth, _near, _far) > 1.0 ? 1.0 : lightRange);
+				godrays += (swapperlinZ(sampleDepth, nearPlane, farPlane) > 1.0 ? 1.0 : lightRange);
+				samplesProcessed ++;
 			}
 
-			return godrays / float(samples);
+			if (samplesProcessed == 0) {
+				return 1.0;
+			}
+
+			return godrays / float(samplesProcessed);
 		#endif
 	}
 #else
-	float godrayTest( in vec3 viewPos, in vec3 lightDir, float noise, float vanilladepth){
+	float sampleVolumetricOcclusion( in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
 		return 1.0;
 	}
 #endif

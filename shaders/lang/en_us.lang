@@ -1115,6 +1115,7 @@ screen.MOD_SETTINGS = Supported Mods
         value.DH_VOLUMETRIC_LIGHT_OCCLUSION.0 = §cOFF
     option.DH_VOLUMETRIC_OCCLUSION_SAMPLES = Volumetric Occlusion Samples
         value.DH_VOLUMETRIC_OCCLUSION_SAMPLES.0 = §cOFF
+    option.DH_VOLUMETRIC_OCCLUSION_DISTANCE = Volumetric Occlusion Max Distance
 
     screen.PHYSICS_MOD_OCEAN = Physics Mod §c⚠ READ DESCRIPTION§r
 
