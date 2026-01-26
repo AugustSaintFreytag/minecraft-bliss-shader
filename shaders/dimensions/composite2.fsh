@@ -653,7 +653,7 @@ void main() {
 	float cloudPlaneDistance = 0.0;
 
 	#if defined OVERWORLD_SHADER
-		vec4 VolumetricClouds = GetVolumetricClouds(viewPos0, BN, WsunVec, directLightColorOccluded, indirectLightColor, cloudPlaneDistance);
+		vec4 VolumetricClouds = GetVolumetricClouds(viewPos0, BN, WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
 	  	
   		#if defined OVERWORLD_SHADER && defined CAVE_FOG && defined CAVE_FOG_DARKEN_SKY
   		  if (isEyeInWater == 0 && eyeAltitude < 1500){
