@@ -425,23 +425,35 @@ float swapperlinZ(float depth, float _near, float _far) {
 		vec2 screenEdges = 2.0 / vec2(viewWidth, viewHeight);
 
 		#if defined DH_VOLUMETRIC_OCCLUSION
-		int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
+			int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
+			
+			const float depthFarThreshold = 0.99999;
+			const float occlusionDistanceCutoff = 1024.0;
+
+			float marchDistance = 0.0;
+
 			for (int i = 0; i < samples; i++) { 
 				newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
 
-				// prefer vanilla depth samples before falling back to DH LOD depth
-				ivec2 vanillaDepthCoord = ivec2(newPos.xy / texelSize / 4.0);
-				float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, vanillaDepthCoord, 0).a / 65000.0));
-				float linearDepth = swapperlinZ(sampleDepth, _near, _far);
-
-				// once vanilla depth is exhausted, fall back to the DH LOD depth buffer
-				if (linearDepth >= 1.0) {
-					ivec2 dhDepthCoord = ivec2(newPos.xy / texelSize);
-					float dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
-					linearDepth = swapperlinZ(dhSampleDepth, _near, _far);
+				if (marchDistance >= occlusionDistanceCutoff) {
+					// Stop ray marching once we reach cutoff distance, stop hitting DH depth.
+					break;
 				}
 
-				godrays += (linearDepth >= 1.0 ? 1.0 : lightRange);
+				// Prefer vanilla depth samples before falling back to DH LOD depth.
+				ivec2 vanillaDepthCoord = ivec2(newPos.xy / texelSize / 4.0);
+				float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, vanillaDepthCoord, 0).a / 65000.0));
+				float linearDepth = clamp(swapperlinZ(sampleDepth, _near, _far), 0.0, 1.0);
+
+				// Once vanilla depth is exhausted, continue in LOD depth buffer.
+				if (linearDepth >= depthFarThreshold) {
+					ivec2 dhDepthCoord = ivec2(newPos.xy / texelSize);
+					float dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
+					linearDepth = clamp(swapperlinZ(dhSampleDepth, _near, _far), 0.0, 1.0);
+				}
+
+				godrays += (linearDepth >= depthFarThreshold ? 1.0 : lightRange);
+				marchDistance += stepSize;
 			}
 
 			return godrays / float(samples);
@@ -644,10 +656,9 @@ void main() {
 	vec3 directLightColorOccluded = directLightColor;
 
 	#if defined OVERWORLD_SHADER && defined DH_VOLUMETRIC_OCCLUSION
-		// float sunEdgeAttenuation = mix(0.5, 1.0, smoothstep(0.0, 0.08, abs(sunElevation)));
-		float sunEdgeAttenuation = 1.0;
+		float sunEdgeAttenuation = mix(0.5, 1.0, smoothstep(0.0, 0.08, abs(sunElevation)));
 		float sunVisibility = godrayTest(viewPos0, normalize(sunVec * lightCol.a), BN.x, z0);
-		directLightColorOccluded = directLightColor * clamp(sunVisibility, 0.0, 1.0) * sunEdgeAttenuation;
+		directLightColorOccluded = directLightColor * 1.0 * sunVisibility;
 	#endif
 
 	float cloudPlaneDistance = 0.0;
