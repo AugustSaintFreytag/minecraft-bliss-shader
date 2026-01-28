@@ -482,10 +482,13 @@ float swapperlinZ(float depth, float nearPlane, float farPlane) {
     return (2.0 * nearPlane) / (farPlane + nearPlane - depth * (farPlane - nearPlane));
 }
 
+
+
 #if defined DISTANT_HORIZONS
-	float sampleVolumetricOcclusion( in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
-		float godrays = 0.0;
-		float stepSize = 60.0;
+	float sampleVolumetricOcclusion(in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
+		float stepSize = DH_VOLUMETRIC_OCCLUSION_STEP;
+		float occlusionDistanceLimit = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
+		float volumetricOcclusionBehindFade = 128.0;
 
 		float nearPlane = near; 
 		float farPlane = far * 4.0;
@@ -497,11 +500,30 @@ float swapperlinZ(float depth, float nearPlane, float farPlane) {
 			farPlane = dhFarPlane;
 		}
 		
-		float lightRange = pow(clamp(-dot(normalize(viewPos), lightDir) + 0.65, 0.0, 1.0), 2.0);
+		float lightRange = pow(clamp(-dot(normalize(viewPos), lightDir) + 0.65, 0.0, 1.0), 2.0) / 2;
+
 		vec3 position = toClipSpace3_DH(viewPos, depthCheck);
-		
-		// Prevent ray from going behind camera.
-		float rayLength = ((viewPos.z + lightDir.z * farPlane * sqrt(3.0)) > - nearPlane) ? (-nearPlane - viewPos.z) / lightDir.z : farPlane * sqrt(3.0);
+
+		float farRayLength = farPlane * sqrt(3.0);
+		float rayLength = farRayLength;
+		bool clippedByNearPlane = false;
+		float nearPlaneHitDistance = 0.0;
+
+		if ((viewPos.z + lightDir.z * farRayLength) > - nearPlane && abs(lightDir.z) > 1e-5) {
+			clippedByNearPlane = true;
+			nearPlaneHitDistance = (-nearPlane - viewPos.z) / lightDir.z;
+			nearPlaneHitDistance = max(nearPlaneHitDistance, 0.0);
+			rayLength = min(nearPlaneHitDistance + volumetricOcclusionBehindFade, farRayLength);
+		}
+
+		float behindFadeStart = 1.0;
+		float behindFadeRange = 0.0;
+
+		if (clippedByNearPlane && rayLength > 0.0) {
+			float fadeDistance = min(volumetricOcclusionBehindFade, rayLength);
+			behindFadeRange = fadeDistance / rayLength;
+			behindFadeStart = clamp(1.0 - behindFadeRange, 0.0, 1.0);
+		}
 
 		vec3 direction = toClipSpace3_DH(viewPos + lightDir * rayLength, depthCheck) - position;
 
@@ -514,75 +536,75 @@ float swapperlinZ(float depth, float nearPlane, float farPlane) {
 		vec3 newPos = position + direction * noise;
 		vec2 screenEdges = 2.0 / vec2(viewWidth, viewHeight);
 
-		#if defined DH_VOLUMETRIC_OCCLUSION
-			int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
-			int samplesProcessed = 0;
+		float raySampleSum = 0.0;
+		
+		int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
+		int samplesProcessed = 0;
+
+		float depthFarThreshold = 0.99;
+		float occlusionDistanceCutoff = occlusionDistanceLimit;
+		float occlusionDistanceCutoffSq = occlusionDistanceCutoff * occlusionDistanceCutoff;
+
+		vec4 sampleClip = vec4(newPos * 2.0 - 1.0, 1.0);
+		vec4 sampleViewHomogeneous = LOD_PROJECTION_INVERSE * sampleClip;
+		vec3 sampleViewPos = sampleViewHomogeneous.xyz / sampleViewHomogeneous.w;
+		float sampleDistanceToViewer = dot(sampleViewPos, sampleViewPos);
+
+		float ratio = sqrt(sampleDistanceToViewer / occlusionDistanceCutoffSq);
+		float distanceFactor = clamp((ratio - 0.35) / 0.65, 0.0, 1.0);
+		float distanceSunFactor = clamp(smoothstep(occlusionDistanceCutoff * 0.2, occlusionDistanceCutoff, length(viewPos)), 0.0, 1.0);
+
+		for (int i = 0; i < samples; i++) {
+			newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
+
+			// Prefer vanilla depth samples before falling back to DH LOD depth.
+			ivec2 vanillaDepthCoord = ivec2(newPos.xy / texelSize / 4.0);
+			float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, vanillaDepthCoord, 0).a / 65000.0));
+			float linearDepth = clamp(swapperlinZ(sampleDepth, nearPlane, farPlane), 0.0, 1.0);
+
+			// Once vanilla depth is exhausted, continue in LOD depth buffer.
+			if (linearDepth >= depthFarThreshold) {
+				ivec2 dhDepthCoord = ivec2(newPos.xy / texelSize);
+				float dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
+				linearDepth = clamp(swapperlinZ(dhSampleDepth, nearPlane, farPlane), 0.0, 1.0);
+			}
+
+			float d = samples > 1 ? float(i) / float(samples - 1) : 1.0;
+			float behindFade = 1.0;
+
+			if (clippedByNearPlane && behindFadeRange > 0.0) {
+				behindFade = clamp(1.0 - smoothstep(behindFadeStart, 1.0, d), 0.0, 1.0);
+			}
 			
-			float depthFarThreshold = 0.99;
-			float occlusionDistanceCutoff = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
-			float occlusionDistanceCutoffSq = occlusionDistanceCutoff * occlusionDistanceCutoff;
+			float rayStrength = pow(mix(1.0, 0.0, float(i) / float(samples)), 4.0);
+			raySampleSum += (linearDepth >= depthFarThreshold ? 1.0 : lightRange) * behindFade * rayStrength;
 
-			for (int i = 0; i < samples; i++) { 
-				newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
+			newPos = clamp(newPos + direction, vec3(screenEdges.x, screenEdges.y, 0.0), 1.0 - vec3(screenEdges.x, screenEdges.y, 0.0));
+			samplesProcessed ++;
+		}
 
-				vec4 sampleClip = vec4(newPos * 2.0 - 1.0, 1.0);
-				vec4 sampleViewHomogeneous = LOD_PROJECTION_INVERSE * sampleClip;
-				vec3 sampleViewPos = sampleViewHomogeneous.xyz / sampleViewHomogeneous.w;
-				
-				if (dot(sampleViewPos, sampleViewPos) > occlusionDistanceCutoffSq) {
-					break;
-				}
+		if (samplesProcessed == 0) {
+			return 1.0;
+		}
 
-				// Prefer vanilla depth samples before falling back to DH LOD depth.
-				ivec2 vanillaDepthCoord = ivec2(newPos.xy / texelSize / 4.0);
-				float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, vanillaDepthCoord, 0).a / 65000.0));
-				float linearDepth = clamp(swapperlinZ(sampleDepth, nearPlane, farPlane), 0.0, 1.0);
-
-				// Once vanilla depth is exhausted, continue in LOD depth buffer.
-				if (linearDepth >= depthFarThreshold) {
-					ivec2 dhDepthCoord = ivec2(newPos.xy / texelSize);
-					float dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
-					linearDepth = clamp(swapperlinZ(dhSampleDepth, nearPlane, farPlane), 0.0, 1.0);
-				}
-
-				godrays += (linearDepth >= depthFarThreshold ? 1.0 : lightRange);
-				newPos += direction;
-				samplesProcessed ++;
-			}
-
-			if (samplesProcessed == 0) {
-				return 1.0;
-			}
-
-			return godrays / float(samples);
-		#else
-			int samples = 16;
-			int samplesProcessed = 0;
-
-			for (int i = 0; i < samples; i++) { 
-				newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
-				float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, ivec2(newPos.xy / texelSize / 4.0), 0).a / 65000.0));
-
-				if(depthCheck) {
-					sampleDepth = texelFetch(dhDepthTex1, ivec2(newPos.xy / texelSize), 0).x;
-				}
-
-				godrays += (swapperlinZ(sampleDepth, nearPlane, farPlane) > 1.0 ? 1.0 : lightRange);
-				samplesProcessed ++;
-			}
-
-			if (samplesProcessed == 0) {
-				return 1.0;
-			}
-
-			return godrays / float(samplesProcessed);
-		#endif
+		return clamp(((raySampleSum / float(samplesProcessed)) * 4) + distanceSunFactor, 0.0, 1.0);
 	}
 #else
 	float sampleVolumetricOcclusion(in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
 		return 1.0;
 	}
 #endif
+
+ivec2 normalizeTexturePos(vec2 pos) {
+	vec2 uv = (pos / vec2(viewWidth, viewHeight));
+	// ivec2 size = textureSize(colortex4, 0);
+	ivec2 size = ivec2(2048);
+	
+	ivec2 ipos = ivec2(uv * vec2(size));
+	ipos = clamp(ipos, ivec2(0), size - ivec2(1));
+
+	return ipos;
+}
 
 //////////////////////////////VOID MAIN//////////////////////////////
 //////////////////////////////VOID MAIN//////////////////////////////
@@ -603,37 +625,37 @@ void main() {
 	vec2 r2_sequence = R2_samples(seed).xy * 5.0;
 	vec2 BN = fract(r2_sequence + bnoise);
 
-	vec2 tc = floor(gl_FragCoord.xy - 0.5) / VL_RENDERING_RESOLUTION_SCALE * texelSize;
-
-	vec2 texcoord = tc/texelSize;
-	vec2 texcoord_norm = tc;
-	ivec2 texcoord_cast = ivec2(texcoord);
+	vec2 rawTexelCoord = floor(gl_FragCoord.xy - 0.5) / VL_RENDERING_RESOLUTION_SCALE * texelSize;
+	ivec2 nTexelCoord = normalizeTexturePos(rawTexelCoord);
+	
+	ivec2 rawTexelPos = ivec2(rawTexelCoord / texelSize);
+	ivec2 nTexelPos = normalizeTexturePos(rawTexelPos);
 
 	#ifdef OVERWORLD_SHADER
-		vec2 lightmap = decodeVec2(texelFetch(colortex14,texcoord_cast,0).x);
+		vec2 lightmap = decodeVec2(texelFetch(colortex14, rawTexelPos, 0).x);
 	#else
-		vec2 lightmap = decodeVec2(texelFetch(colortex14,texcoord_cast,0).a);
+		vec2 lightmap = decodeVec2(texelFetch(colortex14, rawTexelPos, 0).a);
 		lightmap.y = 1.0;
 	#endif
 
-	float alpha = texelFetch(colortex7,texcoord_cast,0).a;
-	float blendedAlpha = texelFetch(colortex2, texcoord_cast,0).a;
+	float alpha = texelFetch(colortex7, rawTexelPos, 0).a;
+	float blendedAlpha = texelFetch(colortex2, rawTexelPos, 0).a;
 
 	bool isInWater = alpha > 0.99;
 
-	float z0 = texelFetch(depthtex0, texcoord_cast,0).x;
-	float z1 = texelFetch(depthtex1, texcoord_cast,0).x;
+	float z0 = texelFetch(depthtex0, rawTexelPos, 0).x;
+	float z1 = texelFetch(depthtex1, rawTexelPos, 0).x;
 
 	#ifdef USING_LOD_MOD
-		float DH_z0 = texelFetch(LOD_DEPTHTEX0, texcoord_cast,0).x;
-		float DH_z1 = texelFetch(LOD_DEPTHTEX1, texcoord_cast,0).x;
+		float DH_z0 = texelFetch(LOD_DEPTHTEX0, rawTexelPos, 0).x;
+		float DH_z1 = texelFetch(LOD_DEPTHTEX1, rawTexelPos, 0).x;
 	#else
 		float DH_z0 = 0.0;
 		float DH_z1 = 0.0;
 	#endif
 	
-	vec3 viewPos0 = toScreenSpace_DH(tc/RENDER_SCALE, z0, DH_z0);
-	vec3 viewPos1 = toScreenSpace_DH(tc/RENDER_SCALE, z1, DH_z1);
+	vec3 viewPos0 = toScreenSpace_DH(rawTexelCoord, z0, DH_z0);
+	vec3 viewPos1 = toScreenSpace_DH(rawTexelCoord, z1, DH_z1);
 	vec3 playerPos = mat3(gbufferModelViewInverse) * viewPos0 + gbufferModelViewInverse[3].xyz;
 	vec3 playerPos_normalized = normalize(playerPos);
 
@@ -669,37 +691,34 @@ void main() {
 	#endif
 	
 	vec3 directLightColorOccluded = directLightColor;
+	float sunVisibility = 1.0;
 
 	#if defined OVERWORLD_SHADER && defined DH_VOLUMETRIC_OCCLUSION
-		float sunEdgeAttenuation = mix(0.5, 1.0, smoothstep(0.0, 0.08, abs(sunElevation)));
-		float sunVisibility = godrayTest(viewPos0, normalize(sunVec * lightCol.a), BN.x, z0);
-		directLightColorOccluded = directLightColor * 1.0 * sunVisibility;
+		vec3 lightDir = normalize(sunVec * lightCol.a);
+		sunVisibility = sampleVolumetricOcclusion(viewPos0, lightDir, BN.x, z0);
 	#endif
 
 	float cloudPlaneDistance = 0.0;
 
 	#if defined OVERWORLD_SHADER
-		vec4 VolumetricClouds = GetVolumetricClouds(viewPos0, BN, WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
+		vec4 volumetricClouds = GetVolumetricClouds(viewPos0, BN, WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
 	  	
   		#if defined OVERWORLD_SHADER && defined CAVE_FOG && defined CAVE_FOG_DARKEN_SKY
   		  if (isEyeInWater == 0 && eyeAltitude < 1500){
   		    float skyhole = pow(clamp(1.0 - pow(max(playerPos_normalized.y - 0.6, 0.0) * 5.0, 2.0), 0.0, 1.0), 2) * caveDetection;
-			VolumetricClouds.rgb *= 1.0 - skyhole;
-			VolumetricClouds.a = mix(VolumetricClouds.a, 1.0, skyhole);
+			volumetricClouds.rgb *= 1.0 - skyhole;
+			volumetricClouds.a = mix(volumetricClouds.a, 1.0, skyhole);
   		  }
   		#endif
 
-		vec4 volumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, directLightColorOccluded, indirectLight_fog, indirectLight, cloudPlaneDistance);
+		vec4 volumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, sunVisibility, directLightColorOccluded, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
 		#if defined LPV_VL_FOG_ILLUMINATION
 			volumetricFog.a *= LPV_ILLUMINATION.a;
 			volumetricFog.rgb = volumetricFog.rgb * LPV_ILLUMINATION.a + LPV_ILLUMINATION.rgb;
 		#endif
 
-		// Bloomy fog mask
-		gl_FragData[1].a = volumetricFog.a;
-
-		volumetricFog = vec4(VolumetricClouds.rgb * volumetricFog.a + volumetricFog.rgb, volumetricFog.a * VolumetricClouds.a);
+		volumetricFog = vec4(volumetricClouds.rgb * volumetricFog.a + volumetricFog.rgb, volumetricFog.a * volumetricClouds.a);
 	#endif
 
 	#if defined NETHER_SHADER || defined END_SHADER
@@ -709,25 +728,36 @@ void main() {
 			volumetricFog.a *= LPV_ILLUMINATION.a;
 			volumetricFog.rgb = volumetricFog.rgb * LPV_ILLUMINATION.a + LPV_ILLUMINATION.rgb;
 		#endif
-
-		// Bloomy fog mask
-		gl_FragData[1].a = volumetricFog.a;
 	#endif
 
 	if (isEyeInWater == 1){
 		vec4 underWaterFog =  waterVolumetrics(vec3(0.0), viewPos0, length(viewPos0), vec2(noise_1), totEpsilon, scatterCoef, indirectLightColor_dynamic, directLightColorOccluded , dot(normalize(viewPos0), normalize(sunVec* lightCol.a)), LPV_ILLUMINATION.rgb);
 		volumetricFog = vec4(underWaterFog.rgb, 1.0);
 	}
+	
+	vec4 clampedVolumetricFog = clamp(volumetricFog, 0.0, 65000.0);
+	vec4 noVolumetricFog = mix(vec4(0.0, 0.0, 0.0, 1.0), clampedVolumetricFog, 0.0);
 
-	gl_FragData[0] = clamp(volumetricFog, 0.0, 65000.0);
+	// gl_FragData[0] = mix(noVolumetricFog, clampedVolumetricFog, sunVisibility);
+	// gl_FragData[1].a = mix(1.0, volumetricFog.a, sunVisibility);
+
+	// Fog Color
+	gl_FragData[0] = clampedVolumetricFog;
+
+	// Bloomy Fog Mask
+	gl_FragData[1].a = volumetricFog.a;
 	
 	if(blendedAlpha > 0.0 || isInWater){
+		// Translucents
+
+		// gl_FragData[0] = vec4(1.0, 0.0, 0.0, 1.0);
+		// return;
 		gl_FragData[1] = vec4(0.0, 0.0, 0.0, 1.0);	
 
 		#if defined OVERWORLD_SHADER
-			VolumetricClouds = GetVolumetricClouds(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
-			volumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, directLightColorOccluded, indirectLight_fog, indirectLight, cloudPlaneDistance);
-			volumetricFog = vec4(VolumetricClouds.rgb * volumetricFog.a + volumetricFog.rgb, volumetricFog.a * VolumetricClouds.a);
+			volumetricClouds = GetVolumetricClouds(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
+			volumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, sunVisibility, directLightColorOccluded, indirectLight_fog, indirectLight, cloudPlaneDistance);
+			volumetricFog = vec4(volumetricClouds.rgb * volumetricFog.a + volumetricFog.rgb, volumetricFog.a * volumetricClouds.a);
 		#endif
 		
 		#if defined NETHER_SHADER || defined END_SHADER
