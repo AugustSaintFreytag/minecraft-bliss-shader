@@ -205,7 +205,25 @@ vec2 R2_samples(float n){
 	return fract(alpha * n);
 }
 
+vec3 sampleSkyColor(int offset) {
+	const int samples = 8;
+	const int posY = 64;
+	const float stepX = 1024 / (samples - 1);
+	const float stepY = 256;
 
+	vec3 colorSum = vec3(0.0);
+
+	for (int i = 0; i < samples; i++) {
+		int isOdd = i % 2 == 0 ? 0 : 1;
+		ivec2 texcoords = ivec2(offset + stepX * i, posY + stepY * isOdd);
+		vec3 skyColor = texelFetch(colortex4, texcoords, 0).rgb;
+
+		colorSum += skyColor;
+	}
+
+	vec3 averageColor = colorSum / float(samples);
+	return averageColor;
+}
 
 void main() {
 	/* RENDERTARGETS:4 */
@@ -470,6 +488,16 @@ void main() {
 	if (gl_FragCoord.x > 14. && gl_FragCoord.x < 15.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ) {
 		gl_FragData[0] = vec4(rodExposure, centerDepth,0.0, 1.0);
 	}
+	
+	// --- Sky Average Color Samples
+	if (gl_FragCoord.x >= SKY_AVERAGE_COLOR_X && gl_FragCoord.x < SKY_AVERAGE_COLOR_X + 1 && gl_FragCoord.y >= SKY_AVERAGE_COLOR_Y && gl_FragCoord.y < SKY_AVERAGE_COLOR_Y + 1) {
+		vec3 averageSkyColor = sampleSkyColor(0);
+		gl_FragData[0] = vec4(averageSkyColor, 1.0);
+	}
 
-	// gl_FragData[0] = vec4(vec3(1.0, 0.0, 0.0) * 1200, 65000.0);
+	// --- Sky and Clouds Average Color Samples
+	if (gl_FragCoord.x >= SKY_AND_CLOUDS_AVERAGE_COLOR_X && gl_FragCoord.x < SKY_AND_CLOUDS_AVERAGE_COLOR_X + 1 && gl_FragCoord.y >= SKY_AND_CLOUDS_AVERAGE_COLOR_Y && gl_FragCoord.y < SKY_AND_CLOUDS_AVERAGE_COLOR_Y + 1) {
+		vec3 averageSkyColor = sampleSkyColor(1048);
+		gl_FragData[0] = vec4(averageSkyColor, 1.0);
+	}
 }

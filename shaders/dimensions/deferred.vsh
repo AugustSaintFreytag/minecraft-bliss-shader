@@ -104,54 +104,15 @@ void main() {
 ///////////////////////////////////
 /// --- AMBIENT LIGHT STUFF --- ///
 ///////////////////////////////////
-
-	averageSkyCol_Clouds = vec3(0.0);
-	averageSkyCol = vec3(0.0);
-
-	vec2 sample3x3[9] = vec2[](
-
-     	vec2(-1.0, -0.3),
-	    vec2( 0.0,  0.0),
-	    vec2( 1.0, -0.3),
-
-		vec2(-1.0, -0.5),
-		vec2( 0.0, -0.5),
-		vec2( 1.0, -0.5),
-
-	    vec2(-1.0, -1.0),
-	    vec2( 0.0, -1.0),
-	    vec2( 1.0, -1.0)
-   	);
-
-	// sample in a 3x3 pattern to get a good area for average color
 	
-	// int maxIT = 9;
-	// for (int i = 0; i < maxIT; i++) {
-	// 	vec3 pos = vec3(0.0,1.0,0.0);
-	// 	pos.xy += normalize(sample3x3[i]) * vec2(0.3183,0.9000);
+	vec3 sampledAverageSkyCol = texelFetch(colortex4, ivec2(SKY_AVERAGE_COLOR_X, SKY_AVERAGE_COLOR_Y), 0).rgb;
+	vec3 sampledAverageSkyColClouds = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb;
 
-	// 	averageSkyCol_Clouds += skyCloudsFromTex(pos,colortex4).rgb/maxIT/150.0;
-	// 	averageSkyCol += skyFromTex(pos,colortex4).rgb/maxIT/150.0;
-   	// }
-	float maxIT = 20.0;
-	for (int i = 0; i < int(maxIT); i++) {
-		vec2 ij = R2_samples(((i*50+1)%1000)*int(maxIT)+i) * vec2(1.0,0.9000);
-		vec3 pos = normalize(rodSample(ij)) * vec3(1.0,0.5,1.0) + vec3(0.0,0.5,0.0);
-
-		averageSkyCol_Clouds += skyCloudsFromTex(pos,colortex4).rgb/maxIT/150.0;
-		averageSkyCol += 1.5 * skyFromTex(pos,colortex4).rgb/maxIT/150.0;
-	}
-
-	// vec3 minimumlight =  vec3(1.0) * 0.01 * MIN_LIGHT_AMOUNT + nightVision * 0.05;
-	// vec3 minimumlight =  vec3(1.0) * 0.01 * MIN_LIGHT_AMOUNT + nightVision * 0.05;
-
-	// luminance based reinhard is useful ouside of tonemapping too.
-	averageSkyCol_Clouds = 1.5 * (averageSkyCol_Clouds / (1.0+luma(averageSkyCol_Clouds)*0.2));
-	
-	averageSkyCol = max(averageSkyCol * PLANET_GROUND_BRIGHTNESS,0.0) ;
+	averageSkyCol = (sampledAverageSkyCol / 120) * PLANET_GROUND_BRIGHTNESS;
+	averageSkyCol_Clouds = sampledAverageSkyColClouds / 120;
 
 	#ifdef USE_CUSTOM_SKY_GROUND_LIGHTING_COLORS
-		averageSkyCol = luma(averageSkyCol) * vec3(SKY_GROUND_R,SKY_GROUND_G,SKY_GROUND_B);
+		averageSkyCol = luma(averageSkyCol) * vec3(SKY_GROUND_R, SKY_GROUND_G, SKY_GROUND_B);
 	#endif
 
 
