@@ -335,7 +335,9 @@ vec4 VLTemporalFiltering(vec3 viewPos, in float referenceDepth, sampler2D depth,
   // return upsampledCurrentFrame;
   // return currentFrame;
 
-  if (previousPosition.x < 0.0 || previousPosition.y < 0.0 || previousPosition.x > 1.0 || previousPosition.y > 1.0) return currentFrame;
+  if (previousPosition.x < 0.0 || previousPosition.y < 0.0 || previousPosition.x > 1.0 || previousPosition.y > 1.0) {
+    return currentFrame;
+  }
   
 	float clampRadius = mix(2.0, 1.0, clamp(length(velocity/texelSize),0.0,1.0)	);
 

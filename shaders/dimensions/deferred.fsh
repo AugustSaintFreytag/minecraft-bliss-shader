@@ -71,11 +71,9 @@ uniform float near;
 #include "/lib/ROBOBO_sky.glsl"
 #include "/lib/sky_gradient.glsl"
 #include "/lib/Shadow_Params.glsl"
-// #include "/lib/waterBump.glsl"
 
 vec4 lightCol = vec4(lightSourceColor, float(sunElevation > 1e-5)*2-1.);
 vec3 WsunVec = mat3(gbufferModelViewInverse)*sunVec;
-// vec3 WsunVec = normalize(LightDir);
 
 vec2 decodeVec2(float a){
     const vec2 constant1 = 65535. / vec2( 256., 65536.);
@@ -94,18 +92,22 @@ vec3 toShadowSpaceProjected(vec3 p3){
 
     return p3;
 }
+
 float interleaved_gradientNoise_temporal(){
 	return fract(52.9829189*fract(0.06711056*gl_FragCoord.x + 0.00583715*gl_FragCoord.y) + 1.0/1.6180339887 * frameCounter);
 }
+
 float interleaved_gradientNoise(){
 	vec2 coord = gl_FragCoord.xy;
 	float noise = fract(52.9829189*fract(0.06711056*coord.x + 0.00583715*coord.y));
 	return noise;
 }
+
 float R2_dither(){
 	vec2 alpha = vec2(0.75487765, 0.56984026);
 	return fract(alpha.x * gl_FragCoord.x + alpha.y * gl_FragCoord.y + 1.0/1.6180339887 * frameCounter) ;
 }
+
 float blueNoise(){
   return fract(texelFetch(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887 * frameCounter);
 }
@@ -136,6 +138,7 @@ vec3 DH_toClipSpace3(vec3 viewSpacePosition) {
 float DH_ld(float dist) {
     return (2.0 * LOD_NEARPLANE) / (LOD_FARPLANE + LOD_NEARPLANE - dist * (LOD_FARPLANE - LOD_NEARPLANE));
 }
+
 float DH_inv_ld (float lindepth){
 	return -((2.0*LOD_NEARPLANE/lindepth)-LOD_FARPLANE-LOD_NEARPLANE)/(LOD_FARPLANE-LOD_NEARPLANE);
 }
@@ -143,6 +146,7 @@ float DH_inv_ld (float lindepth){
 float linearizeDepthFast(const in float depth, const in float near, const in float far) {
     return (near * far) / (depth * (near - far) + far);
 }
+
 float invLinZ (float lindepth){
 	return -((2.0*near/lindepth)-far-near)/(far-near);
 }
@@ -186,15 +190,16 @@ float invLinZ (float lindepth){
 	#include "/lib/end_fog.glsl"
 #endif
 
-vec3 rodSample(vec2 Xi)
-{
+vec3 rodSample(vec2 Xi) {
 	float r = sqrt(1.0f - Xi.x*Xi.y);
     float phi = 2 * 3.14159265359 * Xi.y;
 
     return normalize(vec3(cos(phi) * r, sin(phi) * r, Xi.x)).xzy;
 }
 
-//Low discrepancy 2D sequence, integration error is as low as sobol but easier to compute : http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+// Low discrepancy 2D sequence, integration error is as low as sobol but easier to compute: 
+// http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+
 vec2 R2_samples(float n){
 	vec2 alpha = vec2(0.75487765, 0.56984026);
 	return fract(alpha * n);
@@ -355,7 +360,6 @@ void main() {
 
 		gl_FragData[0] = vec4(finalSky, 1.0);
 	}
-
 
 	#ifdef FAKE_PLANET
 		vec2 pixelPos2 = vec2(16,1);

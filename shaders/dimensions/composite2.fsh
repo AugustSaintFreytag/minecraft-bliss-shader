@@ -579,7 +579,7 @@ float swapperlinZ(float depth, float nearPlane, float farPlane) {
 		#endif
 	}
 #else
-	float sampleVolumetricOcclusion( in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
+	float sampleVolumetricOcclusion(in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
 		return 1.0;
 	}
 #endif
@@ -597,7 +597,7 @@ void main() {
 	
 	float noise_2 = blueNoise();
 	float noise_1 = interleaved_gradientNoise_temporal();
-	vec2 bnoise = blueNoise(gl_FragCoord.xy ).rg;
+	vec2 bnoise = blueNoise(gl_FragCoord.xy).rg;
 
 	int seed = frameCounter % 40000;
 	vec2 r2_sequence = R2_samples(seed).xy * 5.0;
@@ -696,7 +696,7 @@ void main() {
 			volumetricFog.rgb = volumetricFog.rgb * LPV_ILLUMINATION.a + LPV_ILLUMINATION.rgb;
 		#endif
 
-		// for bloomy fog mask
+		// Bloomy fog mask
 		gl_FragData[1].a = volumetricFog.a;
 
 		volumetricFog = vec4(VolumetricClouds.rgb * volumetricFog.a + volumetricFog.rgb, volumetricFog.a * VolumetricClouds.a);
@@ -710,7 +710,7 @@ void main() {
 			volumetricFog.rgb = volumetricFog.rgb * LPV_ILLUMINATION.a + LPV_ILLUMINATION.rgb;
 		#endif
 
-		// for bloomy fog mask
+		// Bloomy fog mask
 		gl_FragData[1].a = volumetricFog.a;
 	#endif
 
