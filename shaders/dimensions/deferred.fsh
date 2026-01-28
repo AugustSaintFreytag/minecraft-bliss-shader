@@ -68,6 +68,7 @@ uniform int hideGUI;
 uniform float near;
 
 #include "/lib/util.glsl"
+#include "/lib/color_transforms.glsl"
 #include "/lib/ROBOBO_sky.glsl"
 #include "/lib/sky_gradient.glsl"
 #include "/lib/Shadow_Params.glsl"
@@ -79,10 +80,6 @@ vec2 decodeVec2(float a){
     const vec2 constant1 = 65535. / vec2( 256., 65536.);
     const float constant2 = 256. / 255.;
     return fract( a * constant1 ) * constant2 ;
-}
-
-vec3 toLinear(vec3 sRGB){
-	return sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);
 }
 
 vec3 toShadowSpaceProjected(vec3 p3){
@@ -205,25 +202,44 @@ vec2 R2_samples(float n){
 	return fract(alpha * n);
 }
 
-vec3 sampleSkyColor(int offset) {
-	const int samples = 8;
-	const int posY = 64;
-	const float stepX = 1024 / (samples - 1);
-	const float stepY = 256;
+// Sky Sampling
 
-	vec3 colorSum = vec3(0.0);
+const int SKY_COLOR_SAMPLES = 12;
 
-	for (int i = 0; i < samples; i++) {
-		int isOdd = i % 2 == 0 ? 0 : 1;
-		ivec2 texcoords = ivec2(offset + stepX * i, posY + stepY * isOdd);
-		vec3 skyColor = texelFetch(colortex4, texcoords, 0).rgb;
+vec3 weightedMeanSkyColor(vec3 colorSamples[SKY_COLOR_SAMPLES], float weights[SKY_COLOR_SAMPLES]) {
+	vec3 weightedSum = vec3(0.0);
+	float weightSum = 0.0;
 
-		colorSum += skyColor;
+	for (int index = 0; index < SKY_COLOR_SAMPLES; ++index) {
+		float weight = weights[index];
+		weightedSum += colorSamples[index] * weight;
+		weightSum += weight;
 	}
 
-	vec3 averageColor = colorSum / float(samples);
-	return averageColor;
+	return (weightSum > 0.0) ? (weightedSum / weightSum) : vec3(0.0);
 }
+
+vec3 sampleSkyColor(int offsetX) {
+	const int offsetY = 16;
+	const float stepX = 1024 / (SKY_COLOR_SAMPLES - 1);
+	const float stepY = 32;
+
+	vec3 samples[SKY_COLOR_SAMPLES];
+	float weights[SKY_COLOR_SAMPLES];
+
+	for (int i = 0; i < SKY_COLOR_SAMPLES; i++) {
+		ivec2 texcoords = ivec2(offsetX + stepX * i, offsetY + stepY * i);
+		vec3 color = texelFetch(colortex4, texcoords, 0).rgb;
+		float weight = luma(color);
+
+		samples[i] = color;
+		weights[i] = weight;
+	}
+
+	return weightedMeanSkyColor(samples, weights);
+}
+
+// Main
 
 void main() {
 	/* RENDERTARGETS:4 */
@@ -497,7 +513,7 @@ void main() {
 
 	// --- Sky and Clouds Average Color Samples
 	if (gl_FragCoord.x >= SKY_AND_CLOUDS_AVERAGE_COLOR_X && gl_FragCoord.x < SKY_AND_CLOUDS_AVERAGE_COLOR_X + 1 && gl_FragCoord.y >= SKY_AND_CLOUDS_AVERAGE_COLOR_Y && gl_FragCoord.y < SKY_AND_CLOUDS_AVERAGE_COLOR_Y + 1) {
-		vec3 averageSkyColor = sampleSkyColor(1048);
+		vec3 averageSkyColor = sampleSkyColor(1024);
 		gl_FragData[0] = vec4(averageSkyColor, 1.0);
 	}
 }
