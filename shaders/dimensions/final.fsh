@@ -4,11 +4,11 @@
 
 #include "/lib/settings.glsl"
 
-uniform sampler2D colortex0;    // Sky, Clouds
+uniform sampler2D colortex0;    // Fog & Clouds
 uniform sampler2D colortex1;    // Scene Albedo (RGB), Material (A)
 uniform sampler2D colortex2;    // Scene Translucents
 uniform sampler2D colortex3;    // Shadow Map (VPS)
-uniform sampler2D colortex4;    // LUT (RGB), Depth (A, Quarter Res)
+uniform sampler2D colortex4;    // Sky, Sky w/ Clouds, LUT
 uniform sampler2D colortex5;    // TAA
 uniform sampler2D colortex6;    // Mip Maps
 uniform sampler2D colortex7;    // Water
@@ -158,10 +158,9 @@ float doVignette( in vec2 texcoord, in float noise){
 void main() {
   
   float noise = interleaved_gradientNoise();
-  vec2 texcoord_offset = texcoord;
 
   #if MOTION_BLUR_AMOUNT > 0
-    float depth = texture(depthtex0, texcoord_offset*RENDER_SCALE).r;
+    float depth = texture(depthtex0, texcoord*RENDER_SCALE).r;
     bool hand = depth < 0.56;
     float depth2 = convertHandDepth_2(depth, hand);
 
@@ -184,11 +183,7 @@ void main() {
   #endif
 
   #if DEBUG_VIEW == debug_SHADOWMAP
-    vec2 shadowUV = texcoord * vec2(2.0, 1.0) ;
-
-    // shadowUV -= vec2(0.5,0.0);
-    // float zoom = 0.1;
-    // shadowUV = ((shadowUV-0.5) - (shadowUV-0.5)*zoom) + 0.5;
+    vec2 shadowUV = texcoord * vec2(2.0, 1.0);
 
     if(shadowUV.x < 1.0 && shadowUV.y < 1.0 && hideGUI == 1) {
       COLOR = texture2D(shadowcolor1, shadowUV).rgb;
@@ -198,10 +193,26 @@ void main() {
     COLOR = vec3(ld(texture2D(depthtex0, texcoord * RENDER_SCALE).r));
   #endif
   #if DEBUG_VIEW == debug_DEPTHTEX1
-    COLOR = vec3(ld(texture2D(depthtex1, texcoord * RENDER_SCALE).r));
+    COLOR = vec3(ld(texture2D(LOD_DEPTHTEX1, texcoord * RENDER_SCALE).r));
   #endif
   #if DEBUG_VIEW == debug_SKYTEX
     COLOR = texture2D(colortex4, texcoord).rgb / 1200;
+
+    if (texcoord.x > 0.8 && texcoord.y > 0.8) {
+      vec3 skyColor = texelFetch(colortex4, ivec2(SKY_AVERAGE_COLOR_X, SKY_AVERAGE_COLOR_Y), 0).rgb / 1200;
+      COLOR = skyColor;
+    }
+
+    if (texcoord.x > 0.9 && texcoord.y > 0.8) {
+      vec3 skyAndCloudsColor = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb / 1200;
+      COLOR = skyAndCloudsColor;
+    }
+  #endif
+  #if DEBUG_VIEW == debug_AUX
+    vec4 color = texture2D(colortex0, texcoord).rgba;
+    COLOR = vec3(color.r, color.g, color.b);
+    // vec4 color = texture2D(colortex13, texcoord / 2);
+    // COLOR = vec3(0.1, color.a, 0.1);
   #endif
 
   gl_FragColor.rgb = COLOR;

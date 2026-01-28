@@ -1514,7 +1514,7 @@ void main() {
 	#if DEBUG_VIEW == debug_VIEW_POSITION
 		gl_FragData[0].rgb = viewPos * 0.001;
 	#endif
-	#if DEBUG_VIEW == debug_FILTERED_STUFF
+	#if DEBUG_VIEW == debug_SSAO
 		// if(hideGUI == 0){
 			float value = SSAO_SSS.y;
 			value = pow(value,3.5);

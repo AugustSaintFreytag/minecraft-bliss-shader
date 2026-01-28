@@ -1123,6 +1123,7 @@ screen.MOD_SETTINGS = Supported Mods
 
     option.TOGGLE_VL_FOG.comment = one big button to just turn all the fog off.
     option.DISTANT_HORIZONS_SHADOWMAP.comment =  §cTHIS SETTING WILL DESTROY PERFORMANCE THIS WILL MAKE SHADOWS LOOK BLOCKY, FLICKERY, AND LOW DETAIL§r. Set shadow distance to 32 chunks (or more) and set shadow resolution to 4096 (or more).
+   
     screen.PHYSICS_MOD_OCEAN.comment = The ocean of physics mod is supported. The mod has its own settings for it located in §bgame options -> physics settings -> ocean§r
 
     option.DH_SSS_OCCLUSION_SAMPLES.comment = Number of samples taken when calculating sub-surface scattering occlusion on Distant Horizons terrain. §a⚠ PERFORMANCE COST:§r medium
@@ -1161,4 +1162,24 @@ option.USE_CUSTOM_DIFFUSE_LIGHTING_COLORS = Custom Diffuse Colors
 
  ###################################################### ↓↓↓ THIS SUBMENU'S LABELS
 screen.DEBUG_SETTINGS = §cDebugging§r/Experimental Settings
+option.DEBUG_VIEW = Debug Mode
+    value.DEBUG_VIEW.debug_OFF = §cOFF
+    value.DEBUG_VIEW.debug_SHADOWMAP = Shadow Map
+    value.DEBUG_VIEW.debug_NORMALS = Normals
+    value.DEBUG_VIEW.debug_SPECULAR = Specular
+    value.DEBUG_VIEW.debug_INDIRECT = Indirect
+    value.DEBUG_VIEW.debug_DIRECT = Direct
+    value.DEBUG_VIEW.debug_VIEW_POSITION = View Position
+	value.DEBUG_VIEW.debug_DH_WATER_BLENDING = Water Blending (LOD)
+	value.DEBUG_VIEW.debug_SSAO = SSAO
+    value.DEBUG_VIEW.debug_MATERIAL_SSS = SSS Materials
+    value.DEBUG_VIEW.debug_MATERIAL_EMISSION = Emissive Materials
+    value.DEBUG_VIEW.debug_LIGHTMAPS = Lightmaps
+    value.DEBUG_VIEW.debug_FORWARD_RENDERING = Forward Rendering
+    value.DEBUG_VIEW.debug_FORWARD_COLOR_TINT = Forward Color Tint
+    value.DEBUG_VIEW.debug_DEFERRED_RENDERING = Deferred Rendering
+    value.DEBUG_VIEW.debug_SKYTEX = Sky & Clouds
+    value.DEBUG_VIEW.debug_DEPTHTEX0 = Depth I
+    value.DEBUG_VIEW.debug_DEPTHTEX1 = Depth II
+    value.DEBUG_VIEW.debug_AUX = Auxiliary
  ###################################################### ↑↑↑ THIS SUBMENU'S DESCRIPTIONS
