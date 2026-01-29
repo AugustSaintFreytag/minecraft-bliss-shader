@@ -270,12 +270,8 @@ vec4 GetVolumetricFog(
 	
 	float indoors = clamp(eyeBrightnessSmooth.y / 240.0, 0, 1);
 
-	vec3 masterLightColor = lightColor * 3.5;
-	vec3 ambientLightColor = ambientColor * 1.5;
-	
-	float saturationIntensity = 0.5 + SdotV * 0.5;
-	masterLightColor = saturateColor(masterLightColor, clamp(saturationIntensity, 0.75, 1.0));
-	ambientLightColor = saturateColor(ambientLightColor, clamp(saturationIntensity, 0.75, 1.0));
+	vec3 masterLightColor = lightColor;
+	vec3 ambientLightColor = ambientColor;
 
 	vec3 localFogColor = parameters.localFogColor.rgb;
 	vec3 localFogColor_lightCol = localFogColor * dot(masterLightColor, vec3(0.33333));
@@ -326,7 +322,7 @@ vec4 GetVolumetricFog(
 		vec3 rayleigh = rayleighCoeffs * airCoef.x;
 		vec3 mie = mieCoeffs * (airCoef.y + min(Haze_amount, 1.0));
 		vec3 airDensity = kill * (rayleigh + mie);
-		vec3 airDensityPhased = rayleighPhase * rayleigh + sunPhase*mie;
+		vec3 airDensityPhased = rayleighPhase * rayleigh + sunPhase * mie;
 		vec3 airVolumeCoeff = exp(-airDensity * dd * rayLength);
 		vec3 airLighting = masterLightColor * shadows * sunPhase * sunVisibility * airDensityPhased + averagedAmbientColor * airDensity * 0.666;
 		
@@ -340,7 +336,7 @@ vec4 GetVolumetricFog(
 
 		float fogDensity = kill * getFogDensities(rayProgress, 0.0);
 		float fogVolumeCoeff = exp(-fogDensity * dd * rayLength);
-		vec3 fogLighting = masterLightColor * sunPhase * sunVisibility * shadows + ambientLightColor * skyPhase;
+		vec3 fogLighting = masterLightColor * 2.5 * sunPhase * sunVisibility * shadows + ambientLightColor * 2.5 * skyPhase;
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			fogLighting += lightningFlash;
@@ -370,10 +366,6 @@ vec4 GetVolumetricFog(
 		absorbance *= fogVolumeCoeff * localFogVolumeCoeff * dot(airVolumeCoeff, vec3(0.33333));
 	}
 
-	// float minFogLuma = 0.5; 
-	// float fogLuma = dot(color, vec3(0.2126, 0.7152, 0.0722)); 
-	// float grayFactor = smoothstep(minFogLuma, minFogLuma + 0.1, fogLuma); 
-	// color = mix(vec3(minFogLuma), color, grayFactor);
 
 	return vec4(color, absorbance);
 }
