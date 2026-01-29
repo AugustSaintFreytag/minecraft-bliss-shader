@@ -204,7 +204,7 @@ vec2 R2_samples(float n){
 
 // Sky Sampling
 
-const int SKY_COLOR_SAMPLES = 12;
+const int SKY_COLOR_SAMPLES = 16;
 
 vec3 weightedMeanSkyColor(vec3 colorSamples[SKY_COLOR_SAMPLES], float weights[SKY_COLOR_SAMPLES]) {
 	vec3 weightedSum = vec3(0.0);
@@ -224,6 +224,7 @@ vec3 sampleSkyColor(int offsetX) {
 	const float stepX = 1024 / (SKY_COLOR_SAMPLES - 1);
 	const float stepY = 32;
 
+	vec3 sampleSum = vec3(0.0);
 	vec3 samples[SKY_COLOR_SAMPLES];
 	float weights[SKY_COLOR_SAMPLES];
 
@@ -234,9 +235,11 @@ vec3 sampleSkyColor(int offsetX) {
 
 		samples[i] = color;
 		weights[i] = weight;
+
+		sampleSum += color;
 	}
 
-	return weightedMeanSkyColor(samples, weights);
+	return sampleSum / vec3(float(SKY_COLOR_SAMPLES));
 }
 
 // Main
