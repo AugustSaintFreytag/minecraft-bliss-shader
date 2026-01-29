@@ -35,6 +35,7 @@ flat varying float centerDepth;
 
 uniform sampler2D noisetex;
 uniform sampler2D colortex1;
+uniform sampler2D colortex4;
 
 uniform float frameTime;
 uniform int frameCounter;
@@ -55,7 +56,7 @@ uniform float sunElevation;
 uniform vec3 sunPosition;
 uniform vec3 moonPosition;
 uniform vec3 cameraPosition;
-// uniform float far;
+uniform float far;
 uniform ivec2 eyeBrightnessSmooth;
 // uniform ivec2 eyeBrightness;
 uniform float caveDetection;
@@ -142,10 +143,6 @@ float DH_inv_ld (float lindepth){
 
 float linearizeDepthFast(const in float depth, const in float near, const in float far) {
     return (near * far) / (depth * (near - far) + far);
-}
-
-float invLinZ (float lindepth){
-	return -((2.0*near/lindepth)-far-near)/(far-near);
 }
 
 // #define LIGHTNINGFLASH_VL

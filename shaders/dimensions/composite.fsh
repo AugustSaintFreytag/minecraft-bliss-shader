@@ -69,7 +69,7 @@ uniform float viewWidth;
 uniform float aspectRatio;
 uniform float viewHeight;
 
-// uniform float far;
+uniform float far;
 uniform float near;
 uniform float dhFarPlane;
 uniform float dhNearPlane;

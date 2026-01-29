@@ -50,6 +50,7 @@ uniform float eyeAltitude;
 uniform float rainStrength;
 uniform float nightVision;
 uniform float near;
+uniform float far;
 uniform float frameTime;
 uniform int frameCounter;
 uniform float frameTimeCounter;

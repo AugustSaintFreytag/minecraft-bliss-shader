@@ -27,6 +27,7 @@ uniform sampler2D depthtex1;
 uniform sampler2D colortex0;
 uniform sampler2D colortex2;
 uniform sampler2D colortex3;
+uniform sampler2D colortex4;
 uniform sampler2D colortex6;
 uniform sampler2D colortex7;
 uniform sampler2D colortex10;
@@ -38,6 +39,7 @@ flat varying vec3 WsunVec;
 uniform vec3 sunVec;
 uniform float sunElevation;
 
+uniform float far;
 uniform float near;
 uniform float dhFarPlane;
 uniform float dhNearPlane;
@@ -95,6 +97,7 @@ uniform int hideGUI;
 #include "/lib/waterBump.glsl"
 
 #include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_occlusion.glsl"
 
 float DH_ld(float dist) {
     return (2.0 * dhNearPlane) / (dhFarPlane + dhNearPlane - dist * (dhFarPlane - dhNearPlane));
@@ -185,10 +188,6 @@ float linearizeDepthFast(const in float depth, const in float near, const in flo
 
 #endif
 
-float invLinZ (float lindepth){
-	return -((2.0*near/lindepth)-far-near)/(far-near);
-}
-
 uniform float nightVision;
 
 #define LIGHTNINGFLASH_VL
@@ -216,12 +215,11 @@ uniform float nightVision;
 	#include "/lib/climate_settings.glsl"
 	#include "/lib/overworld_fog.glsl"
 #endif
+
 #ifdef NETHER_SHADER
-uniform sampler2D colortex4;
 	#include "/lib/nether_fog.glsl"
 #endif
 #ifdef END_SHADER
-uniform sampler2D colortex4;
 	#include "/lib/end_fog.glsl"
 #endif
 
@@ -691,7 +689,7 @@ void main() {
 	vec3 waterEpsilon = vec3(Water_Absorb_R, Water_Absorb_G, Water_Absorb_B);
 	vec3 dirtEpsilon = vec3(Dirt_Absorb_R, Dirt_Absorb_G, Dirt_Absorb_B);
 	vec3 totEpsilon = vec3(Water_Absorb_R, Water_Absorb_G, Water_Absorb_B);
-	vec3 scatterCoef = dirtAmount * vec3(Dirt_Scatter_R, Dirt_Scatter_G, Dirt_Scatter_B) / 3.14;
+	vec3 scatterCoef = dirtAmount * vec3(Dirt_Scatter_R, Dirt_Scatter_G, Dirt_Scatter_B) / PI;
 
 	vec3 baseDirectLightColor = vec3(DIRECTLIGHT_FOG_R, DIRECTLIGHT_FOG_G, DIRECTLIGHT_FOG_B);
 	vec3 baseIndirectLightColor = vec3(INDIRECTLIGHT_FOG_R, INDIRECTLIGHT_FOG_G, INDIRECTLIGHT_FOG_B);

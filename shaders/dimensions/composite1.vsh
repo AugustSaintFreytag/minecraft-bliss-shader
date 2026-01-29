@@ -24,7 +24,7 @@ flat varying vec3 moonCol;
 flat varying vec3 zMults;
 uniform sampler2D colortex4;
 
-// uniform float far;
+uniform float far;
 uniform float near;
 
 uniform mat4 gbufferModelViewInverse;

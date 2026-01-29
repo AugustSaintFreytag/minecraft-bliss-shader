@@ -87,6 +87,11 @@ vec3 linearToSRGB(vec3 linear) {
     );
 }
 
+vec3 saturate(vec3 color, float amount) {
+	float luma = dot(color, lumCoeff);
+	return mix(vec3(luma), color, amount);
+}
+
 vec3 blackbody(float Temp) {
     float t = pow(Temp, -1.5);
     float lt = log(Temp);
@@ -118,6 +123,18 @@ vec3 genUnitVector(vec2 xy) {
 vec2 rotate(vec2 x, float r) {
     vec2 sc = sincos(r);
     return mat2(sc.x, -sc.y, sc.y, sc.x) * x;
+}
+
+float linZ(float depth) {
+    return (2.0 * near) / (far + near - depth * (far - near));
+}
+
+float invLinZ (float lindepth){
+	return -((2.0 * near / lindepth) - far - near) / (far - near);
+}
+
+float swapperLinZ(float depth, float nearPlane, float farPlane) {
+    return (2.0 * nearPlane) / (farPlane + nearPlane - depth * (farPlane - nearPlane));
 }
 
 vec3 cartToSphere(vec2 coord) {
@@ -194,9 +211,4 @@ float HaltonSeq2(int index) {
     }
     
     return r;
-}
-
-vec3 saturateColor(vec3 color, float amount) {
-	float luma = dot(color, lumCoeff);
-	return mix(vec3(luma), color, amount);
 }

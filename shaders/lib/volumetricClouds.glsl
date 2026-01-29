@@ -187,7 +187,6 @@ float GetCloudShadow(vec3 playerPos, vec3 sunVector){
 }
 
 #ifndef CLOUDSHADOWSONLY
-uniform sampler2D colortex4;
 
 float phaseCloud(float x, float g){
     float gg = g * g;
@@ -688,7 +687,7 @@ vec4 GetVolumetricClouds(
 	totalAbsorbance = blendedCloudColor.a;
 
 	float saturationIntensity = SdotV * 2.0;
-	color = saturateColor(color, clamp(saturationIntensity, 0.5, 1.0));
+	color = saturate(color, clamp(saturationIntensity, 0.5, 1.0));
 
 	return vec4(color, totalAbsorbance);
 }

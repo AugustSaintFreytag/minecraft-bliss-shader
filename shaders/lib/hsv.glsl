@@ -13,5 +13,5 @@ vec3 HsvToRgb(const in vec3 c) {
     const vec4 K = vec4(3.0, 2.0, 1.0, 9.0) / 3.0;
 
     vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, saturate(p - K.xxx), c.y);
+    return c.z * mix(K.xxx, limit(p - K.xxx), c.y);
 }
