@@ -1134,12 +1134,11 @@ void main() {
 			SSSColor = SubsurfaceScattering_sun(albedo, ShadowBlockerDepth, sunSSS_density, clamp(dot(feetPlayerPos_normalized, WsunVec),0.0,1.0), SS_directLight.g, shadowMapFalloff2, hand);
 
 			#ifdef DISTANT_HORIZONS
-				if (sunSSS_density > 0.0) {
+				if (sunSSS_density > 0.0 && DH_SSS_OCCLUSION_INTENSITY > 0.0) {
 					vec3 sunDirection = normalize(WsunVec * mat3(gbufferModelViewInverse));
 					float sunVisibility = getDHSunVisibility(viewPos, sunDirection, BN.x, z0);
-					float occlusionMix = DH_SSS_OCCLUSION_INTENSITY;
 
-					SSSColor = mix(SSSColor, SSSColor * sunVisibility, occlusionMix);
+					SSSColor = mix(SSSColor, SSSColor * sunVisibility, DH_SSS_OCCLUSION_INTENSITY);
 				}
 			#endif
 			
