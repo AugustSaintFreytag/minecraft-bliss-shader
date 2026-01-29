@@ -38,9 +38,6 @@ vec3 drawMoon(vec3 PlayerPos, vec3 WorldSunVec, vec3 Color, inout vec3 occludeSt
 	*/
 }
 
-const float pi = 3.141592653589793238462643383279502884197169;
-
-
 
 float w0(float a)
 {
@@ -110,7 +107,7 @@ vec4 texture2D_bicubic(sampler2D tex, vec2 uv)
 vec2 sphereToCarte(vec3 dir) {
     float lon = atan(-dir.x, -dir.z);
     float lat = asin(clamp(dir.y, -1.0, 1.0));
-    return vec2(lon * (0.5/pi) + 0.5, 0.5 - lat * (1.0/pi));
+    return vec2(lon * (0.5 / PI) + 0.5, 0.5 - lat * (1.0 / PI));
 }
 
 vec3 skyFromTex(vec3 pos,sampler2D sampler){

@@ -16,6 +16,7 @@
 flat varying vec3 WsunVec;
 
 
+#include "/lib/util.glsl"
 #include "/lib/res_params.glsl"
 
 uniform sampler2D depthtex0;
@@ -187,7 +188,6 @@ vec3 viewToWorld(vec3 viewPos) {
 #include "/lib/Shadow_Params.glsl"
 
 
-const float PI = 3.141592653589793238462643383279502884197169;
 vec2 SpiralSample(
 	int samples, int totalSamples, float rotation, float Xi
 ){

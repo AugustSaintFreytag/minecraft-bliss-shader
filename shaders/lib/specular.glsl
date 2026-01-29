@@ -47,7 +47,7 @@ vec3 SampleVNDFGGX(
     viewerDirection = normalize(vec3( alpha * 0.5 * viewerDirection.xy, viewerDirection.z));
 
     // Sample a reflection direction off the hemisphere
-    const float tau = 6.2831853; // 2 * pi
+    const float tau = 6.2831853; // 2 * PI
     float phi = tau * xy.x;
 
     float cosTheta = fma(1.0 - xy.y, 1.0 + viewerDirection.z, -viewerDirection.z);

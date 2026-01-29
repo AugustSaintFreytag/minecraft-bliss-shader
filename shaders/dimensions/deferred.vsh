@@ -12,6 +12,7 @@
 #define ANTIALIASING_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
+#include "/lib/util.glsl"
 #include "/lib/res_params.glsl"
 #include "/lib/Shadow_Params.glsl"
 
@@ -56,7 +57,6 @@ uniform float frameTimeCounter;
 vec3 sunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);
 
 #include "/lib/sky_gradient.glsl"
-#include "/lib/util.glsl"
 #include "/lib/ROBOBO_sky.glsl"
 
 float luma(vec3 color) {
@@ -65,7 +65,7 @@ float luma(vec3 color) {
 vec3 rodSample(vec2 Xi)
 {
 	float r = sqrt(1.0f - Xi.x*Xi.y);
-    float phi = 2 * 3.14159265359 * Xi.y;
+    float phi = 2 * PI * Xi.y;
 
     return normalize(vec3(cos(phi) * r, sin(phi) * r, Xi.x)).xzy;
 }
@@ -92,7 +92,6 @@ float hash11(float p)
 #include "/lib/scene_controller.glsl"
 
 void main() {
-
 	gl_Position = ftransform();
 	gl_Position.xy *= vec2(SKY_CLOUD_ATLAS_OFFSET_X + SKY_CLOUD_ATLAS_SIZE + 1.0, SKY_CLOUD_ATLAS_SIZE + 1.0) / 2048.0;
 	gl_Position.xy = gl_Position.xy * 2.0 - 1.0;

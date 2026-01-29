@@ -3,12 +3,12 @@
 #define DISTANCE_BASED_FOG_RELATED_SETTINGS
 #define SEASONS_RELATED_SETTINGS
 #define WATER_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
+#include "/lib/util.glsl"
 #include "/lib/macro_lod_mod.glsl"
 
 flat varying vec3 zMults;
-
-
 flat varying vec3 WsunVec;
 
 #ifdef OVERWORLD_SHADER

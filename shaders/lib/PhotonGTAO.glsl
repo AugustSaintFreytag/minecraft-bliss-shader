@@ -3,12 +3,9 @@
 
 const float eps          = 1e-6;
 const float e            = exp(1.0);
-const float tau          = 2.0 * pi;
-const float half_pi      = 0.5 * pi;
-const float rcp_pi       = 1.0 / pi;
-const float degree       = tau / 360.0; // Size of one degree in radians, useful because radians() is not a constant expression on all platforms
+const float degree       = TAU / 360.0; // Size of one degree in radians, useful because radians() is not a constant expression on all platforms
 const float golden_ratio = 0.5 + 0.5 * sqrt(5.0);
-const float golden_angle = tau / golden_ratio / golden_ratio;
+const float golden_angle = TAU / golden_ratio / golden_ratio;
 const float hand_depth   = 0.56;
 
 #if TAA_MODE == 3
@@ -55,8 +52,9 @@ float fast_acos(float x) {
 	float res = (C2 * abs(x) + C1) * abs(x) + C0; // p(x)
 	res *= sqrt(1.0 - abs(x));
 
-	return x >= 0 ? res : pi - res; // Undo range reduction
+	return x >= 0 ? res : PI - res; // Undo range reduction
 }
+
 vec2 fast_acos(vec2 v) { return vec2(fast_acos(v.x), fast_acos(v.y)); }
 
 uniform vec2 view_res;
@@ -73,6 +71,7 @@ vec2 linear_step(vec2 edge0, vec2 edge1, vec2 x) {
 vec4 project(mat4 m, vec3 pos) {
     return vec4(m[0].x, m[1].y, m[2].zw) * pos.xyzz + m[3];
 }
+
 vec3 project_and_divide(mat4 m, vec3 pos) {
     vec4 homogenous = project(m, pos);
     return homogenous.xyz / homogenous.w;
@@ -152,7 +151,7 @@ float ambient_occlusion(vec3 screen_pos, vec3 view_pos, vec3 view_normal, vec2 d
 	mat3 local_to_view = mat3(viewer_right, viewer_up, viewer_dir);
 
 	for (int i = 0; i < GTAO_SLICES; ++i) {
-		float slice_angle = (i + dither.x) * (pi / float(GTAO_SLICES));
+		float slice_angle = (i + dither.x) * (PI / float(GTAO_SLICES));
 
 		vec3 slice_dir = vec3(cos(slice_angle), sin(slice_angle), 0.0);
 		vec3 view_slice_dir = local_to_view * slice_dir;
@@ -173,7 +172,7 @@ float ambient_occlusion(vec3 screen_pos, vec3 view_pos, vec3 view_normal, vec2 d
 		max_horizon_angles.x = calculate_maximum_horizon_angle(-view_slice_dir, viewer_dir, screen_pos, view_pos, dither.y);
 		max_horizon_angles.y = calculate_maximum_horizon_angle( view_slice_dir, viewer_dir, screen_pos, view_pos, dither.y);
 
-		max_horizon_angles = gamma + clamp(vec2(-1.0, 1.0) * max_horizon_angles - gamma, -half_pi, half_pi) ;
+		max_horizon_angles = gamma + clamp(vec2(-1.0, 1.0) * max_horizon_angles - gamma, -hPI, hPI) ;
 
 
 		ao += integrate_arc(max_horizon_angles, gamma, cos_gamma) * len_sq * norm  ;
