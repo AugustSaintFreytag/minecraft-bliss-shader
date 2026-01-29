@@ -46,7 +46,8 @@ varying vec2 lightmapCoords;
 
 flat varying int isWater;
 
-// uniform float far;
+uniform float near;
+uniform float far;
 uniform float dhFarPlane;
 uniform float dhNearPlane;
 
@@ -92,10 +93,7 @@ vec3 DH_toScreenSpace(vec3 p) {
 vec3 DH_toClipSpace3(vec3 viewSpacePosition) {
     return projMAD(dhProjection, viewSpacePosition) / -viewSpacePosition.z * 0.5 + 0.5;
 }
-// uniform float dhNearPlane;
-float invLinZ (float lindepth){
-	return -((2.0*dhNearPlane/lindepth)-far-dhNearPlane)/(far-dhNearPlane);
-}
+
 float ld(float dist) {
     return (2.0 * dhNearPlane) / (far + dhNearPlane - dist * (far - dhNearPlane));
 }

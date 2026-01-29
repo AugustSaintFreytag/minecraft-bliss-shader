@@ -1106,8 +1106,7 @@ screen.MOD_SETTINGS = Supported Mods
     option.NOISE_RESOLUTION = Noise Texture Resolution (DH)
     option.NOISE_INTENSITY = Noise Texture Intensity (DH)
     option.NOISE_DROPOFF = Noise Texture Drop-off Distance (DH)
-    option.DH_SSS_OCCLUSION_SAMPLES = SSS Occlusion Samples (DH)
-    option.DH_SSS_OCCLUSION_STEP = SSS Occlusion Step Size (DH)
+    option.DH_SSS_OCCLUSION_INTENSITY = SSS Occlusion Intensity (DH)
     option.DH_VOLUMETRIC_OCCLUSION = Volumetric Occlusion (DH)
     option.DH_VOLUMETRIC_SUN_OCCLUSION = Volumetric Sun Occlusion (DH)
         value.DH_VOLUMETRIC_SUN_OCCLUSION.0 = §cOFF
@@ -1115,6 +1114,8 @@ screen.MOD_SETTINGS = Supported Mods
         value.DH_VOLUMETRIC_LIGHT_OCCLUSION.0 = §cOFF
     option.DH_VOLUMETRIC_OCCLUSION_SAMPLES = Volumetric Occlusion Samples
         value.DH_VOLUMETRIC_OCCLUSION_SAMPLES.0 = §cOFF
+    option.DH_VOLUMETRIC_OCCLUSION_STEP = Volumetric Occlusion Step Size
+    option.DH_VOLUMETRIC_OCCLUSION_DISTANCE = Volumetric Occlusion Max Distance
 
     screen.PHYSICS_MOD_OCEAN = Physics Mod §c⚠ READ DESCRIPTION§r
 
@@ -1122,10 +1123,9 @@ screen.MOD_SETTINGS = Supported Mods
 
     option.TOGGLE_VL_FOG.comment = one big button to just turn all the fog off.
     option.DISTANT_HORIZONS_SHADOWMAP.comment =  §cTHIS SETTING WILL DESTROY PERFORMANCE THIS WILL MAKE SHADOWS LOOK BLOCKY, FLICKERY, AND LOW DETAIL§r. Set shadow distance to 32 chunks (or more) and set shadow resolution to 4096 (or more).
+   
     screen.PHYSICS_MOD_OCEAN.comment = The ocean of physics mod is supported. The mod has its own settings for it located in §bgame options -> physics settings -> ocean§r
 
-    option.DH_SSS_OCCLUSION_SAMPLES.comment = Number of samples taken when calculating sub-surface scattering occlusion on Distant Horizons terrain. §a⚠ PERFORMANCE COST:§r medium
-    option.DH_SSS_OCCLUSION_STEP.comment = Step size when calculating sub-surface scattering occlusion on Distant Horizons terrain. §a⚠ PERFORMANCE COST:§r very low
     option.DH_VOLUMETRIC_OCCLUSION_SAMPLES.comment = Number of depth samples taken when evaluating DH volumetric occlusion. Higher values produce smoother masking at the cost of slightly more work.
     option.DH_VOLUMETRIC_OCCLUSION.comment = Uses Distant Horizons depth buffer when sampling for sun-produced volumetrics. Allows DH terrain to obscure sunlight. §a⚠ PERFORMANCE COST:§r medium
     
@@ -1160,4 +1160,24 @@ option.USE_CUSTOM_DIFFUSE_LIGHTING_COLORS = Custom Diffuse Colors
 
  ###################################################### ↓↓↓ THIS SUBMENU'S LABELS
 screen.DEBUG_SETTINGS = §cDebugging§r/Experimental Settings
+option.DEBUG_VIEW = Debug Mode
+    value.DEBUG_VIEW.debug_OFF = §cOFF
+    value.DEBUG_VIEW.debug_SHADOWMAP = Shadow Map
+    value.DEBUG_VIEW.debug_NORMALS = Normals
+    value.DEBUG_VIEW.debug_SPECULAR = Specular
+    value.DEBUG_VIEW.debug_INDIRECT = Indirect
+    value.DEBUG_VIEW.debug_DIRECT = Direct
+    value.DEBUG_VIEW.debug_VIEW_POSITION = View Position
+	value.DEBUG_VIEW.debug_DH_WATER_BLENDING = Water Blending (LOD)
+	value.DEBUG_VIEW.debug_SSAO = SSAO
+    value.DEBUG_VIEW.debug_MATERIAL_SSS = SSS Materials
+    value.DEBUG_VIEW.debug_MATERIAL_EMISSION = Emissive Materials
+    value.DEBUG_VIEW.debug_LIGHTMAPS = Lightmaps
+    value.DEBUG_VIEW.debug_FORWARD_RENDERING = Forward Rendering
+    value.DEBUG_VIEW.debug_FORWARD_COLOR_TINT = Forward Color Tint
+    value.DEBUG_VIEW.debug_DEFERRED_RENDERING = Deferred Rendering
+    value.DEBUG_VIEW.debug_SKYTEX = Sky & Clouds
+    value.DEBUG_VIEW.debug_DEPTHTEX0 = Depth I
+    value.DEBUG_VIEW.debug_DEPTHTEX1 = Depth II
+    value.DEBUG_VIEW.debug_AUX = Auxiliary
  ###################################################### ↑↑↑ THIS SUBMENU'S DESCRIPTIONS

@@ -24,7 +24,7 @@ flat varying vec3 moonCol;
 flat varying vec3 zMults;
 uniform sampler2D colortex4;
 
-// uniform float far;
+uniform float far;
 uniform float near;
 
 uniform mat4 gbufferModelViewInverse;
@@ -38,9 +38,6 @@ uniform float frameTimeCounter;
 
 
 #include "/lib/TAA_jitter.glsl"
-
-
-
 #include "/lib/util.glsl"
 #include "/lib/Shadow_Params.glsl"
 
@@ -62,7 +59,7 @@ void main() {
 	// 	albedoSmooth = texelFetch(colortex4,ivec2(15.5,2.5),0).rgb;
 	// #endif
 
-	averageSkyCol_Clouds = texelFetch(colortex4,ivec2(0,37),0).rgb;
+	averageSkyCol_Clouds = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb;
 
 	unsigned_WsunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);
 	

@@ -35,6 +35,7 @@ flat varying float centerDepth;
 
 uniform sampler2D noisetex;
 uniform sampler2D colortex1;
+uniform sampler2D colortex4;
 
 uniform float frameTime;
 uniform int frameCounter;
@@ -55,7 +56,7 @@ uniform float sunElevation;
 uniform vec3 sunPosition;
 uniform vec3 moonPosition;
 uniform vec3 cameraPosition;
-// uniform float far;
+uniform float far;
 uniform ivec2 eyeBrightnessSmooth;
 // uniform ivec2 eyeBrightness;
 uniform float caveDetection;
@@ -68,23 +69,18 @@ uniform int hideGUI;
 uniform float near;
 
 #include "/lib/util.glsl"
+#include "/lib/color_transforms.glsl"
 #include "/lib/ROBOBO_sky.glsl"
 #include "/lib/sky_gradient.glsl"
 #include "/lib/Shadow_Params.glsl"
-// #include "/lib/waterBump.glsl"
 
 vec4 lightCol = vec4(lightSourceColor, float(sunElevation > 1e-5)*2-1.);
 vec3 WsunVec = mat3(gbufferModelViewInverse)*sunVec;
-// vec3 WsunVec = normalize(LightDir);
 
 vec2 decodeVec2(float a){
     const vec2 constant1 = 65535. / vec2( 256., 65536.);
     const float constant2 = 256. / 255.;
     return fract( a * constant1 ) * constant2 ;
-}
-
-vec3 toLinear(vec3 sRGB){
-	return sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);
 }
 
 vec3 toShadowSpaceProjected(vec3 p3){
@@ -94,18 +90,22 @@ vec3 toShadowSpaceProjected(vec3 p3){
 
     return p3;
 }
+
 float interleaved_gradientNoise_temporal(){
 	return fract(52.9829189*fract(0.06711056*gl_FragCoord.x + 0.00583715*gl_FragCoord.y) + 1.0/1.6180339887 * frameCounter);
 }
+
 float interleaved_gradientNoise(){
 	vec2 coord = gl_FragCoord.xy;
 	float noise = fract(52.9829189*fract(0.06711056*coord.x + 0.00583715*coord.y));
 	return noise;
 }
+
 float R2_dither(){
 	vec2 alpha = vec2(0.75487765, 0.56984026);
 	return fract(alpha.x * gl_FragCoord.x + alpha.y * gl_FragCoord.y + 1.0/1.6180339887 * frameCounter) ;
 }
+
 float blueNoise(){
   return fract(texelFetch(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887 * frameCounter);
 }
@@ -136,15 +136,13 @@ vec3 DH_toClipSpace3(vec3 viewSpacePosition) {
 float DH_ld(float dist) {
     return (2.0 * LOD_NEARPLANE) / (LOD_FARPLANE + LOD_NEARPLANE - dist * (LOD_FARPLANE - LOD_NEARPLANE));
 }
+
 float DH_inv_ld (float lindepth){
 	return -((2.0*LOD_NEARPLANE/lindepth)-LOD_FARPLANE-LOD_NEARPLANE)/(LOD_FARPLANE-LOD_NEARPLANE);
 }
 
 float linearizeDepthFast(const in float depth, const in float near, const in float far) {
     return (near * far) / (depth * (near - far) + far);
-}
-float invLinZ (float lindepth){
-	return -((2.0*near/lindepth)-far-near)/(far-near);
 }
 
 // #define LIGHTNINGFLASH_VL
@@ -186,21 +184,62 @@ float invLinZ (float lindepth){
 	#include "/lib/end_fog.glsl"
 #endif
 
-vec3 rodSample(vec2 Xi)
-{
+vec3 rodSample(vec2 Xi) {
 	float r = sqrt(1.0f - Xi.x*Xi.y);
     float phi = 2 * 3.14159265359 * Xi.y;
 
     return normalize(vec3(cos(phi) * r, sin(phi) * r, Xi.x)).xzy;
 }
 
-//Low discrepancy 2D sequence, integration error is as low as sobol but easier to compute : http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+// Low discrepancy 2D sequence, integration error is as low as sobol but easier to compute: 
+// http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+
 vec2 R2_samples(float n){
 	vec2 alpha = vec2(0.75487765, 0.56984026);
 	return fract(alpha * n);
 }
 
+// Sky Sampling
 
+const int SKY_COLOR_SAMPLES = 16;
+
+vec3 weightedMeanSkyColor(vec3 colorSamples[SKY_COLOR_SAMPLES], float weights[SKY_COLOR_SAMPLES]) {
+	vec3 weightedSum = vec3(0.0);
+	float weightSum = 0.0;
+
+	for (int index = 0; index < SKY_COLOR_SAMPLES; ++index) {
+		float weight = weights[index];
+		weightedSum += colorSamples[index] * weight;
+		weightSum += weight;
+	}
+
+	return (weightSum > 0.0) ? (weightedSum / weightSum) : vec3(0.0);
+}
+
+vec3 sampleSkyColor(int offsetX) {
+	const int offsetY = 16;
+	const float stepX = 1024 / (SKY_COLOR_SAMPLES - 1);
+	const float stepY = 32;
+
+	vec3 sampleSum = vec3(0.0);
+	vec3 samples[SKY_COLOR_SAMPLES];
+	float weights[SKY_COLOR_SAMPLES];
+
+	for (int i = 0; i < SKY_COLOR_SAMPLES; i++) {
+		ivec2 texcoords = ivec2(offsetX + stepX * i, offsetY + stepY * i);
+		vec3 color = texelFetch(colortex4, texcoords, 0).rgb;
+		float weight = luma(color);
+
+		samples[i] = color;
+		weights[i] = weight;
+
+		sampleSum += color;
+	}
+
+	return sampleSum / vec3(float(SKY_COLOR_SAMPLES));
+}
+
+// Main
 
 void main() {
 	/* RENDERTARGETS:4 */
@@ -348,14 +387,13 @@ void main() {
 		float volumetricFogLightBoost = 2.5;
 
 		vec4 volumetricClouds = GetVolumetricClouds(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, cloudPlaneDistance);
-		vec4 volumetricFog = GetVolumetricFog(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, averageSkyCol_Clouds * 5.0, cloudPlaneDistance);
+		vec4 volumetricFog = GetVolumetricFog(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, 1.0, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, averageSkyCol_Clouds * 5.0, cloudPlaneDistance);
 
 		vec3 finalSky = skyColBase * volumetricClouds.a + volumetricClouds.rgb / 5.0;
 		finalSky = finalSky * volumetricFog.a + volumetricFog.rgb / 5.0;
 
 		gl_FragData[0] = vec4(finalSky, 1.0);
 	}
-
 
 	#ifdef FAKE_PLANET
 		vec2 pixelPos2 = vec2(16,1);
@@ -466,6 +504,16 @@ void main() {
 	if (gl_FragCoord.x > 14. && gl_FragCoord.x < 15.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ) {
 		gl_FragData[0] = vec4(rodExposure, centerDepth,0.0, 1.0);
 	}
+	
+	// --- Sky Average Color Samples
+	if (gl_FragCoord.x >= SKY_AVERAGE_COLOR_X && gl_FragCoord.x < SKY_AVERAGE_COLOR_X + 1 && gl_FragCoord.y >= SKY_AVERAGE_COLOR_Y && gl_FragCoord.y < SKY_AVERAGE_COLOR_Y + 1) {
+		vec3 averageSkyColor = sampleSkyColor(0);
+		gl_FragData[0] = vec4(averageSkyColor, 1.0);
+	}
 
-	// gl_FragData[0] = vec4(vec3(1.0, 0.0, 0.0) * 1200, 65000.0);
+	// --- Sky and Clouds Average Color Samples
+	if (gl_FragCoord.x >= SKY_AND_CLOUDS_AVERAGE_COLOR_X && gl_FragCoord.x < SKY_AND_CLOUDS_AVERAGE_COLOR_X + 1 && gl_FragCoord.y >= SKY_AND_CLOUDS_AVERAGE_COLOR_Y && gl_FragCoord.y < SKY_AND_CLOUDS_AVERAGE_COLOR_Y + 1) {
+		vec3 averageSkyColor = sampleSkyColor(1024);
+		gl_FragData[0] = vec4(averageSkyColor, 1.0);
+	}
 }

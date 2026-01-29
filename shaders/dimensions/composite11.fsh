@@ -94,15 +94,15 @@ vec3 luminanceCurve(vec3 color){
 
 vec3 colorGrading(vec3 color) {
 	float grade_luma = dot(color, vec3(1.0 / 3.0));
-  float shadows_amount = saturate(-6.0 * grade_luma + 2.75);
-	float mids_amount = saturate(-abs(6.0 * grade_luma - 3.0) + 1.25);
-	float highlights_amount = saturate(6.0 * grade_luma - 3.25);
+  float shadows_amount = limit(-6.0 * grade_luma + 2.75);
+	float mids_amount = limit(-abs(6.0 * grade_luma - 3.0) + 1.25);
+	float highlights_amount = limit(6.0 * grade_luma - 3.25);
 
 	vec3 graded_shadows = color * SHADOWS_TARGET * SHADOWS_GRADE_MUL * 1.7320508076;
 	vec3 graded_mids = color * MIDS_TARGET * MIDS_GRADE_MUL * 1.7320508076;
 	vec3 graded_highlights = color * HIGHLIGHTS_TARGET * HIGHLIGHTS_GRADE_MUL * 1.7320508076;
 
-	return saturate(graded_shadows * shadows_amount + graded_mids * mids_amount + graded_highlights * highlights_amount);
+	return limit(graded_shadows * shadows_amount + graded_mids * mids_amount + graded_highlights * highlights_amount);
 }
 
 vec3 contrastAdaptiveSharpening(vec3 color, vec2 texcoord){

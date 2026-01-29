@@ -3,6 +3,7 @@
 #define SHADOWMAP_CONSTANT_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
+#include "/lib/util.glsl"
 #include "/lib/DH_utils.glsl"
 
 varying vec4 pos;

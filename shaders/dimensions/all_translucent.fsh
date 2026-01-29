@@ -85,7 +85,7 @@ varying vec3 largeWaveDisplacementNormal;
 
 uniform vec3 sunVec;
 uniform float near;
-// uniform float far;
+uniform float far;
 uniform float sunElevation;
 
 uniform int isEyeInWater;

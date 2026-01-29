@@ -1,7 +1,9 @@
 #define ANTIALIASING_RELATED_SETTINGS
 #define SKY_RELATED_SETTINGS
 #define DISTANCE_BASED_FOG_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
+#include "/lib/res_params.glsl"
 
 varying vec2 texcoord;
 flat varying vec3 zMults;
@@ -34,8 +36,9 @@ void main() {
 
 	#ifdef OVERWORLD_SHADER
 		#ifdef BorderFog
-			skyGroundColor = texelFetch(colortex4,ivec2(1,37),0).rgb / 1200.0 * Sky_Brightness;
+			skyGroundColor = texelFetch(colortex4, ivec2(SKY_AVERAGE_COLOR_X, SKY_AVERAGE_COLOR_Y), 0).rgb / 1200.0 * Sky_Brightness;	
 		#endif
+
 		WsunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);
 	#endif
 

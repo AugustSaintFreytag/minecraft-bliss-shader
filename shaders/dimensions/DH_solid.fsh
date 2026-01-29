@@ -2,6 +2,7 @@
 #define EMISSION_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
+#include "/lib/util.glsl"
 #include "/lib/DH_utils.glsl"
 
 // varying vec4 pos;
@@ -14,7 +15,6 @@ flat varying float EMISSIVE;
 flat varying int dh_material_id;
 
 uniform float nightVision;
-// uniform int hideGUI;
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
 

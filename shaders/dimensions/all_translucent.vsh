@@ -230,10 +230,10 @@ void main() {
 	color = vec4(gl_Color.rgb, 1.0);
 
 	#ifdef OVERWORLD_SHADER
-		lightCol.rgb = texelFetch(colortex4,ivec2(6,37),0).rgb;
-		lightCol.a = float(sunElevation > 1e-5)*2.0 - 1.0;
+		lightCol.rgb = texelFetch(colortex4,ivec2(6, 37), 0).rgb;
+		lightCol.a = float(sunElevation > 1e-5) * 2.0 - 1.0;
 	
-		averageSkyCol_Clouds = texelFetch(colortex4,ivec2(0,37),0).rgb;
+		averageSkyCol_Clouds = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb;
 	
 		// WsunVec = lightCol.a * normalize(mat3(gbufferModelViewInverse) * sunPosition);
 		

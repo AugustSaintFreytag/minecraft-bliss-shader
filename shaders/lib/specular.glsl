@@ -1,15 +1,3 @@
-float invLinZ (float lindepth){
-	return -((2.0*near/lindepth)-far-near)/(far-near);
-}
-float linZ(float depth) {
-    return (2.0 * near) / (far + near - depth * (far - near));
-	// l = (2*n)/(f+n-d(f-n))
-	// f+n-d(f-n) = 2n/l
-	// -d(f-n) = ((2n/l)-f-n)
-	// d = -((2n/l)-f-n)/(f-n)
-
-}
-
 void frisvad(in vec3 n, out vec3 f, out vec3 r){
     if(n.z < -0.9) {
         f = vec3(0.,-1,0);
@@ -34,7 +22,7 @@ vec2 R2_Sample(int n){
 }
 
 float fma(float a,float b,float c){
- return a * b + c;
+	return a * b + c;
 }
 
 vec3 SampleVNDFGGX(
@@ -47,7 +35,7 @@ vec3 SampleVNDFGGX(
     viewerDirection = normalize(vec3( alpha * 0.5 * viewerDirection.xy, viewerDirection.z));
 
     // Sample a reflection direction off the hemisphere
-    const float tau = 6.2831853; // 2 * pi
+    const float tau = 6.2831853; // 2 * PI
     float phi = tau * xy.x;
 
     float cosTheta = fma(1.0 - xy.y, 1.0 + viewerDirection.z, -viewerDirection.z);

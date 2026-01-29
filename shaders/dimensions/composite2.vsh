@@ -1,5 +1,6 @@
 #define ANTIALIASING_RELATED_SETTINGS
 #define SHADOWMAP_CONSTANT_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
 #include "/lib/util.glsl"
 #include "/lib/res_params.glsl"
@@ -9,7 +10,6 @@ flat varying vec3 averageSkyCol;
 flat varying vec3 averageSkyCol_Clouds;
 
 #include "/lib/scene_controller.glsl"
-
 
 flat varying vec3 WsunVec;
 flat varying vec3 refractedSunVec;
@@ -25,6 +25,7 @@ uniform mat4 gbufferModelViewInverse;
 uniform int frameCounter;
 
 uniform float frameTimeCounter;
+
 #include "/lib/Shadow_Params.glsl"
 #include "/lib/sky_gradient.glsl"
 
@@ -42,9 +43,9 @@ void main() {
 
 	
 	#ifdef OVERWORLD_SHADER
-		lightCol.rgb = texelFetch(colortex4,ivec2(6,37),0).rgb;
-		averageSkyCol = texelFetch(colortex4,ivec2(1,37),0).rgb;
-		averageSkyCol_Clouds = texelFetch(colortex4,ivec2(0,37),0).rgb;
+		lightCol.rgb = texelFetch(colortex4, ivec2(6, 37), 0).rgb;
+		averageSkyCol = texelFetch(colortex4, ivec2(SKY_AVERAGE_COLOR_X, SKY_AVERAGE_COLOR_Y), 0).rgb;
+		averageSkyCol_Clouds = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb;
 
 		#define READ_SCENE_CONTROLLER_PARAMETERS
 		#include "/lib/scene_controller.glsl"

@@ -515,7 +515,7 @@ option.DEBUG_VIEW = Вид отладки
     value.debug_DIRECT = Прямой
     value.debug_VIEW_POSITION = Позиция просмотра
 	value.debug_DH_WATER_BLENDING = Смешивание воды  DH
-	value.debug_FILTERED_STUFF = Фильтрованный материал
+	value.debug_SSAO = Эффекты экранного пространства
 	
 option.display_LUT = дисплей LUT
 option.SSS_view = Вид SSS

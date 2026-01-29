@@ -15,6 +15,7 @@
 #define AMBIENT_LIGHT_RELATED_SETTINGS
 #define VOLUMETRIC_CLOUD_RELATED_SETTINGS
 #define WATER_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
 #include "/lib/macro_lod_mod.glsl"
 #include "/lib/TAA_jitter.glsl"
@@ -27,9 +28,6 @@
 	#extension GL_ARB_shader_image_load_store: enable
 	#extension GL_ARB_shading_language_packing: enable
 #endif
-
-#include "/lib/util.glsl"
-#include "/lib/res_params.glsl"
 
 #define diagonal3_old(m) vec3((m)[0].x, (m)[1].y, m[2].z)
 #define  projMAD_old(m, v) (diagonal3_old(m) * (v) + (m)[3].xyz)
@@ -95,7 +93,7 @@ uniform vec3 previousCameraPosition;
 uniform float updateFadeTime;
 // uniform float centerDepthSmooth;
 
-// uniform float far;
+uniform float far;
 uniform float near;
 uniform float farPlane;
 uniform float dhFarPlane;
@@ -121,6 +119,8 @@ uniform ivec2 eyeBrightnessSmooth;
 uniform ivec2 eyeBrightness;
 
 uniform vec3 sunVec;
+uniform float sunElevation;
+
 flat varying vec3 WsunVec;
 flat varying vec3 unsigned_WsunVec;
 flat varying vec3 WmoonVec;
@@ -134,8 +134,10 @@ uniform int heldBlockLightValue2;
 uniform int heldItemId;
 uniform int heldItemId2;
 
-
 uniform float waterEnteredAltitude;
+
+#include "/lib/util.glsl"
+#include "/lib/res_params.glsl"
 
 void convertHandDepth(inout float depth) {
     float ndcDepth = depth * 2.0 - 1.0;
@@ -175,11 +177,9 @@ float convertHandDepth_2(in float depth, bool hand) {
 #include "/lib/lightning_stuff.glsl"
 #include "/lib/diffuse_lighting.glsl"
 #include "/lib/end_fog.glsl"
-#include "/lib/DistantHorizons_projections.glsl"
 
-float ld(float dist) {
-    return (2.0 * near) / (far + near - dist * (far - near));
-}
+#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_occlusion.glsl"
 
 vec3 decode (vec2 encn){
     vec3 n = vec3(0.0);
@@ -200,6 +200,7 @@ float DH_ld(float dist) {
 }
 
 #include "/lib/specular.glsl"
+
 float DH_inv_ld (float lindepth){
 	return -((2.0*dhNearPlane/lindepth)-dhFarPlane-dhNearPlane)/(dhFarPlane-dhNearPlane);
 }
@@ -319,53 +320,6 @@ vec3 worldToView(vec3 worldPos) {
     return pos.xyz;
 }
 
-float swapperlinZ(float depth, float _near, float _far) {
-    return (2.0 * _near) / (_far + _near - depth * (_far - _near));
-}
-
-#if defined DISTANT_HORIZONS
-float DH_SSS_SunVisibility(vec3 viewPos, vec3 lightDir, float noise) {
-	float visibility = 0.0;
-	float samples = DH_SSS_OCCLUSION_SAMPLES;
-	float stepMult = DH_SSS_OCCLUSION_STEP;
-
-	float _near = LOD_NEARPLANE;
-	float _far = LOD_FARPLANE;
-
-	if (samples == 0.0) {
-		return 1.0;
-	}
-
-	vec3 position = toClipSpace3_DH(viewPos, true);
-
-	// Prevent ray from going behind the camera.
-	float rayLength = ((viewPos.z + lightDir.z * _far * sqrt(3.0)) > -_near)
-		? (-_near - viewPos.z) / lightDir.z
-		: _far * sqrt(3.0);
-
-	vec3 direction = toClipSpace3_DH(viewPos + lightDir * rayLength, true) - position;
-	direction.xyz = direction.xyz / max(max(abs(direction.x) / 0.0005, abs(direction.y) / 0.0005), 500.0);
-	direction *= stepMult;
-
-	position.xy *= RENDER_SCALE;
-	direction.xy *= RENDER_SCALE;
-
-	vec3 newPos = position + direction * noise;
-	vec2 screenEdges = 2.0 / vec2(viewWidth, viewHeight);
-
-	for (int i = 0; i < int(samples); i++) {
-		newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
-
-		float sampleDepth = texelFetch2D(LOD_DEPTHTEX1, ivec2(newPos.xy / texelSize), 0).x;
-		visibility += (sampleDepth < newPos.z) ? 0.0 : 1.0;
-
-		newPos += direction;
-	}
-
-	return visibility / samples;
-}
-#endif
-
 vec2 SSRT_Shadows(vec3 viewPos, bool depthCheck, vec3 lightDir, float noise, bool isSSS, bool hand){
 	float shadows = 1.0;
 	float samples = 16.0;
@@ -397,7 +351,7 @@ vec2 SSRT_Shadows(vec3 viewPos, bool depthCheck, vec3 lightDir, float noise, boo
 	// literally shadow bias to fight shadow acne due to precision problems when comparing sampled depth and marched position
 	newPos += direction * 0.3;
 
-	float SSSdistanceScale = 1.0 / (1.0 + swapperlinZ(position.z, _near, _far) * 12.0);
+	float SSSdistanceScale = 1.0 / (1.0 + swapperLinZ(position.z, _near, _far) * 12.0);
 	float distanceScale2 = 1.0 + length(mat3(gbufferModelViewInverse) * viewPos) / 150.0;
 
 	for (int i = 0; i < int(samples); i++) { 
@@ -419,8 +373,8 @@ vec2 SSRT_Shadows(vec3 viewPos, bool depthCheck, vec3 lightDir, float noise, boo
 		#endif
 
 		if(sampleDepth < newPos.z){
-			float linearCurrentPos = swapperlinZ(newPos.z, _near, _far);
-			float linearSampledDepth = swapperlinZ(sampleDepth, _near, _far);
+			float linearCurrentPos = swapperLinZ(newPos.z, _near, _far);
+			float linearSampledDepth = swapperLinZ(sampleDepth, _near, _far);
 
 			float dist = abs(linearSampledDepth - linearCurrentPos) / linearCurrentPos;
 			
@@ -519,7 +473,7 @@ void doEdgeAwareBlur(
 		#ifdef USING_LOD_MOD
 			float offsetDepth = sqrt(texelFetch(depth, UV + offset + UV_NOISE,0).a/65000.0);
 		#else
-			float offsetDepth = ld(convertHandDepth_2(texelFetch(depth, UV + offset + UV_NOISE, 0).r,hand));
+			float offsetDepth = linZ(convertHandDepth_2(texelFetch(depth, UV + offset + UV_NOISE, 0).r,hand));
 		#endif
 
 		float edgeDiff = abs(offsetDepth - referenceDepth) < threshold ? 1.0 : 1e-7;
@@ -576,7 +530,7 @@ vec4 BilateralUpscale_VLFOG(sampler2D tex, sampler2D depth, float referenceDepth
 		#ifdef USING_LOD_MOD
 			float offsetDepth = sqrt(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE,0).a/65000.0);
 		#else
-			float offsetDepth = ld(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE, 0).r);
+			float offsetDepth = linZ(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE, 0).r);
 		#endif
 
 		float edgeDiff = abs(offsetDepth - referenceDepth) < threshold ? 1.0 : 1e-7;
@@ -803,8 +757,8 @@ void main() {
 		bool isDHrange = z >= 1.0;
 
 		#ifdef USING_LOD_MOD
-			float DH_mixedLinearZ = sqrt(texture(colortex12,texcoord).a/65000.0);
-			float DH_depth0 = texture(LOD_DEPTHTEX0,texcoord).x;
+			float DH_mixedLinearZ = sqrt(texture(colortex12,texcoord).a / 65000.0);
+			float DH_depth0 = texture(LOD_DEPTHTEX0, texcoord).x;
 			float DH_depth1 = texture(LOD_DEPTHTEX1 ,texcoord).x;
 
 			float depthOpaque = z;
@@ -1074,7 +1028,7 @@ void main() {
 		#if defined USING_LOD_MOD && defined DH_AMBIENT_OCCLUSION
 			doEdgeAwareBlur(colortex3,	colortex14, colortex12, DH_mixedLinearZ, hand, SSAO_SSS, filteredShadow);
 		#else
-			doEdgeAwareBlur(colortex3,	colortex14, depthtex0, ld(z0), 	hand, SSAO_SSS, filteredShadow);
+			doEdgeAwareBlur(colortex3,	colortex14, depthtex0, linZ(z0), 	hand, SSAO_SSS, filteredShadow);
 		#endif
 		
 		float ShadowBlockerDepth = filteredShadow.y;
@@ -1180,9 +1134,11 @@ void main() {
 			SSSColor = SubsurfaceScattering_sun(albedo, ShadowBlockerDepth, sunSSS_density, clamp(dot(feetPlayerPos_normalized, WsunVec),0.0,1.0), SS_directLight.g, shadowMapFalloff2, hand);
 
 			#ifdef DISTANT_HORIZONS
-				if (sunSSS_density > 0.0) {
-					float dhSSSVisibility = DH_SSS_SunVisibility(viewPos, normalize(WsunVec*mat3(gbufferModelViewInverse)), ig_noise);
-					SSSColor *= dhSSSVisibility;
+				if (sunSSS_density > 0.0 && DH_SSS_OCCLUSION_INTENSITY > 0.0) {
+					vec3 sunDirection = normalize(WsunVec * mat3(gbufferModelViewInverse));
+					float sunVisibility = getDHSunVisibility(viewPos, sunDirection, BN.x, z0);
+
+					SSSColor = mix(SSSColor, SSSColor * sunVisibility, DH_SSS_OCCLUSION_INTENSITY);
 				}
 			#endif
 			
@@ -1514,7 +1470,7 @@ void main() {
 	#if DEBUG_VIEW == debug_VIEW_POSITION
 		gl_FragData[0].rgb = viewPos * 0.001;
 	#endif
-	#if DEBUG_VIEW == debug_FILTERED_STUFF
+	#if DEBUG_VIEW == debug_SSAO
 		// if(hideGUI == 0){
 			float value = SSAO_SSS.y;
 			value = pow(value,3.5);
