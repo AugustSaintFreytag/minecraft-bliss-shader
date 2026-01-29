@@ -15,6 +15,7 @@
 #define AMBIENT_LIGHT_RELATED_SETTINGS
 #define VOLUMETRIC_CLOUD_RELATED_SETTINGS
 #define WATER_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
 #include "/lib/macro_lod_mod.glsl"
 #include "/lib/TAA_jitter.glsl"
@@ -27,9 +28,6 @@
 	#extension GL_ARB_shader_image_load_store: enable
 	#extension GL_ARB_shading_language_packing: enable
 #endif
-
-#include "/lib/util.glsl"
-#include "/lib/res_params.glsl"
 
 #define diagonal3_old(m) vec3((m)[0].x, (m)[1].y, m[2].z)
 #define  projMAD_old(m, v) (diagonal3_old(m) * (v) + (m)[3].xyz)
@@ -95,7 +93,7 @@ uniform vec3 previousCameraPosition;
 uniform float updateFadeTime;
 // uniform float centerDepthSmooth;
 
-// uniform float far;
+uniform float far;
 uniform float near;
 uniform float farPlane;
 uniform float dhFarPlane;
@@ -121,6 +119,8 @@ uniform ivec2 eyeBrightnessSmooth;
 uniform ivec2 eyeBrightness;
 
 uniform vec3 sunVec;
+uniform float sunElevation;
+
 flat varying vec3 WsunVec;
 flat varying vec3 unsigned_WsunVec;
 flat varying vec3 WmoonVec;
@@ -319,50 +319,6 @@ vec3 worldToView(vec3 worldPos) {
     pos = gbufferModelView * pos;
     return pos.xyz;
 }
-
-
-#if defined DISTANT_HORIZONS
-float DH_SSS_SunVisibility(vec3 viewPos, vec3 lightDir, float noise) {
-	float visibility = 0.0;
-	float samples = DH_SSS_OCCLUSION_SAMPLES;
-	float stepMult = DH_SSS_OCCLUSION_STEP;
-
-	float _near = LOD_NEARPLANE;
-	float _far = LOD_FARPLANE;
-
-	if (samples == 0.0) {
-		return 1.0;
-	}
-
-	vec3 position = toClipSpace3_DH(viewPos, true);
-
-	// Prevent ray from going behind the camera.
-	float rayLength = ((viewPos.z + lightDir.z * _far * sqrt(3.0)) > -_near)
-		? (-_near - viewPos.z) / lightDir.z
-		: _far * sqrt(3.0);
-
-	vec3 direction = toClipSpace3_DH(viewPos + lightDir * rayLength, true) - position;
-	direction.xyz = direction.xyz / max(max(abs(direction.x) / 0.0005, abs(direction.y) / 0.0005), 500.0);
-	direction *= stepMult;
-
-	position.xy *= RENDER_SCALE;
-	direction.xy *= RENDER_SCALE;
-
-	vec3 newPos = position + direction * noise;
-	vec2 screenEdges = 2.0 / vec2(viewWidth, viewHeight);
-
-	for (int i = 0; i < int(samples); i++) {
-		newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
-
-		float sampleDepth = texelFetch2D(LOD_DEPTHTEX1, ivec2(newPos.xy / texelSize), 0).x;
-		visibility += (sampleDepth < newPos.z) ? 0.0 : 1.0;
-
-		newPos += direction;
-	}
-
-	return visibility / samples;
-}
-#endif
 
 vec2 SSRT_Shadows(vec3 viewPos, bool depthCheck, vec3 lightDir, float noise, bool isSSS, bool hand){
 	float shadows = 1.0;
@@ -1179,8 +1135,11 @@ void main() {
 
 			#ifdef DISTANT_HORIZONS
 				if (sunSSS_density > 0.0) {
-					float dhSSSVisibility = DH_SSS_SunVisibility(viewPos, normalize(WsunVec*mat3(gbufferModelViewInverse)), ig_noise);
-					SSSColor *= dhSSSVisibility;
+					vec3 sunDirection = normalize(WsunVec * mat3(gbufferModelViewInverse));
+					float sunVisibility = getDHSunVisibility(viewPos, sunDirection, BN.x, z0);
+					float occlusionMix = DH_SSS_OCCLUSION_INTENSITY;
+
+					SSSColor = mix(SSSColor, SSSColor * sunVisibility, occlusionMix);
 				}
 			#endif
 			

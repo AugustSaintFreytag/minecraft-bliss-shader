@@ -476,141 +476,8 @@ float convertHandDepth(float depth) {
     return ndcDepth * 0.5 + 0.5;
 }
 
-float swapperlinZ(float depth, float nearPlane, float farPlane) {
-    return (2.0 * nearPlane) / (farPlane + nearPlane - depth * (farPlane - nearPlane));
-}
-
 #if defined DISTANT_HORIZONS
-	float sunAngleFactorFromElevation() {
-		const float HOURS_PER_HALF_DAY = 12.0;
-		const float HORIZON_ANGLE = PI * 0.5;
-
-		const float sunAngleEventOffsetHours = 0.0;
-		const float sunAngleTransitionHours = 1.0;
-
-		float sunAngle = acos(clamp(sunElevation, -1.0, 1.0));
-		float distanceFromHorizon = abs(sunAngle - HORIZON_ANGLE);
-
-		float offsetHours = clamp(max(sunAngleEventOffsetHours, 0.0), 0.0, HOURS_PER_HALF_DAY);
-		float transitionHours = clamp(max(sunAngleTransitionHours, 0.0), 0.0, HOURS_PER_HALF_DAY);
-
-		float hourToAngle = PI / HOURS_PER_HALF_DAY;
-		float offsetAngle = offsetHours * hourToAngle;
-		float transitionAngle = max(transitionHours * hourToAngle, 1e-4);
-
-		float normalizedDistance = max(distanceFromHorizon - offsetAngle, 0.0);
-		float transitionProgress = smoothstep(0.0, transitionAngle, normalizedDistance);
-
-		return clamp(1.0 - transitionProgress, 0.0, 1.0);
-	}
-
-	float sampleVolumetricOcclusion(in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
-		int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
-		float stepSize = DH_VOLUMETRIC_OCCLUSION_STEP;
-		float occlusionDistanceLimit = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
-		float volumetricOcclusionBehindFade = 128.0;
-
-		float nearPlane = near; 
-		float farPlane = far * 4.0;
-
-		bool depthCheck = true;
-
-		if (depthCheck) {
-			nearPlane = dhNearPlane;
-			farPlane = dhFarPlane;
-		}
-		
-		float lightRange = pow(clamp(-dot(normalize(viewPos), lightDir) + 0.65, 0.0, 1.0), 2.0) / 2;
-
-		vec3 position = toClipSpace3_DH(viewPos, depthCheck);
-
-		float farRayLength = farPlane * sqrt(3.0);
-		float rayLength = farRayLength;
-		bool clippedByNearPlane = false;
-		float nearPlaneHitDistance = 0.0;
-
-		if ((viewPos.z + lightDir.z * farRayLength) > - nearPlane && abs(lightDir.z) > 1e-5) {
-			clippedByNearPlane = true;
-			nearPlaneHitDistance = (-nearPlane - viewPos.z) / lightDir.z;
-			nearPlaneHitDistance = max(nearPlaneHitDistance, 0.0);
-			rayLength = min(nearPlaneHitDistance + volumetricOcclusionBehindFade, farRayLength);
-		}
-
-		float behindFadeStart = 1.0;
-		float behindFadeRange = 0.0;
-
-		if (clippedByNearPlane && rayLength > 0.0) {
-			float fadeDistance = min(volumetricOcclusionBehindFade, rayLength);
-			behindFadeRange = fadeDistance / rayLength;
-			behindFadeStart = clamp(1.0 - behindFadeRange, 0.0, 1.0);
-		}
-
-		vec3 direction = toClipSpace3_DH(viewPos + lightDir * rayLength, depthCheck) - position;
-
-		direction.xyz = direction.xyz / max(max(abs(direction.x) / 0.0005, abs(direction.y) / 0.0005), 500.0);
-		direction *= stepSize;
-		
-		position.xy *= RENDER_SCALE;
-		direction.xy *= RENDER_SCALE;
-		
-		vec3 newPos = position + direction * noise;
-		vec2 screenEdges = 2.0 / vec2(viewWidth, viewHeight);
-
-		float depthFarThreshold = 0.99;
-		float occlusionDistanceCutoff = occlusionDistanceLimit;
-		float occlusionDistanceCutoffSq = occlusionDistanceCutoff * occlusionDistanceCutoff;
-		float distanceToViewer = length(viewPos);
-
-		float sunAngleFactor = sunAngleFactorFromElevation();
-
-		if (sunAngleFactor == 1.0) {
-			return 1.0;
-		}
-
-		float sunDistanceFactor = clamp(smoothstep(occlusionDistanceCutoff * 0.2, occlusionDistanceCutoff, distanceToViewer), 0.0, 1.0);
-
-		if (sunDistanceFactor == 1.0) {
-			return 1.0;
-		}
-		
-		float raySampleSum = 0.0;
-		int samplesProcessed = 0;
-
-		for (int i = 0; i < samples; i++) {
-			newPos.xy = clamp(newPos.xy, screenEdges, 1.0 - screenEdges);
-
-			// Prefer vanilla depth samples before falling back to DH LOD depth.
-			ivec2 vanillaDepthCoord = ivec2(newPos.xy / texelSize / 4.0);
-			float sampleDepth = invLinZ(sqrt(texelFetch(colortex4, vanillaDepthCoord, 0).a / 65000.0));
-			float linearDepth = clamp(swapperlinZ(sampleDepth, nearPlane, farPlane), 0.0, 1.0);
-
-			// Once vanilla depth is exhausted, continue in LOD depth buffer.
-			if (linearDepth >= depthFarThreshold) {
-				ivec2 dhDepthCoord = ivec2(newPos.xy / texelSize);
-				float dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
-				linearDepth = clamp(swapperlinZ(dhSampleDepth, nearPlane, farPlane), 0.0, 1.0);
-			}
-
-			float d = samples > 1 ? float(i) / float(samples - 1) : 1.0;
-			float behindFade = 1.0;
-
-			if (clippedByNearPlane && behindFadeRange > 0.0) {
-				behindFade = clamp(1.0 - smoothstep(behindFadeStart, 1.0, d), 0.0, 1.0);
-			}
-			
-			float rayStrength = pow(mix(1.0, 0.0, float(i) / float(samples)), 2.0);
-			raySampleSum += (linearDepth >= depthFarThreshold ? 1.0 : lightRange) * behindFade * rayStrength;
-
-			newPos = clamp(newPos + direction, vec3(screenEdges.x, screenEdges.y, 0.0), 1.0 - vec3(screenEdges.x, screenEdges.y, 0.0));
-			samplesProcessed ++;
-		}
-
-		if (samplesProcessed == 0) {
-			return 1.0;
-		}
-
-		return clamp(((raySampleSum / float(samplesProcessed)) * 4) + sunDistanceFactor + sunAngleFactor, 0.0, 1.0);
-	}
+	
 #else
 	float sampleVolumetricOcclusion(in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
 		return 1.0;
@@ -713,18 +580,25 @@ void main() {
 	#endif
 	
 	vec3 directLightColorOccluded = directLightColor;
-	float sunVisibility = 1.0;
 
 	#if defined OVERWORLD_SHADER && defined DH_VOLUMETRIC_OCCLUSION
 		vec3 lightDir = normalize(sunVec * lightCol.a);
-		sunVisibility = sampleVolumetricOcclusion(viewPos0, lightDir, BN.x, z0);
+		float sunVisibility = getDHSunVisibility(viewPos0, lightDir, BN.x, z0);
 
 		// Sun Angle Factor Debugging Display
-		// if (gl_FragCoord.x < 100 && gl_FragCoord.y < 100) {
-		// 	float sunAngleFactor = sunAngleFactorFromElevation();
-		// 	gl_FragData[0].rgb = vec3(sunAngleFactor * 0.01, sunAngleFactor, sunAngleFactor * 0.01);
-		// 	return;
-		// }
+		if (gl_FragCoord.x < 100 && gl_FragCoord.y < 100) {
+			float sunAngleFactor = getSunAngleFactorFromElevation();
+			vec3 sunAngleColor = vec3(sunAngleFactor * 0.05, 0.0, sunAngleFactor);
+
+			if (sunAngleFactor > 0.99) {
+				sunAngleColor.g = 1.0;
+			}
+			
+			gl_FragData[0].rgb = sunAngleColor;
+			return;
+		}
+	#else
+		float sunVisibility = 1.0;
 	#endif
 
 	float cloudPlaneDistance = 0.0;
@@ -747,6 +621,7 @@ void main() {
 			volumetricFog.rgb = volumetricFog.rgb * LPV_ILLUMINATION.a + LPV_ILLUMINATION.rgb;
 		#endif
 
+		// volumetricClouds.rgb = mix(volumetricClouds.rgb, indirectLight.rgb, min(1 - volumetricClouds.a * 1.25, 1 - volumetricFog.a * 0.5));
 		volumetricFog = vec4(volumetricClouds.rgb * volumetricFog.a + volumetricFog.rgb, volumetricFog.a * volumetricClouds.a);
 	#endif
 
@@ -765,10 +640,6 @@ void main() {
 	}
 	
 	vec4 clampedVolumetricFog = clamp(volumetricFog, 0.0, 65000.0);
-	vec4 noVolumetricFog = mix(vec4(0.0, 0.0, 0.0, 1.0), clampedVolumetricFog, 0.0);
-
-	// gl_FragData[0] = mix(noVolumetricFog, clampedVolumetricFog, sunVisibility);
-	// gl_FragData[1].a = mix(1.0, volumetricFog.a, sunVisibility);
 
 	// Fog Color
 	gl_FragData[0] = clampedVolumetricFog;
