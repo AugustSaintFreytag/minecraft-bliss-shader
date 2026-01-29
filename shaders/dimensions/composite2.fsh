@@ -586,17 +586,17 @@ void main() {
 		float sunVisibility = getDHSunVisibility(viewPos0, lightDir, BN.x, z0);
 
 		// Sun Angle Factor Debugging Display
-		if (gl_FragCoord.x < 100 && gl_FragCoord.y < 100) {
-			float sunAngleFactor = getSunAngleFactorFromElevation();
-			vec3 sunAngleColor = vec3(sunAngleFactor * 0.05, 0.0, sunAngleFactor);
+		// if (gl_FragCoord.x < 100 && gl_FragCoord.y < 100) {
+		// 	float sunAngleFactor = getSunAngleDisocclusionFactor();
+		// 	vec3 sunAngleColor = vec3(sunAngleFactor * 0.05, 0.0, sunAngleFactor);
 
-			if (sunAngleFactor > 0.99) {
-				sunAngleColor.g = 1.0;
-			}
+		// 	if (sunAngleFactor > 0.99) {
+		// 		sunAngleColor.g = 1.0;
+		// 	}
 			
-			gl_FragData[0].rgb = sunAngleColor;
-			return;
-		}
+		// 	gl_FragData[0].rgb = sunAngleColor;
+		// 	return;
+		// }
 	#else
 		float sunVisibility = 1.0;
 	#endif

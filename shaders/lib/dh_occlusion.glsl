@@ -1,10 +1,11 @@
 // Utility
 
-float getSunAngleFactorFromElevation() {
+// Returns 1.0 when sun is unobstructable (e.g. noon) and 0.0 when near horizon (e.g. sunrise and sunset).
+float getSunAngleDisocclusionFactor() {
 	const float HOURS_PER_HALF_DAY = 12.0;
 	const float HORIZON_ANGLE = PI * 0.5;
 
-	const float sunAngleEventOffsetHours = 0.0;
+	const float sunAngleEventOffsetHours = 0.25;
 	const float sunAngleTransitionHours = 0.5;
 
 	float sunAngle = acos(clamp(sunElevation, -1.0, 1.0));
@@ -20,7 +21,7 @@ float getSunAngleFactorFromElevation() {
 	float normalizedDistance = max(distanceFromHorizon - offsetAngle, 0.0);
 	float transitionProgress = smoothstep(0.0, transitionAngle, normalizedDistance);
 
-	return clamp(1.0 - transitionProgress * 2, 0.0, 1.0);
+	return clamp(transitionProgress, 0.0, 1.0);
 }
 
 // Sun
@@ -78,7 +79,7 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 	float occlusionDistanceCutoffSq = occlusionDistanceCutoff * occlusionDistanceCutoff;
 	float distanceToViewer = length(viewPos);
 
-	float sunAngleFactor = getSunAngleFactorFromElevation();
+	float sunAngleFactor = getSunAngleDisocclusionFactor();
 
 	if (sunAngleFactor == 1.0) {
 		return 1.0;
