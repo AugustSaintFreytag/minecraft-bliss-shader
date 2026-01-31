@@ -542,6 +542,8 @@ void main() {
 		float DH_z0 = 0.0;
 		float DH_z1 = 0.0;
 	#endif
+
+	bool isSky = min(z0, DH_z0) >= 1.0;
 	
 	vec3 viewPos0 = toScreenSpace_DH(rawTexelCoord, z0, DH_z0);
 	vec3 viewPos1 = toScreenSpace_DH(rawTexelCoord, z1, DH_z1);
@@ -616,12 +618,14 @@ void main() {
 
 		vec4 volumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, sunVisibility, directLightColorOccluded, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
+		volumetricFog.rgb *= isSky ? 2.0 : 1.0;
+		volumetricFog = clamp(volumetricFog, 0.0, 65000.0);
+
 		#if defined LPV_VL_FOG_ILLUMINATION
 			volumetricFog.a *= LPV_ILLUMINATION.a;
 			volumetricFog.rgb = volumetricFog.rgb * LPV_ILLUMINATION.a + LPV_ILLUMINATION.rgb;
 		#endif
 
-		// volumetricClouds.rgb = mix(volumetricClouds.rgb, indirectLight.rgb, min(1 - volumetricClouds.a * 1.25, 1 - volumetricFog.a * 0.5));
 		volumetricFog = vec4(volumetricClouds.rgb * volumetricFog.a + volumetricFog.rgb, volumetricFog.a * volumetricClouds.a);
 	#endif
 

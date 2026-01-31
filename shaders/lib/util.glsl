@@ -88,8 +88,15 @@ vec3 linearToSRGB(vec3 linear) {
 }
 
 vec3 saturate(vec3 color, float amount) {
-	float luma = dot(color, lumCoeff);
-	return mix(vec3(luma), color, amount);
+	float luminance = dot(color, lumCoeff);
+	return mix(vec3(luminance), color, amount);
+}
+
+vec3 lighten(vec3 color, float boost) {
+	float luminance = dot(color, lumCoeff);
+	float attenuation = 2.0 - pow(clamp(luminance, 0.0, 1.0), 2);   
+
+	return color * (1.0 + boost * attenuation);
 }
 
 vec3 blackbody(float Temp) {

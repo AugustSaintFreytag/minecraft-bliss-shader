@@ -5,8 +5,8 @@ uniform ivec2 eyeBrightness;
 #define FOG_USE_SHAPING 1
 #define FOG_USE_TURBULENCE 1
 
-const float FOG_TURBULENCE_MIX = 0.75;
-const float FOG_SHAPING_INTENSITY = 0.95;
+const float FOG_TURBULENCE_MIX = 0.8;
+const float FOG_SHAPING_INTENSITY = 0.75;
 
 // Utilities
 
@@ -336,7 +336,10 @@ vec4 GetVolumetricFog(
 
 		float fogDensity = kill * getFogDensities(rayProgress, 0.0);
 		float fogVolumeCoeff = exp(-fogDensity * dd * rayLength);
-		vec3 fogLighting = masterLightColor * 2.0 * sunPhase * sunVisibility * shadows + ambientLightColor * 2.0 * skyPhase;
+
+		vec3 attenuatedMasterLightColor = lighten(masterLightColor, 3.0);
+		vec3 attentuatedAmbientLightColor = lighten(ambientLightColor, 2.0);
+		vec3 fogLighting = attenuatedMasterLightColor * sunPhase * sunVisibility * shadows + attentuatedAmbientLightColor * skyPhase;
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			fogLighting += lightningFlash;
