@@ -5,8 +5,8 @@ uniform ivec2 eyeBrightness;
 #define FOG_USE_SHAPING 1
 #define FOG_USE_TURBULENCE 1
 
-const float FOG_TURBULENCE_MIX = 0.75;
-const float FOG_SHAPING_INTENSITY = 0.95;
+const float FOG_TURBULENCE_MIX = 0.8;
+const float FOG_SHAPING_INTENSITY = 0.75;
 
 // Utilities
 
