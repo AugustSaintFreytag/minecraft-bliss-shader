@@ -127,7 +127,7 @@ void calculateFinishedPointLight(
             vec4 sampledLightColor = getHandheldLightData(heldItemId);
             float lightRange = sampledLightColor.a;
 
-            lighting = sampledLightColor.rgb;
+            lighting = sampledLightColor.rgb * 2.0;
             // lighting = vec3(0.1, 0.9, 0.1);
             
             // ensure that there is color if no light item is held. or if the light item is not listed.
