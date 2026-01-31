@@ -5,8 +5,8 @@ float getSunAngleDisocclusionFactor() {
 	const float HOURS_PER_HALF_DAY = 12.0;
 	const float HORIZON_ANGLE = PI * 0.5;
 
-	const float sunAngleEventOffsetHours = 0.25;
-	const float sunAngleTransitionHours = 0.5;
+	const float sunAngleEventOffsetHours = 2.0;
+	const float sunAngleTransitionHours = 1.5;
 
 	float sunAngle = acos(clamp(sunElevation, -1.0, 1.0));
 	float distanceFromHorizon = abs(sunAngle - HORIZON_ANGLE);
