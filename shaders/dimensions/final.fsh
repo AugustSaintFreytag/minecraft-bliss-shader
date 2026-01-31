@@ -7,7 +7,7 @@
 uniform sampler2D colortex0;    // Fog & Clouds
 uniform sampler2D colortex1;    // Scene Albedo (RGB), Material (A)
 uniform sampler2D colortex2;    // Scene Translucents
-uniform sampler2D colortex3;    // Shadow Map (VPS)
+uniform sampler2D colortex3;    // SSAO & SSSSS
 uniform sampler2D colortex4;    // Sky, Sky w/ Clouds, LUT
 uniform sampler2D colortex5;    // TAA
 uniform sampler2D colortex6;    // Mip Maps
