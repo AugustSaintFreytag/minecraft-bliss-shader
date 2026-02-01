@@ -37,6 +37,8 @@ const float goldenAngle = TAU / PHI / PHI;
 
 #define lumCoeff vec3(0.2125, 0.7154, 0.0721)
 
+// Transforms
+
 float facos(const float sx) {
     float x = clamp(abs( sx ),0.,1.);
     float a = sqrt( 1. - x ) * ( -0.16882 * x + 1.56734 );
@@ -56,20 +58,12 @@ vec3 circlemapL(float i, float n) {
 	return vec3(sincos(i * n * goldenAngle), sqrt(i));
 }
 
-vec3 calculateRoughSpecular(const float i, const float alpha2, const int steps) {
-    float x = (alpha2 * i) / (1.0 - i);
-    float y = i * float(steps) * 64.0 * 64.0 * goldenAngle;
-
-    float c = inversesqrt(x + 1.0);
-    float s = sqrt(x) * c;
-
-    return vec3(cos(y) * s, sin(y) * s, c);
-}
-
 vec3 clampNormal(vec3 n, vec3 v) {
     float NoV = clamp( dot(n, -v), 0., 1. );
     return normalize( NoV * v + n );
 }
+
+// Color
 
 vec3 srgbToLinear(vec3 srgb) {
     return mix(
@@ -114,12 +108,43 @@ vec3 blackbody(float Temp) {
     return srgbToLinear(col);
 }
 
+// Coordinates
+
+bool matchesCoords(vec4 fragCoords, int minX, int maxX, int minY, int maxY) {    
+	return fragCoords.x >= minX && fragCoords.x < maxX
+	    && fragCoords.y >= minY && fragCoords.y < maxY;
+}
+
+bool matchesCoords(vec4 fragCoords, int x, int y) {
+	float fx = float(x);
+	float fy = float(y);
+
+	return fragCoords.x >= fx && fragCoords.x < fx + 1.0
+	    && fragCoords.y >= fy && fragCoords.y < fy + 1.0;
+}
+
+bool matchesCoords(vec4 fragCoords, ivec2 coords) {
+	return matchesCoords(fragCoords, coords.x, coords.y);
+}
+
+// Misc
+
 float calculateHardShadows(float shadowDepth, vec3 shadowPosition, float bias) {
     if(shadowPosition.z >= 1.0) {
         return 1.0;
     }
 
     return 1.0 - fstep(shadowDepth, shadowPosition.z - bias);
+}
+
+vec3 calculateRoughSpecular(const float i, const float alpha2, const int steps) {
+    float x = (alpha2 * i) / (1.0 - i);
+    float y = i * float(steps) * 64.0 * 64.0 * goldenAngle;
+
+    float c = inversesqrt(x + 1.0);
+    float s = sqrt(x) * c;
+
+    return vec3(cos(y) * s, sin(y) * s, c);
 }
 
 vec3 genUnitVector(vec2 xy) {
