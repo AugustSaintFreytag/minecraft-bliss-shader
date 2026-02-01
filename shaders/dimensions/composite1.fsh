@@ -883,6 +883,8 @@ void main() {
 	
 	vec3 feetPlayerPos = mat3(gbufferModelViewInverse) * viewPos;
 	vec3 feetPlayerPos_normalized = normalize(feetPlayerPos);
+	
+	float playerDist = length(feetPlayerPos);
 
 	#ifdef POM
 		#ifdef Horrible_slope_normals
@@ -1053,8 +1055,8 @@ void main() {
 			////////////////////////////////	SHADOWMAP		////////////////////////////////
 			
 			// setup shadow projection
-			float shadowMapFalloff = smoothstep(0.0, 1.0, min(max(1.0 - length(feetPlayerPos) / (shadowDistance + 32.0), 0.0) * 5.0, 1.0));
-			float shadowMapFalloff2 = smoothstep(0.0, 1.0, min(max(1.0 - length(feetPlayerPos) / shadowDistance, 0.0) * 5.0, 1.0));
+			float shadowMapFalloff = smoothstep(0.0, 1.0, min(max(1.0 - playerDist / (shadowDistance + 32.0), 0.0) * 5.0, 1.0));
+			float shadowMapFalloff2 = smoothstep(0.0, 1.0, min(max(1.0 - playerDist / shadowDistance, 0.0) * 5.0, 1.0));
 
 			if(isEyeInWater == 1){
 				shadowMapFalloff = 1.0;
@@ -1105,7 +1107,7 @@ void main() {
 				float SSS_shadow = ShadowAlpha;
 				
 				#ifdef USING_LOD_MOD
-					shadowMapFalloff2 = smoothstep(0.0, 1.0, min(max(1.0 - length(feetPlayerPos) / min(shadowDistance, max(far - 32.0, 32.0)), 0.0) * 5.0, 1.0));
+					shadowMapFalloff2 = smoothstep(0.0, 1.0, min(max(1.0 - playerDist / min(shadowDistance, max(far - 32.0, 32.0)), 0.0) * 5.0, 1.0));
 				#endif
 
 				#ifndef RENDER_ENTITY_SHADOWS
