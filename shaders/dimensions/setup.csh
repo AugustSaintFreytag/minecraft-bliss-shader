@@ -561,7 +561,7 @@ void main() {
             mixWeight = 0.8;
         }
 
-        if (blockId == BLOCK_ELECTRICAL_LIGHT) {
+        if (blockId == BLOCK_ELECTRIC_LIGHT) {
             lightColor = vec3(1.000, 0.821, 0.842);
             lightRange = 24.0;
             mixWeight = 0.85;
@@ -795,19 +795,19 @@ void main() {
             blockId == BLOCK_SOUL_LANTERN || blockId == ITEM_SOUL_LANTERN
         ) {
             lightColor = vec3(0.1, 0.6, 1.0);
-            lightRange = 10.0;
+            lightRange = 16.0;
             mixWeight = 0.8;
         }
 
         if (blockId == BLOCK_TORCH || blockId == ITEM_TORCH) {
             lightColor = vec3(TORCH_R, TORCH_G, TORCH_B);
-            lightRange = 14.0;
+            lightRange = 20.0;
             mixWeight = 0.8;
         }
 
         if (blockId == BLOCK_LANTERN || blockId == ITEM_LANTERN) {
             lightColor = vec3(TORCH_R, TORCH_G, TORCH_B);
-            lightRange = 16.0;
+            lightRange = 20.0;
             mixWeight = 0.8;
         }
 
