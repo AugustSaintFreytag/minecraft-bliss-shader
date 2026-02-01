@@ -309,7 +309,7 @@ vec4 waterVolumetrics(vec3 rayStart, vec3 rayEnd, float rayLength, vec2 dither, 
 				float distortFactor = 1.0;
 			#endif
 
-			vec3 pos = vec3(spPos.xy*distortFactor, spPos.z);
+			vec3 pos = vec3(spPos.xy * distortFactor, spPos.z);
 			if (abs(pos.x) < 1.0 - 0.5 / 2048. && abs(pos.y) < 1.0 - 0.5 / 2048) {
 				pos = pos*vec3(0.5,0.5,0.5/6.0)+0.5;
 
@@ -580,8 +580,6 @@ void main() {
 	#else
 		vec4 LPV_ILLUMINATION = vec4(0.0, 0.0, 0.0, 1.0);
 	#endif
-	
-	vec3 directLightColorOccluded = directLightColor;
 
 	#if defined OVERWORLD_SHADER && defined DH_VOLUMETRIC_OCCLUSION
 		vec3 lightDir = normalize(sunVec * lightCol.a);
@@ -616,7 +614,7 @@ void main() {
   		  }
   		#endif
 
-		vec4 volumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, sunVisibility, directLightColorOccluded, indirectLight_fog, indirectLight, cloudPlaneDistance);
+		vec4 volumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, sunVisibility, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
 		volumetricFog.rgb *= isSky ? 2.0 : 1.0;
 		volumetricFog = clamp(volumetricFog, 0.0, 65000.0);
@@ -639,7 +637,7 @@ void main() {
 	#endif
 
 	if (isEyeInWater == 1){
-		vec4 underWaterFog =  waterVolumetrics(vec3(0.0), viewPos0, length(viewPos0), vec2(noise_1), totEpsilon, scatterCoef, indirectLightColor_dynamic, directLightColorOccluded , dot(normalize(viewPos0), normalize(sunVec* lightCol.a)), LPV_ILLUMINATION.rgb);
+		vec4 underWaterFog =  waterVolumetrics(vec3(0.0), viewPos0, length(viewPos0), vec2(noise_1), totEpsilon, scatterCoef, indirectLightColor_dynamic, directLightColor , dot(normalize(viewPos0), normalize(sunVec* lightCol.a)), LPV_ILLUMINATION.rgb);
 		volumetricFog = vec4(underWaterFog.rgb, 1.0);
 	}
 	
@@ -651,28 +649,32 @@ void main() {
 	// Bloomy Fog Mask
 	gl_FragData[1].a = volumetricFog.a;
 	
+	
 	if(blendedAlpha > 0.0 || isInWater){
 		// Translucents
-
-		// gl_FragData[0] = vec4(1.0, 0.0, 0.0, 1.0);
-		// return;
-		gl_FragData[1] = vec4(0.0, 0.0, 0.0, 1.0);	
+		vec4 translucentVolumetricClouds = volumetricClouds;
+		vec4 translucentVolumetricFog = vec4(0.0, 0.0, 0.0, 1.0);
 
 		#if defined OVERWORLD_SHADER
-			volumetricClouds = GetVolumetricClouds(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
-			volumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, sunVisibility, directLightColorOccluded, indirectLight_fog, indirectLight, cloudPlaneDistance);
-			volumetricFog = vec4(volumetricClouds.rgb * volumetricFog.a + volumetricFog.rgb, volumetricFog.a * volumetricClouds.a);
+			translucentVolumetricClouds = GetVolumetricClouds(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
+			translucentVolumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, sunVisibility, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
+			translucentVolumetricFog = vec4(translucentVolumetricClouds.rgb * translucentVolumetricFog.a + translucentVolumetricFog.rgb, translucentVolumetricFog.a * translucentVolumetricClouds.a);
 		#endif
 		
 		#if defined NETHER_SHADER || defined END_SHADER
-			volumetricFog = GetVolumetricFog(viewPos1, noise_1, noise_1);
+			translucentVolumetricFog = GetVolumetricFog(viewPos1, noise_1, noise_1);
 		#endif
 		
-		gl_FragData[1] = clamp(volumetricFog, 0.0, 65000.0);
+		gl_FragData[1] = clamp(translucentVolumetricFog, 0.0, 65000.0);
 
-		if(isInWater && isEyeInWater != 1){
-			vec4 underWaterVL = waterVolumetricsTranslucent(viewPos0, viewPos1, estimatedDepth, estimatedSunDepth, Vdiff, noise_1, totEpsilon, scatterCoef, indirectLight, directLightColor, dot(normalize(viewPos0), normalize(sunVec*lightCol.a)));
-			gl_FragData[1] = clamp(underWaterVL, 0.0, 65000.0);
+		if(isInWater && isEyeInWater != 1) {
+			vec4 waterVolumetricFog = waterVolumetricsTranslucent(viewPos0, viewPos1, estimatedDepth, estimatedSunDepth, Vdiff, noise_1, totEpsilon, scatterCoef, indirectLight, directLightColor, dot(normalize(viewPos0), normalize(sunVec * lightCol.a)));
+			vec4 waterVolumetricFogDistant = translucentVolumetricFog * vec4(vec3(0.5), 1.0);
+
+			float distanceFactor = smoothstep(0.0, far * 0.5, far - length(viewPos1));
+			waterVolumetricFog = mix(waterVolumetricFogDistant, waterVolumetricFog, clamp(distanceFactor, 0.0, 1.0));
+
+			gl_FragData[1] = clamp(waterVolumetricFog, 0.0, 65000.0);
 		}
 	}
 }
