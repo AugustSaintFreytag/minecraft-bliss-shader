@@ -1372,11 +1372,13 @@ void main() {
 				float lightPower = clamp(luminance * 0.5, 0.0, 1.0);
 				float shadowFactor = 1.0 - shadowIntensity;
 				float skylightFactor = 1.0 - lightmap.y;
+				float distanceFactor = clamp(((playerDist - far) / 64.0) * (1 - (playerDist / 2048.0)), 0.0, 1.0);
+
+				// gl_FragData[0].rgb = vec3(distanceFactor);
+				// return;
 				
 				// Blend all factors with smooth falloffs
-				float occlusionFactor = clamp(shadowFactor * 0.6 + (1.0 - lightPower) * 0.3 + skylightFactor * 0.3, 0.0, 1.0);
-				// occlusionFactor = pow(occlusionFactor, 1.5); // Smooth curve for more natural transition
-				
+				float occlusionFactor = clamp(shadowFactor * 0.75 + (1.0 - lightPower) * 0.3 + skylightFactor * 0.3 + distanceFactor * 0.75, 0.0, 2.0);
 				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL * shadowColor) * mix(vec3(1.0), AO, occlusionFactor);
 			#else
 				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL * shadowColor);
