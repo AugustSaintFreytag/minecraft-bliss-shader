@@ -1,4 +1,5 @@
 #include "/lib/settings.glsl"
+#include "/lib/res_params.glsl"
 
 varying vec2 texcoord;
 
@@ -18,7 +19,7 @@ void main() {
 	gl_Position = ftransform();
 	texcoord = gl_MultiTexCoord0.xy;
 
-	exposure = vec4(vec3(texelFetch(colortex4,ivec2(10,37),0).r),texelFetch(colortex4,ivec2(10,37),0).r);
-	rodExposureDepth = texelFetch(colortex4,ivec2(14,37),0).rg;
+	exposure = vec4(vec3(texelFetch(colortex4,IMAGE_BRIGHTNESS_COORDS,0).r),texelFetch(colortex4,IMAGE_BRIGHTNESS_COORDS,0).r);
+	rodExposureDepth = texelFetch(colortex4,AUTO_EXPOSURE_COORDS,0).rg;
 	rodExposureDepth.y = sqrt(rodExposureDepth.y/65000.0);
 }

@@ -2,11 +2,11 @@
 #include "/lib/res_params.glsl"
 
 
-vec3 drawSun(float cosY, float sunInt,vec3 nsunlight, vec3 inColor){
+vec3 drawSun(float cosY, float sunInt,vec3 nsunlight, vec3 inColor) {
 	return (inColor+nsunlight/0.0008821203*pow(smoothstep(cos(0.0093084168595*3.2),cos(0.0093084168595*1.8),cosY),3.)*0.62);
 }
 
-vec3 drawMoon(vec3 PlayerPos, vec3 WorldSunVec, vec3 Color, inout vec3 occludeStars){
+vec3 drawMoon(vec3 PlayerPos, vec3 WorldSunVec, vec3 Color, inout vec3 occludeStars) {
 
 	float Shape = min(max(dot(WorldSunVec,PlayerPos)-0.9994,0.0)/(1.0-0.9994),1.0);//  * clamp(-dot(WorldSunVec,PlayerPos),0,1);
 	
@@ -107,65 +107,60 @@ vec4 texture2D_bicubic(sampler2D tex, vec2 uv)
 vec2 sphereToCarte(vec3 dir) {
     float lon = atan(-dir.x, -dir.z);
     float lat = asin(clamp(dir.y, -1.0, 1.0));
+
     return vec2(lon * (0.5 / PI) + 0.5, 0.5 - lat * (1.0 / PI));
 }
 
-vec3 skyFromTex(vec3 pos,sampler2D sampler){
-
+vec3 skyFromTex(vec3 pos, sampler2D sampler) {
 	vec2 p = sphereToCarte(pos);
-
 	vec2 clampUV = vec2(1.0);
-	p = clamp(p*2.0-1.0, -clampUV, clampUV)*0.5+0.5;
+
+	p = clamp(p * 2.0 - 1.0, -clampUV, clampUV) * 0.5 + 0.5;
 
 	vec2 uv = (p * SKY_ATLAS_SIZE + vec2(SKY_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5)) * texelSize;
+
 	return texture(sampler, uv).rgb;
 }
-vec3 skyFromTexLOD(vec3 pos,sampler2D sampler, float LOD){
+vec3 skyFromTexLOD(vec3 pos, sampler2D sampler, float LOD) {
 	vec2 p = sphereToCarte(pos);
-
 	vec2 uv = (p * SKY_ATLAS_SIZE + vec2(SKY_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5)) * texelSize;
+
 	return texture2DLod(sampler, uv, LOD).rgb;
 }
 
 
-vec4 skyCloudsFromTex(vec3 pos,sampler2D sampler){
-
+vec4 skyCloudsFromTex(vec3 pos,sampler2D sampler) {
 	vec2 p = sphereToCarte(pos);
-
-	vec2 uv = p * texelSize * SKY_CLOUD_ATLAS_SIZE + vec2(SKY_CLOUD_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5) * texelSize;
+	vec2 uv = p * texelSize * SKY_ATLAS_SIZE + vec2(SKY_CLOUD_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5) * texelSize;
 
 	return texture(sampler, uv);
 }
 
-vec4 skyCloudsFromTexBLUR(vec3 pos,sampler2D sampler, float scaler){
-
+vec4 skyCloudsFromTexBLUR(vec3 pos,sampler2D sampler, float scaler) {
 	vec2 p = sphereToCarte(pos);
-	vec2 scaleA = texelSize*SKY_CLOUD_ATLAS_SIZE;
+	vec2 scaleA = texelSize*SKY_ATLAS_SIZE;
 	vec2 scaleB = vec2(SKY_CLOUD_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5)*texelSize;
 	vec2 posi = p;
 	
-	vec2 uv = p * texelSize * SKY_CLOUD_ATLAS_SIZE + vec2(SKY_CLOUD_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5) * texelSize;
-
-
+	vec2 uv = p * texelSize * SKY_ATLAS_SIZE + vec2(SKY_CLOUD_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5) * texelSize;
 	vec4 color = texture(sampler, uv);
 
 	return color;
 }
 
-vec4 skyCloudsFromTexLOD(vec3 pos,sampler2D sampler, float roughness){
+vec4 skyCloudsFromTexLOD(vec3 pos,sampler2D sampler, float roughness) {
 	vec2 p = sphereToCarte(pos);
 
 	roughness = (1-pow(1-roughness,3));
 	p = mix(p, ((p-0.5) - (p-0.5)*roughness) + 0.5, clamp(p.y*2.0, 0.0, 1.0));
 
-	vec2 uv = p * texelSize * SKY_CLOUD_ATLAS_SIZE + vec2(SKY_CLOUD_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5) * texelSize;
+	vec2 uv = p * texelSize * SKY_ATLAS_SIZE + vec2(SKY_CLOUD_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5) * texelSize;
 
 	return texture(sampler, uv);
 }
 
 
-
-vec4 volumetricsFromTex(vec3 pos,sampler2D sampler, float LOD){
+vec4 volumetricsFromTex(vec3 pos,sampler2D sampler, float LOD) {
 	vec2 p = sphereToCarte(pos);
 	vec2 uv = (p * FOG_ATLAS_SIZE + vec2(FOG_ATLAS_OFFSET_X + 0.5, FOG_ATLAS_OFFSET_Y + 0.5)) * texelSize;
 	return texture2DLod(sampler, uv, LOD);

@@ -61,7 +61,7 @@ void main() {
 	vNormal = normalize(gl_NormalMatrix * gl_Normal);
 	
 	averageSkyCol_Clouds = texelFetch2D(colortex4, ivec2(0, 37), 0).rgb;
-	lightSourceColor = texelFetch2D(colortex4, ivec2(6, 37), 0).rgb;
+	lightSourceColor = texelFetch2D(colortex4, LIGHT_COLOR_COORDS, 0).rgb;
 	
 	#if DOF_QUALITY == 5
 		vec2 jitter = clamp(jitter_offsets[frameCounter % 64], -1.0, 1.0);

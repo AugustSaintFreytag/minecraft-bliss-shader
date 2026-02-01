@@ -5,6 +5,6 @@ uniform vec2 texelSize;
 
 void main() {
 	gl_Position = ftransform();
-	gl_Position.xy *= vec2(SKY_CLOUD_ATLAS_OFFSET_X + SKY_CLOUD_ATLAS_SIZE + 1.0, SKY_CLOUD_ATLAS_SIZE + 1.0) / 2048.0;
+	gl_Position.xy *= vec2(SKY_CLOUD_ATLAS_OFFSET_X + SKY_ATLAS_SIZE + 1.0, SKY_ATLAS_SIZE + 1.0) * texelSize;
 	gl_Position.xy = gl_Position.xy * 2.0 - 1.0;
 }

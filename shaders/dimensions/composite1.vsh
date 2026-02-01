@@ -50,7 +50,7 @@ void main() {
 
 	zMults = vec3(1.0/(far * near),far+near,far-near);
 
-	lightCol.rgb = texelFetch(colortex4,ivec2(6,37),0).rgb;
+	lightCol.rgb = texelFetch(colortex4,LIGHT_COLOR_COORDS,0).rgb;
 	lightCol.a = float(sunElevation > 1e-5)*2.0 - 1.0;
 
 	moonCol = texelFetch(colortex4,ivec2(9,37),0).rgb;
@@ -59,7 +59,7 @@ void main() {
 	// 	albedoSmooth = texelFetch(colortex4,ivec2(15.5,2.5),0).rgb;
 	// #endif
 
-	averageSkyCol_Clouds = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb;
+	averageSkyCol_Clouds = texelFetch(colortex4, SKY_AND_CLOUDS_AVERAGE_COLOR_COORDS, 0).rgb;
 
 	unsigned_WsunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);
 	

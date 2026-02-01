@@ -43,9 +43,9 @@ void main() {
 
 	
 	#ifdef OVERWORLD_SHADER
-		lightCol.rgb = texelFetch(colortex4, ivec2(6, 37), 0).rgb;
-		averageSkyCol = texelFetch(colortex4, ivec2(SKY_AVERAGE_COLOR_X, SKY_AVERAGE_COLOR_Y), 0).rgb;
-		averageSkyCol_Clouds = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb;
+		lightCol.rgb = texelFetch(colortex4, LIGHT_COLOR_COORDS, 0).rgb;
+		averageSkyCol = texelFetch(colortex4, SKY_AVERAGE_COLOR_COORDS, 0).rgb;
+		averageSkyCol_Clouds = texelFetch(colortex4, SKY_AND_CLOUDS_AVERAGE_COLOR_COORDS, 0).rgb;
 
 		#define READ_SCENE_CONTROLLER_PARAMETERS
 		#include "/lib/scene_controller.glsl"
@@ -69,7 +69,10 @@ void main() {
 
 	vec3 moonVec = normalize(mat3(gbufferModelViewInverse) * moonPosition);
 	vec3 WmoonVec = moonVec;
-	if(dot(-moonVec, WsunVec) < 0.9999) WmoonVec = -moonVec;
+
+	if(dot(-moonVec, WsunVec) < 0.9999) {
+		WmoonVec = -moonVec;
+	}
 
 	WsunVec = mix(WmoonVec, WsunVec, clamp(lightCol.a,0,1));
 
