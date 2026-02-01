@@ -428,7 +428,7 @@ void main() {
 
 		if(depth < 1.0){
    			gl_FragData[2] = vec4(vec3(0.0), depth * depth * 65000.0);
-		}else{
+		} else {
 			gl_FragData[2] = vec4(vec3(0.0), 65000.0);
 		}
 	#endif
@@ -502,7 +502,6 @@ void main() {
 
 				//do shadows only if on shadow map
 				if (abs(projectedShadowPosition.x) < 1.0-1.5/shadowMapResolution && abs(projectedShadowPosition.y) < 1.0-1.5/shadowMapResolution && abs(projectedShadowPosition.z) < 6.0 ){
-					
 					projectedShadowPosition.z += shadowProjection[3].z * 0.0013;
 					
 					const float threshMul = max(2048.0/shadowMapResolution*shadowDistance/128.0,0.95);
@@ -519,12 +518,13 @@ void main() {
 					float avgDepth = 0.0;
 
 					for(int i = 0; i < VPS_Search_Samples; i++){
-
 						vec2 offsetS = CleanSample(i, VPS_Search_Samples - 1, noise) * 0.5;
-					
-						float weight = 3.0 + (i+noise) * rdMul/SHADOW_FILTER_SAMPLE_COUNT*shadowMapResolution*distortFactor/2.7;
+						float weight = 3.0 + (i + noise) * rdMul / SHADOW_FILTER_SAMPLE_COUNT * shadowMapResolution * distortFactor / 2.7;
+						ivec2 coords = ivec2((projectedShadowPosition.xy + offsetS * rdMul) * shadowMapResolution);
 						
-						float d = texelFetch(shadow, ivec2((projectedShadowPosition.xy+offsetS*rdMul)*shadowMapResolution),0).x;
+						coords = clamp(coords, ivec2(0), ivec2(shadowMapResolution - 1));
+						
+						float d = texelFetch(shadow, coords, 0).x;
 						float b = smoothstep(weight*diffthresh/2.0, weight*diffthresh, projectedShadowPosition.z - d);
 
 						blockerCount += b;
@@ -538,15 +538,14 @@ void main() {
 						avgBlockerDepth += d * b;
 					}
 
-						gl_FragData[0].g = avgDepth / VPS_Search_Samples;
+					gl_FragData[0].g = avgDepth / VPS_Search_Samples;
+					gl_FragData[0].b = blockerCount / VPS_Search_Samples;
 
-						gl_FragData[0].b = blockerCount / VPS_Search_Samples;
-
-						if (blockerCount >= 0.9){
-							avgBlockerDepth /= blockerCount;
-							float ssample = max(projectedShadowPosition.z - avgBlockerDepth,0.0)*1500.0;
-							gl_FragData[0].r = clamp(ssample, scales.x, scales.y)/(scales.y)*(mult-minshadowfilt)+minshadowfilt;
-						}
+					if (blockerCount >= 0.9){
+						avgBlockerDepth /= blockerCount;
+						float ssample = max(projectedShadowPosition.z - avgBlockerDepth,0.0)*1500.0;
+						gl_FragData[0].r = clamp(ssample, scales.x, scales.y)/(scales.y)*(mult-minshadowfilt)+minshadowfilt;
+					}
 
 				}
 		#endif
