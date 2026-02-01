@@ -453,8 +453,10 @@ void doEdgeAwareBlur(
 ){
 	float threshold = clamp(referenceDepth*referenceDepth * 0.5, 0.0001, 0.005);
 
-	vec2 coord = gl_FragCoord.xy - 1.5;
-	ivec2 UV = ivec2(coord);
+	vec2 coords = gl_FragCoord.xy - 1.5;
+	vec2 texCoords = coords * texelSize;
+
+	ivec2 UV = ivec2(coords);
 	ivec2 UV_NOISE = ivec2(gl_FragCoord.xy * texelSize + 1);
 
 	ivec2 OFFSET[4] = ivec2[](
@@ -489,9 +491,7 @@ void doEdgeAwareBlur(
 		#endif
 
 		edgeSum += edgeDiff;
-	}
-
-	vec2 texCoords = coord * texelSize;
+	}	
 
 	// Sample without an offset with texture filtering to get a slightly blurred sample.
 	// Make sure to average without skewing the rest of the average.
@@ -535,7 +535,7 @@ vec4 BilateralUpscale_VLFOG(sampler2D tex, sampler2D depth, float referenceDepth
 
 	for(int i = 0; i < 4; i++) {
 		#ifdef USING_LOD_MOD
-			float offsetDepth = sqrt(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE,0).a/65000.0);
+			float offsetDepth = sqrt(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE,0).a / 65000.0);
 		#else
 			float offsetDepth = linZ(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE, 0).r);
 		#endif
@@ -545,6 +545,7 @@ vec4 BilateralUpscale_VLFOG(sampler2D tex, sampler2D depth, float referenceDepth
 		colorSum += offsetColor*edgeDiff;
 		edgeSum += edgeDiff;
 	}
+
 	return colorSum/edgeSum;
 }
 
@@ -738,7 +739,7 @@ void main() {
 	vec3 DEBUG = vec3(1.0);
 
 	////// --------------- SETUP STUFF --------------- //////
-	vec2 texcoord = (gl_FragCoord.xy*texelSize);
+	vec2 texcoord = gl_FragCoord.xy * texelSize;
 
 	float noise_2 = R2_dither();
 	vec2 bnoise = blueNoise(gl_FragCoord.xy).rg;
@@ -824,7 +825,7 @@ void main() {
 	float labPorosity = clamp(SpecularTex.z * 255.0, 0.0,64.5)/64.5;	
 	// LabSSS = 1;
 
-	vec4 normalAndAO = texture(colortex15,texcoord);
+	vec4 normalAndAO = texture(colortex15, texcoord);
 	vec3 FlatNormals = normalize(normalAndAO.rgb * 2.0 - 1.0);
 	vec3 slopednormal = normal;
 
@@ -1032,17 +1033,22 @@ void main() {
 		
 		float ShadowBlockerDepth = filteredShadow.y;
 
-	////////////////////////////////////////////////////////////////////////////////////
-	/////////////////////////////	MAJOR LIGHTSOURCE STUFF 	////////////////////////
-	////////////////////////////////////////////////////////////////////////////////////
+		// ivec2 coords = ivec2(gl_FragCoord.xy);
+		// vec3 SAMPLE = texelFetch(colortex3, coords, 0).rgb;
+		// gl_FragData[0].rgb = SAMPLE;// vec3(ShadowBlockerDepth);
+		// return;
+
+		////////////////////////////////////////////////////////////////////////////////////
+		/////////////////////////////	MAJOR LIGHTSOURCE STUFF 	////////////////////////
+		////////////////////////////////////////////////////////////////////////////////////
 	
 		#ifdef OVERWORLD_SHADER
-			float LM_shadowMapFallback =  clamp(lightmap.y, 0.0,1.0);
+			float LM_shadowMapFallback =  clamp(lightmap.y, 0.0, 1.0);
 
-			NdotL = clamp((-15 + dot(slopednormal, WsunVec)*255.0) / 240.0  ,0.0,1.0);
+			NdotL = clamp((-15 + dot(slopednormal, WsunVec) * 255.0) / 240.0, 0.0, 1.0);
 
 			// NdotL = 1;
-			float flatNormNdotL = clamp((-15 + dot((FlatNormals), WsunVec)*255.0) / 240.0  ,0.0,1.0);
+			float flatNormNdotL = clamp((-15 + dot((FlatNormals), WsunVec) * 255.0) / 240.0, 0.0, 1.0);
 			
 			////////////////////////////////	SHADOWMAP		////////////////////////////////
 			
@@ -1107,8 +1113,6 @@ void main() {
 				#endif
 				
 				#ifdef SCREENSPACE_CONTACT_SHADOWS
-					// float zForShadow = useDhDepth ? 1.0 : z;
-					// vec3 shadowViewPos = toScreenSpace_DH(texcoord/RENDER_SCALE, zForShadow, DH_depth1);
 					vec3 shadowViewPos = toScreenSpace_DH(texcoord/RENDER_SCALE, z, DH_depth1);
 					bool isSSS = sunSSS_density > 0.0 && shadowMapFalloff2 < 1.0;
 					vec2 SS_directLight = SSRT_Shadows(shadowViewPos, isDHRange, normalize(WsunVec * mat3(gbufferModelViewInverse)), ig_noise, isSSS, hand);
@@ -1353,9 +1357,27 @@ void main() {
 		#endif
 		#ifdef OVERWORLD_SHADER
 			#ifdef AO_in_sunlight
-				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL*shadowColor * (AO*0.7+0.3));
+				// Compute refined occlusion factor based on lighting conditions
+				float luminance = dot(DirectLightColor, lumCoeff);
+				
+				// Determine how much the pixel is in shadow (0 = full shadow, 1 = full light)
+				float shadowIntensity = dot(shadowColor, vec3(0.333));
+				
+				// Combine factors for smooth SSAO blending:
+				// - Lower luminance = more SSAO
+				// - Shadows = more SSAO
+				// - Lower sky lightmap = more SSAO
+				float lightPower = clamp(luminance * 0.5, 0.0, 1.0);
+				float shadowFactor = 1.0 - shadowIntensity;
+				float skylightFactor = 1.0 - lightmap.y;
+				
+				// Blend all factors with smooth falloffs
+				float occlusionFactor = clamp(shadowFactor * 0.6 + (1.0 - lightPower) * 0.3 + skylightFactor * 0.3, 0.0, 1.0);
+				// occlusionFactor = pow(occlusionFactor, 1.5); // Smooth curve for more natural transition
+				
+				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL * shadowColor) * mix(vec3(1.0), AO, occlusionFactor);
 			#else
-				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL*shadowColor);
+				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL * shadowColor);
 			#endif
 		#endif
 
@@ -1380,10 +1402,9 @@ void main() {
 	} else {
 		vec3 Background = vec3(0.0);
 
-
 		#ifdef OVERWORLD_SHADER
 
-			float atmosphereGround = 1.0 - exp2(-50.0 * pow(clamp(feetPlayerPos_normalized.y+0.025,0.0,1.0),2.0)  ); // darken the ground in the sky.
+			float atmosphereGround = 1.0 - exp2(-50.0 * pow(clamp(feetPlayerPos_normalized.y+0.025,0.0,1.0),2.0)); // darken the ground in the sky.
 			
 			#if RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 0 || RESOURCEPACK_SKY == 3
 				// vec3 orbitstar = vec3(feetPlayerPos_normalized.x,abs(feetPlayerPos_normalized.y),feetPlayerPos_normalized.z); orbitstar.x -= WsunVec.x*0.2;
@@ -1429,7 +1450,7 @@ void main() {
 
 		#endif
 
-		gl_FragData[0].rgb = clamp(fp10Dither(Background, triangularize(noise_2)), 0.0, 65000.);
+		gl_FragData[0].rgb = clamp(fp10Dither(Background, triangularize(noise_2)), 0.0, 65000.0);
 	}
 
 
