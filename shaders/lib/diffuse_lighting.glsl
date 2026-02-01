@@ -119,7 +119,7 @@ void calculateFinishedPointLight(
         
         #if HANDHELD_LIGHTSOURCE_MODE > 1
             /// previous frame data to lag the light behind to seem handheld.
-            handPos -= (cameraPosition-previousCameraPosition)*3.0;
+            handPos -= (cameraPosition - previousCameraPosition) * 3.0;
         #endif
         
         // get color and stuff
@@ -127,8 +127,7 @@ void calculateFinishedPointLight(
             vec4 sampledLightColor = getHandheldLightData(heldItemId);
             float lightRange = sampledLightColor.a;
 
-            lighting = sampledLightColor.rgb * 2.0;
-            // lighting = vec3(0.1, 0.9, 0.1);
+            lighting = saturate(sampledLightColor.rgb * 3.0, 1.75);
             
             // ensure that there is color if no light item is held. or if the light item is not listed.
             if(heldItemId < 1) {

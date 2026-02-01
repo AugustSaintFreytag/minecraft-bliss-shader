@@ -36,7 +36,7 @@ void main() {
 
 	#ifdef OVERWORLD_SHADER
 		#ifdef BorderFog
-			skyGroundColor = texelFetch(colortex4, ivec2(SKY_AVERAGE_COLOR_X, SKY_AVERAGE_COLOR_Y), 0).rgb / 1200.0 * Sky_Brightness;	
+			skyGroundColor = texelFetch(colortex4, SKY_AVERAGE_COLOR_COORDS, 0).rgb / 1200.0 * Sky_Brightness;	
 		#endif
 
 		WsunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);

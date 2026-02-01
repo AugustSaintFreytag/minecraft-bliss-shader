@@ -138,7 +138,7 @@ float DH_ld(float dist) {
 }
 
 float DH_inv_ld (float lindepth){
-	return -((2.0*LOD_NEARPLANE/lindepth)-LOD_FARPLANE-LOD_NEARPLANE)/(LOD_FARPLANE-LOD_NEARPLANE);
+	return -((2.0 * LOD_NEARPLANE / lindepth) - LOD_FARPLANE - LOD_NEARPLANE) / (LOD_FARPLANE - LOD_NEARPLANE);
 }
 
 float linearizeDepthFast(const in float depth, const in float near, const in float far) {
@@ -185,8 +185,8 @@ float linearizeDepthFast(const in float depth, const in float near, const in flo
 #endif
 
 vec3 rodSample(vec2 Xi) {
-	float r = sqrt(1.0f - Xi.x*Xi.y);
-    float phi = 2 * 3.14159265359 * Xi.y;
+	float r = sqrt(1.0 - Xi.x * Xi.y);
+    float phi = 2 * PI * Xi.y;
 
     return normalize(vec3(cos(phi) * r, sin(phi) * r, Xi.x)).xzy;
 }
@@ -199,53 +199,12 @@ vec2 R2_samples(float n){
 	return fract(alpha * n);
 }
 
-// Sky Sampling
-
-const int SKY_COLOR_SAMPLES = 16;
-
-vec3 weightedMeanSkyColor(vec3 colorSamples[SKY_COLOR_SAMPLES], float weights[SKY_COLOR_SAMPLES]) {
-	vec3 weightedSum = vec3(0.0);
-	float weightSum = 0.0;
-
-	for (int index = 0; index < SKY_COLOR_SAMPLES; ++index) {
-		float weight = weights[index];
-		weightedSum += colorSamples[index] * weight;
-		weightSum += weight;
-	}
-
-	return (weightSum > 0.0) ? (weightedSum / weightSum) : vec3(0.0);
-}
-
-vec3 sampleSkyColor(int offsetX) {
-	const int offsetY = 16;
-	const float stepX = 1024 / (SKY_COLOR_SAMPLES - 1);
-	const float stepY = 32;
-
-	vec3 sampleSum = vec3(0.0);
-	vec3 samples[SKY_COLOR_SAMPLES];
-	float weights[SKY_COLOR_SAMPLES];
-
-	for (int i = 0; i < SKY_COLOR_SAMPLES; i++) {
-		ivec2 texcoords = ivec2(offsetX + stepX * i, offsetY + stepY * i);
-		vec3 color = texelFetch(colortex4, texcoords, 0).rgb;
-		float weight = luma(color);
-
-		samples[i] = color;
-		weights[i] = weight;
-
-		sampleSum += color;
-	}
-
-	return sampleSum / vec3(float(SKY_COLOR_SAMPLES));
-}
-
 // Main
 
 void main() {
 	/* RENDERTARGETS:4 */
 
 	gl_FragData[0] = vec4(0.0, 0.0, 0.0, 1.0);
-
 	float mixhistory = 0.06;
 
 
@@ -269,40 +228,53 @@ void main() {
 		vec3 AmbientLightTint = vec3(AmbientLight_R, AmbientLight_G, AmbientLight_B);
 
 		// --- the color of the atmosphere + the average color of the atmosphere.
-		vec3 skyGroundCol = skyFromTex(vec3(0, -1 ,0), colortex4).rgb;// * clamp(WsunVec.y*2.0,0.2,1.0);
+		vec3 skyGroundCol = skyFromTex(vec3(0, -1 , 0), colortex4).rgb; // * clamp(WsunVec.y*2.0,0.2,1.0);
 
-		/// --- Save light values
-		if (gl_FragCoord.x < 1. && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ){
-			gl_FragData[0] = vec4(averageSkyCol_Clouds * AmbientLightTint,1.0);
-			if(worldTimeChangeCheck) mixhistory = 1.0;
+		if (matchesCoords(gl_FragCoord, SKY_AVERAGE_COLOR_COORDS)) {
+			gl_FragData[0] = vec4(skyGroundCol, 1.0) * 1200.0;
+			return;
 		}
 
-		if (gl_FragCoord.x > 1. && gl_FragCoord.x < 2.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ){
-			gl_FragData[0] = vec4((skyGroundCol/150.0) * AmbientLightTint,1.0);
-			if(worldTimeChangeCheck) mixhistory = 1.0;
+		if (matchesCoords(gl_FragCoord, SKY_AND_CLOUDS_AVERAGE_COLOR_COORDS)){
+			gl_FragData[0] = vec4(averageSkyCol_Clouds * AmbientLightTint, 1.0);
+
+			if(worldTimeChangeCheck) {
+				mixhistory = 1.0;
+			}
 		}
 
-		#ifdef ambientLight_only
-			if (gl_FragCoord.x > 6. && gl_FragCoord.x < 7.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 )
-			gl_FragData[0] = vec4(0.0,0.0,0.0,1.0);
+		if (matchesCoords(gl_FragCoord, SKY_AVERAGE_COLOR_COORDS)) {
+			gl_FragData[0] = vec4((skyGroundCol / 150.0) * AmbientLightTint, 1.0);
+			
+			if(worldTimeChangeCheck) {
+				mixhistory = 1.0;
+			}
+		}
 
-			if (gl_FragCoord.x > 8. && gl_FragCoord.x < 9.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 )
-			gl_FragData[0] = vec4(0.0,0.0,0.0,1.0);
+		#ifdef ambientLight_only			
+			if (matchesCoords(gl_FragCoord, LIGHT_COLOR_COORDS)) {
+				gl_FragData[0] = vec4(0.0, 0.0, 0.0, 1.0);
+			}
 
-			if (gl_FragCoord.x > 13. && gl_FragCoord.x < 14.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 )
-			gl_FragData[0] = vec4(0.0,0.0,0.0,1.0);
+			if (matchesCoords(gl_FragCoord, SUN_COLOR_COORDS)) {
+				gl_FragData[0] = vec4(0.0, 0.0, 0.0, 1.0);
+			}
+
+			if (matchesCoords(gl_FragCoord, MOON_COLOR_COORDS)) {
+				gl_FragData[0] = vec4(0.0, 0.0, 0.0, 1.0);
+			}
 		#else
-			if (gl_FragCoord.x > 6. && gl_FragCoord.x < 7.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ){
-				gl_FragData[0] = vec4(lightSourceColor,1.0);
+			if (matchesCoords(gl_FragCoord, LIGHT_COLOR_COORDS)) {
+				gl_FragData[0] = vec4(lightSourceColor, 1.0);
 				if(worldTimeChangeCheck) mixhistory = 1.0;
 			}
 
-			if (gl_FragCoord.x > 8. && gl_FragCoord.x < 9.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ){
+			if (matchesCoords(gl_FragCoord, SUN_COLOR_COORDS)) {
 				gl_FragData[0] = vec4(sunColor,1.0);
 				if(worldTimeChangeCheck) mixhistory = 1.0;
 			}
 
-			if (gl_FragCoord.x > 9. && gl_FragCoord.x < 10.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ){
+			if (matchesCoords(gl_FragCoord, MOON_COLOR_COORDS)) {
 				gl_FragData[0] = vec4(moonColor,1.0);
 				if(worldTimeChangeCheck) mixhistory = 1.0;
 			}
@@ -328,23 +300,23 @@ void main() {
 	////////////////////////////////
 
 	/// --- Sky only
-	if (gl_FragCoord.x > SKY_ATLAS_OFFSET_X && gl_FragCoord.y > SKY_ATLAS_OFFSET_Y && gl_FragCoord.x < SKY_ATLAS_OFFSET_X + SKY_ATLAS_SIZE + 1.0){
+	if (gl_FragCoord.x >= SKY_ATLAS_OFFSET_X && gl_FragCoord.x < SKY_ATLAS_OFFSET_X + SKY_ATLAS_SIZE + 1.0 && gl_FragCoord.y >= SKY_ATLAS_OFFSET_Y && gl_FragCoord.y < SKY_ATLAS_OFFSET_Y + SKY_ATLAS_SIZE + 1) {
 		if(worldTimeChangeCheck || frameCounter < 100) {
 			mixhistory = 1.0;
 		}
 
-		vec2 p = clamp((floor(gl_FragCoord.xy-vec2(SKY_ATLAS_OFFSET_X, SKY_ATLAS_OFFSET_Y)) + 0.5)/SKY_ATLAS_SIZE, 0.0, 1.0);
+		vec2 p = clamp((floor(gl_FragCoord.xy - vec2(SKY_ATLAS_OFFSET_X, SKY_ATLAS_OFFSET_Y)) + 0.5) / SKY_ATLAS_SIZE, 0.0, 1.0);
 		vec3 viewVector = cartToSphere(p);
 
 		vec2 planetSphere = vec2(0.0);
 		vec3 sky = vec3(0.0);
 		vec3 skyAbsorb = vec3(0.0);
 		
-		sky = calculateAtmosphere(averageSkyCol*2000.0, viewVector, vec3(0.0,1.0,0.0), WsunVec, -WsunVec, planetSphere, skyAbsorb, 10, blueNoise());
+		sky = calculateAtmosphere(averageSkyCol * 2000.0, viewVector, vec3(0.0, 1.0, 0.0), WsunVec, -WsunVec, planetSphere, skyAbsorb, 10, blueNoise());
 
 		// fade atmosphere conditions for rain away when you pass above the cloud plane.
-		float heightRelativeToClouds = clamp(1.0 - max(eyeAltitude - CloudLayer0_height,0.0) / 200.0 ,0.0,1.0);
-		if(rainStrength > 0.0) sky = mix(sky, averageSkyCol * 2000.0 * (skyAbsorb*0.7+0.3), clamp(1.0 - exp(pow(clamp(-viewVector.y+0.9,0.0,1.0),2) * -5.0),0.0,1.0) * heightRelativeToClouds * rainStrength);
+		float heightRelativeToClouds = clamp(1.0 - max(eyeAltitude - CloudLayer0_height, 0.0) / 200.0, 0.0, 1.0);
+		if(rainStrength > 0.0) sky = mix(sky, averageSkyCol * 2000.0 * (skyAbsorb * 0.7 + 0.3), clamp(1.0 - exp(pow(clamp(-viewVector.y + 0.9, 0.0, 1.0), 2) * -5.0), 0.0, 1.0) * heightRelativeToClouds * rainStrength);
 		
 		#ifdef AEROCHROME_MODE
 			sky *= vec3(0.0, 0.18, 0.35);
@@ -354,12 +326,12 @@ void main() {
 	}
 
 	/// --- Sky + clouds + fog 
-	if (gl_FragCoord.x > SKY_CLOUD_ATLAS_OFFSET_X && gl_FragCoord.y > SKY_ATLAS_OFFSET_Y && gl_FragCoord.x < SKY_CLOUD_ATLAS_OFFSET_X + SKY_CLOUD_ATLAS_SIZE + 1.0){
+	if (gl_FragCoord.x >= SKY_CLOUD_ATLAS_OFFSET_X && gl_FragCoord.x < SKY_CLOUD_ATLAS_OFFSET_X + SKY_ATLAS_SIZE + 1.0 && gl_FragCoord.y >= SKY_CLOUD_ATLAS_OFFSET_Y && gl_FragCoord.y < SKY_CLOUD_ATLAS_OFFSET_Y + SKY_ATLAS_SIZE + 1) {
 		if(worldTimeChangeCheck || frameCounter < 100) {
 			mixhistory = 1.0;
 		}
 
-		vec2 p = clamp((floor(gl_FragCoord.xy - vec2(SKY_CLOUD_ATLAS_OFFSET_X, SKY_ATLAS_OFFSET_Y)) + 0.5) / SKY_CLOUD_ATLAS_SIZE, 0.0, 1.0);
+		vec2 p = clamp((floor(gl_FragCoord.xy - vec2(SKY_CLOUD_ATLAS_OFFSET_X, SKY_CLOUD_ATLAS_OFFSET_Y)) + 0.5) / SKY_ATLAS_SIZE, 0.0, 1.0);
 		
 		vec3 viewVector = cartToSphere(p);
 		vec3 viewPos = mat3(gbufferModelView) * viewVector * 1024.0;
@@ -396,8 +368,7 @@ void main() {
 	}
 
 	#ifdef FAKE_PLANET
-		vec2 pixelPos2 = vec2(16,1);
-		if (gl_FragCoord.x > pixelPos2.x && gl_FragCoord.x < pixelPos2.x + 1 && gl_FragCoord.y > pixelPos2.y){
+		if (matchesCoords(gl_FragCoord, FAKE_PLANET_COLOR_COORDS)){
 			if(worldTimeChangeCheck) mixhistory = 1.0;
 
 			vec3 pos = vec3(0.0);
@@ -408,6 +379,7 @@ void main() {
 
 			vec2 variable = vec2(0);
 			vec3 absorb = vec3(0.0);
+
 			vec3 transmittance = calculateAtmosphere(vec3(0.0), pos, vec3(0.0,1.0,0.0), pos, vec3(0.0), variable, absorb, 25, 0.0);
 			transmittance = min(sunColor2 * absorb, sunColor2);
 
@@ -420,8 +392,8 @@ void main() {
 	#if defined NETHER_SHADER || defined END_SHADER
 		vec2 fogPos = vec2(FOG_ATLAS_OFFSET_X, FOG_ATLAS_OFFSET_Y);
 
-		//Sky gradient with clouds
-		if (gl_FragCoord.x > (fogPos.x - FOG_ATLAS_SIZE*0.22) && gl_FragCoord.y > 0.4 && gl_FragCoord.x < (fogPos.x + FOG_ATLAS_SIZE + FOG_ATLAS_SIZE*0.22)){
+		// Sky gradient with clouds
+		if (gl_FragCoord.x > (fogPos.x - FOG_ATLAS_SIZE * 0.22) && gl_FragCoord.y > 0.4 && gl_FragCoord.x < (fogPos.x + FOG_ATLAS_SIZE + FOG_ATLAS_SIZE * 0.22)){
 			vec2 p = clamp((floor(gl_FragCoord.xy-fogPos) + 0.5)/FOG_ATLAS_SIZE,-0.2,1.2);
 
 			vec3 viewVector = cartToSphere(clamp(p, 0.0, 1.0));
@@ -434,7 +406,6 @@ void main() {
 			BackgroundColor += VL_Fog.rgb;
 
 			gl_FragData[0] = vec4(BackgroundColor*8.0, 1.0);
-
 		}
 	#endif
 
@@ -445,7 +416,7 @@ void main() {
 		float flash = 0.0;
 		float maxWaitTime = 5;
 
-		float Timer = texelFetch(colortex4, ivec2(3, 1), 0).x / 150.0;
+		float Timer = texelFetch(colortex4, TIMER_COORDS, 0).x / 150.0;
 		Timer -= frameTime;
 
 		if(Timer <= 0.0){
@@ -455,26 +426,25 @@ void main() {
 		}
 
 		vec2 pixelPos0 = vec2(3,1);
-		if (gl_FragCoord.x > pixelPos0.x && gl_FragCoord.x < pixelPos0.x + 1 && gl_FragCoord.y > pixelPos0.y && gl_FragCoord.y < pixelPos0.y + 1){
+
+		if (matchesCoords(gl_FragCoord, TIMER_COORDS)){
 			mixhistory = 1.0;
 			gl_FragData[0] = vec4(Timer, 0.0, 0.0, 1.0);
 		}
 
 		/* ---------------------- FLASHING ---------------------- */
 
-		vec2 pixelPos1 = vec2(1,1);
-		if (gl_FragCoord.x > pixelPos1.x && gl_FragCoord.x < pixelPos1.x + 1 && gl_FragCoord.y > pixelPos1.y && gl_FragCoord.y < pixelPos1.y + 1){
+		if (matchesCoords(gl_FragCoord, FLASHING_COORDS)){
 			mixhistory = clamp(4.0 * frameTime,0.0,1.0);
 			gl_FragData[0] = vec4(flash, 0.0, 0.0, 1.0);
 		}
 
 		/* ---------------------- POSITION ---------------------- */
 
-		vec2 pixelPos2 = vec2(2,1);
-		if (gl_FragCoord.x > pixelPos2.x && gl_FragCoord.x < pixelPos2.x + 1 && gl_FragCoord.y > pixelPos2.y && gl_FragCoord.y < pixelPos2.y + 1){
+		if (matchesCoords(gl_FragCoord, TEMPORAL_POSITION_COORDS)){
 			mixhistory = clamp(500.0 * frameTime,0.0,1.0);
 
-			vec3 LastPos = (texelFetch(colortex4,ivec2(2,1),0).xyz/150.0) * 2.0 - 1.0;
+			vec3 LastPos = (texelFetch(colortex4, TEMPORAL_POSITION_COORDS, 0).xyz / 150.0) * 2.0 - 1.0;
 			
 			LastPos += (hash31(frameCounter / 50) * 2.0 - 1.0);
 			LastPos = LastPos * 0.5 + 0.5;
@@ -488,32 +458,20 @@ void main() {
 
 	#endif
 
-
 	// Temporally accumulate sky and light values
-	vec3 frameHistory = texelFetch(colortex4, ivec2(gl_FragCoord.xy), 0).rgb;
-	vec3 currentFrame = gl_FragData[0].rgb * 150.0;
 
+	vec3 previousColor = texelFetch(colortex4, ivec2(gl_FragCoord.xy), 0).rgb;
+	vec3 currentColor = gl_FragData[0].rgb * 150.0;
 
-	gl_FragData[0].rgb = clamp(mix(frameHistory, currentFrame, clamp(mixhistory, 0.0, 1.0)), 0.0, 65000.0);
+	gl_FragData[0].rgb = clamp(mix(previousColor, currentColor, clamp(mixhistory, 0.0, 1.0)), 0.0, 65000.0);
 
 	// Exposure values
-	if (gl_FragCoord.x > 10. && gl_FragCoord.x < 11.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ) {
-		gl_FragData[0] = vec4(exposure, avgBrightness, avgL2,1.0);
+
+	if (matchesCoords(gl_FragCoord, IMAGE_BRIGHTNESS_COORDS)) {
+		gl_FragData[0] = vec4(exposure, avgBrightness, avgL2, 1.0);
 	}
 
-	if (gl_FragCoord.x > 14. && gl_FragCoord.x < 15.  && gl_FragCoord.y > 19.+18. && gl_FragCoord.y < 19.+18.+1 ) {
-		gl_FragData[0] = vec4(rodExposure, centerDepth,0.0, 1.0);
-	}
-	
-	// --- Sky Average Color Samples
-	if (gl_FragCoord.x >= SKY_AVERAGE_COLOR_X && gl_FragCoord.x < SKY_AVERAGE_COLOR_X + 1 && gl_FragCoord.y >= SKY_AVERAGE_COLOR_Y && gl_FragCoord.y < SKY_AVERAGE_COLOR_Y + 1) {
-		vec3 averageSkyColor = sampleSkyColor(0);
-		gl_FragData[0] = vec4(averageSkyColor, 1.0);
-	}
-
-	// --- Sky and Clouds Average Color Samples
-	if (gl_FragCoord.x >= SKY_AND_CLOUDS_AVERAGE_COLOR_X && gl_FragCoord.x < SKY_AND_CLOUDS_AVERAGE_COLOR_X + 1 && gl_FragCoord.y >= SKY_AND_CLOUDS_AVERAGE_COLOR_Y && gl_FragCoord.y < SKY_AND_CLOUDS_AVERAGE_COLOR_Y + 1) {
-		vec3 averageSkyColor = sampleSkyColor(1024);
-		gl_FragData[0] = vec4(averageSkyColor, 1.0);
+	if (matchesCoords(gl_FragCoord, AUTO_EXPOSURE_COORDS)) {
+		gl_FragData[0] = vec4(rodExposure, centerDepth, 0.0, 1.0);
 	}
 }

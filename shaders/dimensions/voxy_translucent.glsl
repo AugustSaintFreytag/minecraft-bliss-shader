@@ -244,7 +244,7 @@ void voxy_emitFragment(VoxyFragmentParameters parameters) {
     // Diffuse Lighting
     #ifdef OVERWORLD_SHADER
         // Direct Lighting
-	    DirectLightColor = texelFetch(colortex4, ivec2(6,37),0).rgb / 2400.0;
+	    DirectLightColor = texelFetch(colortex4, LIGHT_COLOR_COORDS,0).rgb / 2400.0;
 
     	float NdotL = clamp(dot(normal, WsunVec),0.0,1.0); 
         NdotL = clamp((-15 + NdotL*255.0) / 240.0  ,0.0,1.0);
@@ -255,7 +255,7 @@ void voxy_emitFragment(VoxyFragmentParameters parameters) {
     	Direct_lighting = DirectLightColor * NdotL * Shadows;
         
         // Indirect Lighting
-		AmbientLightColor = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb / 900.0;
+		AmbientLightColor = texelFetch(colortex4, SKY_AND_CLOUDS_AVERAGE_COLOR_COORDS, 0).rgb / 900.0;
 		vec3 indirectNormal = normal.xyz / dot(abs(normal.xyz),vec3(1.0));
 		float indirect_NdotL = clamp(indirectNormal.y*0.7+0.3,0.0,1.0);
 		indirect_NdotL = mix(0.08, 1.0, indirect_NdotL);

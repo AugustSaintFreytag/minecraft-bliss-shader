@@ -198,13 +198,13 @@ void main() {
   #if DEBUG_VIEW == debug_SKYTEX
     COLOR = texture2D(colortex4, texcoord).rgb / 1200;
 
-    if (texcoord.x > 0.8 && texcoord.y > 0.8) {
-      vec3 skyColor = texelFetch(colortex4, ivec2(SKY_AVERAGE_COLOR_X, SKY_AVERAGE_COLOR_Y), 0).rgb / 1200;
+    if (texcoord.x > 0.9 && texcoord.y > 0.8) {
+      vec3 skyColor = texelFetch(colortex4, SKY_AVERAGE_COLOR_COORDS, 0).rgb / 1200;
       COLOR = skyColor;
     }
 
-    if (texcoord.x > 0.9 && texcoord.y > 0.8) {
-      vec3 skyAndCloudsColor = texelFetch(colortex4, ivec2(SKY_AND_CLOUDS_AVERAGE_COLOR_X, SKY_AND_CLOUDS_AVERAGE_COLOR_Y), 0).rgb / 1200;
+    if (texcoord.x > 0.95 && texcoord.y > 0.8) {
+      vec3 skyAndCloudsColor = texelFetch(colortex4, SKY_AND_CLOUDS_AVERAGE_COLOR_COORDS, 0).rgb / 1200;
       COLOR = skyAndCloudsColor;
     }
   #endif
