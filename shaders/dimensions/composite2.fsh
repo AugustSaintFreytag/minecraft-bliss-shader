@@ -616,7 +616,6 @@ void main() {
 
 		vec4 volumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, sunVisibility, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
-		volumetricFog.rgb *= isSky ? 2.0 : 1.0;
 		volumetricFog = clamp(volumetricFog, 0.0, 65000.0);
 
 		#if defined LPV_VL_FOG_ILLUMINATION

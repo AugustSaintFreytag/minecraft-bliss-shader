@@ -6,7 +6,11 @@ uniform ivec2 eyeBrightness;
 #define FOG_USE_TURBULENCE 1
 
 const float FOG_TURBULENCE_MIX = 0.8;
+uniform bool isInSpecialEnvironment;
+uniform vec3 exitedBiomePos;
+
 const float FOG_SHAPING_INTENSITY = 0.75;
+
 
 // Utilities
 
@@ -93,8 +97,6 @@ float applyFogTurbulence(float baseNoise, vec3 pos){
 #endif
 }
 
-uniform bool isInSpecialEnvironment;
-uniform vec3 exitedBiomePos;
 
 float getLocalEffectDensity(
 	in vec3 playerPos
@@ -140,7 +142,7 @@ float getFogDensities(
 		float shapeBaseNoise = densityAtPosFog(samplePos * 24.0);
 		float shapeNoise = applyFogTurbulence(shapeBaseNoise, samplePos * 18.0);
 		float shape = 1.0 - applyFogShaping(shapeNoise, clumpyCoverage, FOG_SHAPING_INTENSITY);
-		float shape2BaseNoise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6 ,0.0) * 2.0 ,1.0) * 200.0));
+		float shape2BaseNoise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0, 1.0) * 200.0));
 		float shape2Noise = applyFogTurbulence(shape2BaseNoise, samplePos2 * 150.0);
 		float shape2 = 1.0 - applyFogShaping(shape2Noise, clumpyCoverage, FOG_SHAPING_INTENSITY);
 		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - 60, 0.0));
@@ -260,8 +262,10 @@ vec4 GetVolumetricFog(
 
 	float SdotV = dot(sunVector, normalize(playerPos));
 	float rayleighPhase = phaseRayleigh(SdotV);
-	float sunPhase = fogPhase(SdotV) * 5.0;
+
 	float flatPhase = clamp(SdotV * 0.5 + 0.5, 0.0, 1.0);
+	float fullSunPhase = fogPhase(SdotV) * 5.0;
+	float sunPhase = mix(flatPhase * 0.25, fullSunPhase, sunVisibility);
 
 	float absorbance = 1.0;
 	float localAbsorbance = 1.0;
@@ -305,6 +309,8 @@ vec4 GetVolumetricFog(
 		#endif
 
 		vec3 shadows = getShadows(mix(rayProgress, localRayProgress, localFogExists), sunVector, d, start, shadowMapRayStartPos, shadowMapRayProgress, flatPhase, sunPhase);
+
+		shadows -= vec3(1 - sunVisibility) * 0.25;
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			vec3 lightningFlash = createLightningPointLight(rayProgress - cameraPosition, lightningBoltPosition.xyz, 1.0, 1.0) * indoors;
@@ -313,6 +319,7 @@ vec4 GetVolumetricFog(
 		// Atmosphere
 
 		float planetVolume = clamp(1.0 - length((rayProgress-cameraPosition) - vec3(0.0, 250.0, 0.0)) / 2500.0, 0.0,1.0);
+
 		#ifdef USING_LOD_MOD
 			vec2 airCoef = exp2(-max(rayProgress.y-62.0,0.0)/vec2(8.0e3, 1.2e3)*vec2(6.,7.0)) * planetVolume * 12.5 * Haze_amount;
 		#else
@@ -324,7 +331,7 @@ vec4 GetVolumetricFog(
 		vec3 airDensity = kill * (rayleigh + mie);
 		vec3 airDensityPhased = rayleighPhase * rayleigh + sunPhase * mie;
 		vec3 airVolumeCoeff = exp(-airDensity * dd * rayLength);
-		vec3 airLighting = masterLightColor * shadows * sunPhase * sunVisibility * airDensityPhased + averagedAmbientColor * airDensity * 0.666;
+		vec3 airLighting = masterLightColor * shadows * sunPhase * airDensityPhased + averagedAmbientColor * airDensity * 0.666;
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			airLighting += lightningFlash * airDensity;
@@ -337,13 +344,15 @@ vec4 GetVolumetricFog(
 		float fogDensity = kill * getFogDensities(rayProgress, 0.0);
 		float fogVolumeCoeff = exp(-fogDensity * dd * rayLength);
 
-		float masterLightIntensity = clamp(dot(masterLightColor, lumCoeff), 0.0, 1.0);
-		float ambientLightIntensity = clamp(dot(ambientLightColor, lumCoeff), 0.0, 1.0);
+		float masterLightIntensity = dot(masterLightColor, lumCoeff);
+		float ambientLightIntensity = dot(ambientLightColor, lumCoeff);
 
-		vec3 attenuatedMasterLightColor = lighten(masterLightColor, masterLightIntensity * 3.0);
-		vec3 attentuatedAmbientLightColor = lighten(ambientLightColor, ambientLightIntensity * 2.0);
+		vec3 attenuatedMasterLightColor = masterLightColor;
+		vec3 attentuatedAmbientLightColor = ambientLightColor;
 
-		vec3 fogLighting = attenuatedMasterLightColor * sunPhase * sunVisibility * shadows + attentuatedAmbientLightColor * skyPhase;
+		vec3 fogLighting = attenuatedMasterLightColor * sunPhase * shadows + attentuatedAmbientLightColor * skyPhase;
+
+		fogLighting = clamp(fogLighting, vec3(masterLightIntensity * 0.25), vec3(5.0));
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			fogLighting += lightningFlash;
@@ -364,7 +373,7 @@ vec4 GetVolumetricFog(
 		#endif
 
 		float localFogVolumeCoeff = exp(-localEffectDensity * dd * localRayLength);
-		vec3 localFogLighting = localFogColor_lightCol * shadows * sunPhase + localFogColor_ambientCol * skyPhase * sunVisibility;
+		vec3 localFogLighting = localFogColor_lightCol * shadows * sunPhase + localFogColor_ambientCol * skyPhase;
 		
 		color += (localFogLighting - localFogLighting * localFogVolumeCoeff) * localAbsorbance;
 		
