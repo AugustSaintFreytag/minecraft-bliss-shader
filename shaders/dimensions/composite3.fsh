@@ -368,7 +368,7 @@ vec4 VLTemporalFiltering(vec3 viewPos, in float referenceDepth, sampler2D depth,
 
 }
 
-void blendAllFogTypes( inout vec3 color, inout float bloomyFogMult, vec4 volumetrics, float linearDistance, vec3 playerPos, vec3 cameraPosition, bool isSky ){
+void blendAllFogTypes(inout vec3 color, inout float bloomyFogMult, vec4 volumetrics, float linearDistance, vec3 playerPos, vec3 cameraPosition, bool isSky){
 
   // blend cave fog
   #if defined OVERWORLD_SHADER && defined CAVE_FOG
@@ -403,20 +403,34 @@ void blendAllFogTypes( inout vec3 color, inout float bloomyFogMult, vec4 volumet
     
     bloomyFogMult *= dot(transmittance,vec3(0.3333))*0.75 + 0.25;
   }
-  /// blend volumetrics
-  color = color * volumetrics.a + volumetrics.rgb;
+
+  #if defined OVERWORLD_SHADER
+    if(isSky && volumetrics.a < 0.99) {
+      float fogDensity = 1.0 - volumetrics.a;
+      float viewAngle = 1.0 - clamp(playerPos.y, 0.0, 1.0);  // Stronger effect when looking horizontally
+      
+      // Amplify fog opacity for sky pixels
+      float skyFogBoost = fogDensity * viewAngle * 0.5;  // 0.5 = intensity (0.3-0.7 range recommended)
+      
+      volumetrics.rgb += volumetrics.rgb * skyFogBoost * 0.5;  // Add extra inscatter
+      volumetrics.a += skyFogBoost * 8.0;
+    }
+  #endif
   
   // make bloomy fog only work outside of the overworld (unless underwater)
   #if !defined OVERWORLD_SHADER
     bloomyFogMult = min(bloomyFogMult, volumetrics.a);
   #endif
 
+  /// blend volumetrics
+  color = color * volumetrics.a + volumetrics.rgb;
+
   // blend vanilla fogs (blindness, darkness, lava, powdered snow)
   if(isEyeInWater > 1 || blindness > 0 || darknessFactor > 0){
     float environmentFogDensity = 1.0 - clamp(linearDistance/fogEnd,0,1);
     environmentFogDensity = 1.0 - environmentFogDensity*environmentFogDensity;
     environmentFogDensity *= environmentFogDensity;
-    environmentFogDensity =  mix(environmentFogDensity, 1.0, min(darknessLightFactor*2.0,1));
+    environmentFogDensity = mix(environmentFogDensity, 1.0, min(darknessLightFactor*2.0,1));
 
     color = mix(color, toLinear(fogColor), environmentFogDensity);
   }
