@@ -609,6 +609,13 @@ void main() {
     temporallyFilteredVL.rgb *= nametagbackground;
   #endif
 
+  #ifdef OVERWORLD_SHADER
+    if(isSky) {
+      // Read and set sky color from buffer.
+      color.rgb = skyCloudsFromTex(playerPos_normalized, colortex4).rgb / 1200.0;
+    }
+  #endif
+
   // blend all fog types. volumetric fog, volumetric clouds, distance based fogs for lava, powdered snow, blindness, and darkness.
   blendAllFogTypes(color, bloomyFogMult, temporallyFilteredVL, linearDistance, playerPos_normalized, cameraPosition, isSky);
 
