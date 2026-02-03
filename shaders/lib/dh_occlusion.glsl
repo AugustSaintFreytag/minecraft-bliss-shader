@@ -34,8 +34,10 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 	const float volumetricOcclusionBehindFade = 128.0;
 	const float depthFarThreshold = 0.99;
 
-	float nearPlane = dhNearPlane;
-	float farPlane = dhFarPlane;
+	float dhNear = dhNearPlane;
+	float dhFar = dhFarPlane;
+	float vanillaNear = near;
+	float vanillaFar = far;
 
 	// Pre-check if current sun angle makes occlusion impossible.
 
@@ -58,15 +60,15 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 	// Ray Construction
 	
 	float lightRange = pow(clamp(-dot(normalize(viewPos), lightDir) + 0.65, 0.0, 1.0), 2.0) / 2;
-	float farRayLength = farPlane * sqrt(3.0);
+	float farRayLength = dhFar * sqrt(3.0);
 
 	bool clippedByNearPlane = false;
 	float nearPlaneHitDistance = 0.0;
 	float rayLength = farRayLength;
 
-	if ((viewPos.z + lightDir.z * farRayLength) > - nearPlane && abs(lightDir.z) > 1e-5) {
+	if ((viewPos.z + lightDir.z * farRayLength) > - dhNear && abs(lightDir.z) > 1e-5) {
 		clippedByNearPlane = true;
-		nearPlaneHitDistance = (-nearPlane - viewPos.z) / lightDir.z;
+		nearPlaneHitDistance = (-dhNear - viewPos.z) / lightDir.z;
 		nearPlaneHitDistance = max(nearPlaneHitDistance, 0.0);
 		rayLength = min(nearPlaneHitDistance + volumetricOcclusionBehindFade, farRayLength);
 	}
@@ -107,12 +109,12 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 
 		#ifdef UseQuarterResDepth
 			float sampleDepthLinear = sqrt(texelFetch(colortex4, ivec2(samplePos.xy / texelSize / 4.0), 0).a / 65000.0);
-			float sampleDepthRaw = -((2.0 * nearPlane / sampleDepthLinear) - farPlane - nearPlane) / (farPlane - nearPlane);
+			float sampleDepthRaw = -((2.0 * vanillaNear / sampleDepthLinear) - vanillaFar - vanillaNear) / (vanillaFar - vanillaNear);
 		#else
 			float sampleDepthRaw = texelFetch(depthtex1, ivec2(samplePos.xy / texelSize), 0).r;
 		#endif
 
-		float linearDepth = clamp(swapperLinZ(sampleDepthRaw, nearPlane, farPlane), 0.0, 1.0);
+		float linearDepth = clamp(swapperLinZ(sampleDepthRaw, vanillaNear, vanillaFar), 0.0, 1.0);
 
 		bool useLODDepth = false;
 		float dhSampleDepth = 1.0;
@@ -120,7 +122,7 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 		if (linearDepth >= depthFarThreshold) {
 			ivec2 dhDepthCoord = ivec2(samplePos.xy / texelSize);
 			dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
-			linearDepth = clamp(swapperLinZ(dhSampleDepth, nearPlane, farPlane), 0.0, 1.0);
+			linearDepth = clamp(swapperLinZ(dhSampleDepth, dhNear, dhFar), 0.0, 1.0);
 			useLODDepth = true;
 		}
 
