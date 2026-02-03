@@ -29,18 +29,40 @@ float getSunAngleDisocclusionFactor() {
 float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float vanillaDepth){
 	const int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
 	const float stepSize = DH_VOLUMETRIC_OCCLUSION_STEP;
-	const float occlusionDistanceLimit = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
+	const float occlusionDistanceCutoff = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
+
 	const float volumetricOcclusionBehindFade = 128.0;
+	const float depthFarThreshold = 0.99;
 
 	float nearPlane = dhNearPlane;
 	float farPlane = dhFarPlane;
+
+	// Pre-check if current sun angle makes occlusion impossible.
+
+	float sunAngleFactor = getSunAngleDisocclusionFactor();
+
+	if (sunAngleFactor == 1.0) {
+		return 1.0;
+	}
+
+	// Pre-check if distance to sampled position is outside of bounds.
+
+	float occlusionDistanceCutoffSq = occlusionDistanceCutoff * occlusionDistanceCutoff;
+	float distanceToViewer = length(viewPos);
+	float sunDistanceFactor = clamp(smoothstep(occlusionDistanceCutoff * 0.2, occlusionDistanceCutoff, distanceToViewer), 0.0, 1.0);
+
+	if (sunDistanceFactor == 1.0) {
+		return 1.0;
+	}
+
+	// Ray Construction
 	
 	float lightRange = pow(clamp(-dot(normalize(viewPos), lightDir) + 0.65, 0.0, 1.0), 2.0) / 2;
 	float farRayLength = farPlane * sqrt(3.0);
-	
-	float rayLength = farRayLength;
+
 	bool clippedByNearPlane = false;
 	float nearPlaneHitDistance = 0.0;
+	float rayLength = farRayLength;
 
 	if ((viewPos.z + lightDir.z * farRayLength) > - nearPlane && abs(lightDir.z) > 1e-5) {
 		clippedByNearPlane = true;
@@ -58,31 +80,17 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 		behindFadeStart = clamp(1.0 - behindFadeRange, 0.0, 1.0);
 	}
 
-	float rayStepSize = max(stepSize, 1e-4);
 	vec2 screenEdges = 2.0 / vec2(viewWidth, viewHeight);
+	float rayStepSize = max(stepSize, 1e-4);
 
-	float depthFarThreshold = 0.99;
-	float occlusionDistanceCutoff = occlusionDistanceLimit;
-	float occlusionDistanceCutoffSq = occlusionDistanceCutoff * occlusionDistanceCutoff;
-	float distanceToViewer = length(viewPos);
-
-	float sunAngleFactor = getSunAngleDisocclusionFactor();
-
-	if (sunAngleFactor == 1.0) {
-		return 1.0;
-	}
-
-	float sunDistanceFactor = clamp(smoothstep(occlusionDistanceCutoff * 0.2, occlusionDistanceCutoff, distanceToViewer), 0.0, 1.0);
-
-	if (sunDistanceFactor == 1.0) {
-		return 1.0;
-	}
+	// Sampling
 	
 	float raySampleSum = 0.0;
 	int samplesProcessed = 0;
 
 	for (int i = 0; i < samples; i++) {
 		float sampleDistance = (float(i) + noise) * rayStepSize;
+
 		if (sampleDistance > rayLength) {
 			break;
 		}
@@ -95,7 +103,8 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 			break;
 		}
 
-		// Prefer vanilla depth samples before falling back to DH LOD depth.
+		// Use vanilla depth within range, then swap to DH depth farther away.
+
 		#ifdef UseQuarterResDepth
 			float sampleDepthLinear = sqrt(texelFetch(colortex4, ivec2(samplePos.xy / texelSize / 4.0), 0).a / 65000.0);
 			float sampleDepthRaw = -((2.0 * nearPlane / sampleDepthLinear) - farPlane - nearPlane) / (farPlane - nearPlane);
@@ -104,10 +113,10 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 		#endif
 
 		float linearDepth = clamp(swapperLinZ(sampleDepthRaw, nearPlane, farPlane), 0.0, 1.0);
+
 		bool useLODDepth = false;
 		float dhSampleDepth = 1.0;
 
-		// Once vanilla depth is exhausted, continue in LOD depth buffer.
 		if (linearDepth >= depthFarThreshold) {
 			ivec2 dhDepthCoord = ivec2(samplePos.xy / texelSize);
 			dhSampleDepth = texelFetch(LOD_DEPTHTEX1, dhDepthCoord, 0).x;
@@ -115,24 +124,23 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 			useLODDepth = true;
 		}
 
-		float d = rayLength > 1e-4 ? clamp(sampleDistance / rayLength, 0.0, 1.0) : 1.0;
+		float fadeDistance = rayLength > 1e-4 ? clamp(sampleDistance / rayLength, 0.0, 1.0) : 1.0;
 		float behindFade = 1.0;
 
 		if (clippedByNearPlane && behindFadeRange > 0.0) {
-			behindFade = clamp(1.0 - smoothstep(behindFadeStart, 1.0, d), 0.0, 1.0);
+			behindFade = clamp(1.0 - smoothstep(behindFadeStart, 1.0, fadeDistance), 0.0, 1.0);
 		}
 		
 		vec3 sceneViewPos = useLODDepth
 			? toScreenSpace_DH(samplePos.xy, 1.0, dhSampleDepth)
 			: toScreenSpace_DH(samplePos.xy, sampleDepthRaw, dhSampleDepth);
 		float depthBias = 0.01 + sampleDistance * 1e-4;
-		float occluded = (sceneViewPos.z > (sampleViewPos.z + depthBias)) ? 1.0 : 0.0;
+		float occlusion = (sceneViewPos.z > (sampleViewPos.z + depthBias)) ? 1.0 : 0.0;
 
 		float rayStrength = pow(mix(1.0, 0.0, float(i) / float(samples)), 2.0);
-		// float rayStrength = 1.0;
-		float sampleVisibility = (linearDepth >= depthFarThreshold) ? 1.0 : mix(1.0, lightRange, occluded);
-		raySampleSum += sampleVisibility * behindFade * rayStrength;
+		float sampleVisibility = (linearDepth >= depthFarThreshold) ? 1.0 : mix(1.0, lightRange, occlusion);
 
+		raySampleSum += sampleVisibility * behindFade * rayStrength;
 		samplesProcessed ++;
 	}
 
@@ -140,6 +148,5 @@ float getDHSunVisibility(in vec3 viewPos, in vec3 lightDir, float noise, float v
 		return 1.0;
 	}
 
-	float suppressionFactor = 1.0;
-	return clamp(((raySampleSum / float(samplesProcessed)) * suppressionFactor) + sunDistanceFactor + sunAngleFactor, 0.0, 1.0);
+	return clamp((raySampleSum / float(samplesProcessed)) + sunDistanceFactor + sunAngleFactor, 0.0, 1.0);
 }
