@@ -3,7 +3,7 @@
 
 #include "/lib/settings.glsl"
 #include "/lib/util.glsl"
-#include "/lib/DH_utils.glsl"
+#include "/lib/dh_utils.glsl"
 
 // varying vec4 pos;
 varying vec4 localPos;

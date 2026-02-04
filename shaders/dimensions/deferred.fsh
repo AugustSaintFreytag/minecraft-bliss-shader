@@ -40,6 +40,8 @@ uniform sampler2D colortex4;
 uniform float frameTime;
 uniform int frameCounter;
 uniform float frameTimeCounter;
+uniform float viewWidth;
+uniform float viewHeight;
 uniform float rainStrength;
 uniform float eyeAltitude;
 uniform vec3 sunVec;
@@ -57,6 +59,10 @@ uniform vec3 sunPosition;
 uniform vec3 moonPosition;
 uniform vec3 cameraPosition;
 uniform float far;
+uniform float near;
+uniform float farPlane;
+uniform float dhFarPlane;
+uniform float dhNearPlane;
 uniform ivec2 eyeBrightnessSmooth;
 // uniform ivec2 eyeBrightness;
 uniform float caveDetection;
@@ -66,13 +72,15 @@ uniform float dayChangeSmooth;
 uniform bool worldTimeChangeCheck;
 
 uniform int hideGUI;
-uniform float near;
 
 #include "/lib/util.glsl"
 #include "/lib/color_transforms.glsl"
 #include "/lib/ROBOBO_sky.glsl"
 #include "/lib/sky_gradient.glsl"
 #include "/lib/Shadow_Params.glsl"
+
+#include "/lib/dh_projections.glsl"
+#include "/lib/dh_occlusion.glsl"
 
 vec4 lightCol = vec4(lightSourceColor, float(sunElevation > 1e-5)*2-1.);
 vec3 WsunVec = mat3(gbufferModelViewInverse)*sunVec;
@@ -119,8 +127,6 @@ vec3 toScreenSpace(vec3 p) {
     vec4 viewPos = iProjDiag * feetPlayerPos.xyzz + gbufferProjectionInverse[3];
     return viewPos.xyz / viewPos.w;
 }
-
-#include "/lib/DistantHorizons_projections.glsl"
 
 vec3 DH_toScreenSpace(vec3 p) {
 	vec4 iProjDiag = vec4(LOD_PROJECTION_INVERSE[0].x, LOD_PROJECTION_INVERSE[1].y, LOD_PROJECTION_INVERSE[2].zw);

@@ -96,7 +96,7 @@ uniform int hideGUI;
 #include "/lib/Shadow_Params.glsl"
 #include "/lib/waterBump.glsl"
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 #include "/lib/dh_occlusion.glsl"
 
 float DH_ld(float dist) {

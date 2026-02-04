@@ -86,7 +86,7 @@ uniform int hideGUI;
 uniform float near;
 uniform float far;
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 
 vec2 decodeVec2(float a){
     const vec2 constant1 = 65535. / vec2( 256., 65536.);

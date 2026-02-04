@@ -178,7 +178,7 @@ float convertHandDepth_2(in float depth, bool hand) {
 #include "/lib/diffuse_lighting.glsl"
 #include "/lib/end_fog.glsl"
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 #include "/lib/dh_occlusion.glsl"
 
 vec3 decode (vec2 encn){

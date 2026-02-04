@@ -278,7 +278,7 @@ float ld(float dist) {
 
 uniform float dhFarPlane;
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 
 
 

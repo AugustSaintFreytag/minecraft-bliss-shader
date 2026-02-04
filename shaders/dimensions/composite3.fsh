@@ -96,7 +96,7 @@ vec3 toScreenSpace(vec3 p) {
     return fragposition.xyz / fragposition.w;
 }
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 
 float interleaved_gradientNoise_temporal(){
 	#if TAA_MODE > 0

@@ -37,7 +37,7 @@ flat varying int water;
 // uniform float far;
 uniform float dhFarPlane;
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 
 vec4 toClipSpace3(vec3 viewSpacePosition) {
 
