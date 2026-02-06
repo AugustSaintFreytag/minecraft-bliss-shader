@@ -349,7 +349,13 @@ vec4 GetVolumetricFog(
 
 		vec3 fogLighting = masterLightColor * sunPhase * shadows + ambientLightColor * skyPhase;
 
+		// Brightness Boost
+		
+		float fogLuminance = dot(lumCoeff, fogLighting);
+		float minFogLuminance = 0.65;
+		float fogLuminanceDelta = clamp(minFogLuminance - fogLuminance, 0.0, 100.0);
 
+		fogLighting += vec3(fogLuminanceDelta) * saturate(ambientColor, 0.5);
 
 		// Lightning
 		
