@@ -155,10 +155,10 @@ float getFogDensities(
 
 // Shadows
 
-vec3 sampleShadowmapVL(vec3 start, vec3 shadowMapRayStartPos, vec3 shadowMapRayProgress, float increment) {
+vec3 sampleShadowmapVL(vec3 shadowMapZeroPos, vec3 shadowMapRayStartPos, vec3 shadowMapRayProgress) {
 	vec3 shadowColor = vec3(1.0);
 
-	shadowMapRayProgress = start.xyz + increment*shadowMapRayStartPos;
+	shadowMapRayProgress = shadowMapZeroPos.xyz + shadowMapRayStartPos;
 
 	#ifdef DISTORT_SHADOWMAP
 		float distortFactor = calcDistort(shadowMapRayProgress.xy);
@@ -190,15 +190,14 @@ vec3 sampleShadowmapVL(vec3 start, vec3 shadowMapRayStartPos, vec3 shadowMapRayP
 vec3 getShadows(
 	vec3 rayProgress, 
 	in vec3 sunVector,
-	float increment, 
-	vec3 start, 
+	vec3 shadowMapZeroPos, 
 	vec3 shadowMapRayStartPos, 
 	vec3 shadowMapRayProgress,
 	float flatPhase,
 	inout float sunPhase
 ){
 	vec3 shadows = vec3(1.0);
-	shadows *= sampleShadowmapVL(start, shadowMapRayStartPos, shadowMapRayProgress, increment);
+	shadows *= sampleShadowmapVL(shadowMapZeroPos, shadowMapRayStartPos, shadowMapRayProgress);
 	
 	float cloudShadow = GetCloudShadow(rayProgress, sunVector);
 	shadows *= cloudShadow;
@@ -206,7 +205,7 @@ vec3 getShadows(
 	return shadows;
 }
 
-// Entry
+// Volumetric Fog
 
 vec4 GetVolumetricFog(
 	in vec3 viewPos,
@@ -224,7 +223,8 @@ vec4 GetVolumetricFog(
 		return vec4(0.0, 0.0, 0.0, 1.0);
 	#endif
 	
-	int SAMPLECOUNT = VL_SAMPLES;
+	const int sampleCount = VL_SAMPLES;
+	const float expFactor = 11.0;
 
 	// Project pixel position into shadow map space.
 	vec3 playerPos = mat3(gbufferModelViewInverse) * viewPos + gbufferModelViewInverse[3].xyz;
@@ -232,21 +232,22 @@ vec4 GetVolumetricFog(
 
 	vec3 localRayStartPos = rayStartPos;
 	float localRayLength = length(localRayStartPos);
-	localRayStartPos *= min(localRayLength, 64.0)/localRayLength;
-	localRayLength = length(localRayStartPos);
-	vec3 localRayProgress = vec3(0.0);
+
+	localRayStartPos *= min(localRayLength, 64.0) / localRayLength;
+	localRayLength = length(localRayStartPos); 
 
 	// Shadow Map
+
 	vec3 shadowViewPos = mat3(shadowModelView) * playerPos + shadowModelView[3].xyz;
 	shadowViewPos = diagonal3(shadowProjection) * shadowViewPos + shadowProjection[3].xyz;
 
-	vec3 start = toShadowSpaceProjected(vec3(0.0));
-	vec3 shadowMapRayStartPos = shadowViewPos - start;
+	vec3 shadowMapZeroPos = toShadowSpaceProjected(vec3(0.0));
+	vec3 shadowMapRayStartPos = shadowViewPos - shadowMapZeroPos;
 
 	float rayLength = length(rayStartPos);
 
 	#ifdef USING_LOD_MOD
-		float maxLength = min(rayLength, max(far, LOD_RENDERDISTANCE))/rayLength;
+		float maxLength = min(rayLength, max(far, LOD_RENDERDISTANCE)) / rayLength;
 	#else
 		float maxLength = min(rayLength, far)/rayLength;
 	#endif
@@ -257,22 +258,23 @@ vec4 GetVolumetricFog(
 	rayLength = length(rayStartPos);
 
 	vec3 rayProgress = vec3(0.0);
+	vec3 localRayProgress = vec3(0.0);
 	vec3 shadowMapRayProgress = vec3(0.0);
-	float expFactor = 11.0;
 
 	float SdotV = dot(sunVector, normalize(playerPos));
 	float rayleighPhase = phaseRayleigh(SdotV);
 
 	float flatPhase = clamp(SdotV * 0.5 + 0.5, 0.0, 1.0);
 	float fullSunPhase = fogPhase(SdotV) * 5.0;
-	float sunPhase = mix(flatPhase * 0.25, fullSunPhase, sunVisibility);
+	float sunPhase = mix(flatPhase, fullSunPhase, sunVisibility);
 
 	float absorbance = 1.0;
 	float localAbsorbance = 1.0;
-	float LPVAbsorb = 1.0;
+
 	vec3 airAbsorbance = vec3(1.0);
 	
 	float indoors = clamp(eyeBrightnessSmooth.y / 240.0, 0, 1);
+	float daylightFactor = clamp(sunElevation * 4.0, 0.0, 1.0);
 
 	vec3 masterLightColor = lightColor;
 	vec3 ambientLightColor = ambientColor;
@@ -281,89 +283,88 @@ vec4 GetVolumetricFog(
 	vec3 localFogColor_lightCol = localFogColor * dot(masterLightColor, vec3(0.33333));
 	vec3 localFogColor_ambientCol = localFogColor * dot(ambientLightColor, vec3(0.33333));
 
-	float skyPhase = 0.5 + pow(1.0 - pow(1.0 - clamp(normalize(playerPos).y * 0.5 + 0.5, 0.0, 1.0), 2.0), 5.0) * 2.0;
+	float skyPhase = 0.5 + pow(1.0 - pow(1.0 - clamp(normalize(playerPos).y * 0.5 + 0.5, 0.0, 1.0), 2.0), 2.0) * 2.0;
 
 	vec3 rayleighCoeffs = vec3(sky_coefficientRayleighR*1e-6, sky_coefficientRayleighG*1e-5, sky_coefficientRayleighB*1e-5);
 	vec3 mieCoeffs = vec3(sky_coefficientMieR*1e-6, sky_coefficientMieG*1e-6, sky_coefficientMieB*1e-6);
 
-	// this is to reduce sampling problems with shadows when thick local fog is used.
-	float localFogExists = (parameters.localFog.x > 0.0 || parameters.localFog.y > 0.0) ? 1.0 : 0.0;
+	// If current fog parameters include any local fog.
+	float localFogDensityFactor = (parameters.localFog.x > 0.0 || parameters.localFog.y > 0.0) ? 1.0 : 0.0;
 
 	vec3 color = vec3(0.0);
 	
-	for (int i = 0; i < SAMPLECOUNT; i++) {
-		float d = (pow(expFactor, float(i+dither.x)/float(SAMPLECOUNT))/expFactor - 1.0/expFactor)/(1-1.0/expFactor);
-		float dd = pow(expFactor, float(i+dither.y)/float(SAMPLECOUNT)) * log(expFactor) / float(SAMPLECOUNT)/(expFactor-1.0);
+	for (int i = 0; i < sampleCount; i++) {
+		float sampleOffset = (pow(expFactor, float(i + dither.x) / float(sampleCount)) / expFactor - 1.0 / expFactor) / (1.0 - 1.0 / expFactor);
+		float volumeSampleOffset = pow(expFactor, float(i + dither.y) / float(sampleCount)) * log(expFactor) / float(sampleCount) / (expFactor - 1.0);
 	
 		#if defined CloudLayer0 || defined CloudLayer1 || defined CloudLayer2
-			float kill = length(d*rayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
+			float kill = length(sampleOffset * rayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
 		#else
 			float kill = 1.0;
 		#endif
 
-		rayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + d*rayStartPos;
-		localRayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + d*localRayStartPos;
+		rayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * rayStartPos;
+		localRayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * localRayStartPos;
 		
 		#ifdef FAKE_PLANET
 			lightColor = getPlanetAbsorb(rayProgress, WsunVec, colortex4);
 		#endif
 
-		vec3 shadows = getShadows(mix(rayProgress, localRayProgress, localFogExists), sunVector, d, start, shadowMapRayStartPos, shadowMapRayProgress, flatPhase, sunPhase);
-
-		shadows -= vec3(1 - sunVisibility) * 0.25;
+		// Receives: Sampled position, sun vector, sampling distance, shadow map zero position, shadow map max ray length position, shadow map progress, ambient light phase, sun light phase
+		vec3 shadows = getShadows(mix(rayProgress, localRayProgress, localFogDensityFactor), sunVector, shadowMapZeroPos, shadowMapRayStartPos * sampleOffset, shadowMapRayProgress, flatPhase, sunPhase);
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			vec3 lightningFlash = createLightningPointLight(rayProgress - cameraPosition, lightningBoltPosition.xyz, 1.0, 1.0) * indoors;
 		#endif
 		
-		// Atmosphere
+		// (I) Atmosphere
 
 		float planetVolume = clamp(1.0 - length((rayProgress-cameraPosition) - vec3(0.0, 250.0, 0.0)) / 2500.0, 0.0,1.0);
 
 		#ifdef USING_LOD_MOD
-			vec2 airCoef = exp2(-max(rayProgress.y-62.0,0.0)/vec2(8.0e3, 1.2e3)*vec2(6.,7.0)) * planetVolume * 12.5 * Haze_amount;
+			vec2 airCoef = exp2(-max(rayProgress.y - 62.0, 0.0) / vec2(8.0e3, 1.2e3) * vec2(6.0, 7.0)) * planetVolume * 12.5 * ATMOSPHERIC_HAZE_AMOUNT;
 		#else
-			vec2 airCoef = exp2(-max(rayProgress.y-62.0,0.0)/vec2(8.0e3, 1.2e3)*vec2(6.,7.0)) * planetVolume * 25.0 * Haze_amount;
+			vec2 airCoef = exp2(-max(rayProgress.y - 62.0, 0.0) / vec2(8.0e3, 1.2e3) * vec2(6.0, 7.0)) * planetVolume * 25.0 * ATMOSPHERIC_HAZE_AMOUNT;
 		#endif
 
 		vec3 rayleigh = rayleighCoeffs * airCoef.x;
-		vec3 mie = mieCoeffs * (airCoef.y + min(Haze_amount, 1.0));
+		vec3 mie = mieCoeffs * (airCoef.y + min(ATMOSPHERIC_HAZE_AMOUNT, 1.0));
 		vec3 airDensity = kill * (rayleigh + mie);
 		vec3 airDensityPhased = rayleighPhase * rayleigh + sunPhase * mie;
-		vec3 airVolumeCoeff = exp(-airDensity * dd * rayLength);
+		vec3 airVolumeCoeff = exp(-airDensity * volumeSampleOffset * rayLength);
 		vec3 airLighting = masterLightColor * shadows * sunPhase * airDensityPhased + averagedAmbientColor * airDensity * 0.666;
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			airLighting += lightningFlash * airDensity;
 		#endif
-		
-		color += (airLighting - airLighting * airVolumeCoeff) / (airDensity + 1e-6) * airAbsorbance;
 
-		// Global Fog
+		airLighting = (airLighting - airLighting * airVolumeCoeff) / (airDensity + 1e-6) * airAbsorbance;
+		
+		color += airLighting;
+
+		// (II) Global Fog
 
 		float fogDensity = kill * getFogDensities(rayProgress, 0.0);
-		float fogVolumeCoeff = exp(-fogDensity * dd * rayLength);
+		float fogVolumeCoeff = exp(-fogDensity * volumeSampleOffset * rayLength);
 
-		float masterLightIntensity = dot(masterLightColor, lumCoeff);
-		float ambientLightIntensity = dot(ambientLightColor, lumCoeff);
+		vec3 fogLighting = masterLightColor * sunPhase * shadows + ambientLightColor * skyPhase;
 
-		vec3 attenuatedMasterLightColor = masterLightColor;
-		vec3 attentuatedAmbientLightColor = ambientLightColor;
 
-		vec3 fogLighting = attenuatedMasterLightColor * sunPhase * shadows + attentuatedAmbientLightColor * skyPhase;
 
-		fogLighting = clamp(fogLighting, vec3(masterLightIntensity * 0.25), vec3(5.0));
+		// Lightning
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			fogLighting += lightningFlash;
 		#endif
 		
-		color += (fogLighting - fogLighting * fogVolumeCoeff) * absorbance;
+		fogLighting = (fogLighting - fogLighting * fogVolumeCoeff) * absorbance;
 
-		// Local Fog
+		color += fogLighting;
+
+		// (III) Local Fog
 
 		#if (defined CloudLayer0 || defined CloudLayer1 || defined CloudLayer2)
-			kill = length(d * localRayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
+			kill = length(sampleOffset * localRayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
 		#endif
 
 		float localEffectDensity = kill * getLocalEffectDensity(localRayProgress);
@@ -372,7 +373,7 @@ vec4 GetVolumetricFog(
 			localEffectDensity *= indoors;
 		#endif
 
-		float localFogVolumeCoeff = exp(-localEffectDensity * dd * localRayLength);
+		float localFogVolumeCoeff = exp(-localEffectDensity * volumeSampleOffset * localRayLength);
 		vec3 localFogLighting = localFogColor_lightCol * shadows * sunPhase + localFogColor_ambientCol * skyPhase;
 		
 		color += (localFogLighting - localFogLighting * localFogVolumeCoeff) * localAbsorbance;
@@ -381,7 +382,6 @@ vec4 GetVolumetricFog(
 		airAbsorbance *= airVolumeCoeff * fogVolumeCoeff * localFogVolumeCoeff;
 		absorbance *= fogVolumeCoeff * localFogVolumeCoeff * dot(airVolumeCoeff, vec3(0.33333));
 	}
-
 
 	return vec4(color, absorbance);
 }
