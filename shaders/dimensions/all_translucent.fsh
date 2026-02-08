@@ -272,10 +272,6 @@ float encodeVec2(float x,float y){
     return encodeVec2(vec2(x,y));
 }
 
-float ld(float dist) {
-    return (2.0 * near) / (far + near - dist * (far - near));
-}
-
 uniform float dhFarPlane;
 
 #include "/lib/dh_projections.glsl"

@@ -5,37 +5,23 @@
 #define SHADOWMAP_CONSTANT_RELATED_SETTINGS
 #define AMBIENT_LIGHT_RELATED_SETTINGS
 #define WATER_RELATED_SETTINGS
-#include "/lib/settings.glsl"
-#include "/lib/util.glsl"
-#include "/lib/res_params.glsl"
-#include "/lib/color_transforms.glsl"
-#include "/lib/projections.glsl"
 
-#include "/lib/macro_lod_mod.glsl"
 #ifdef OVERWORLD_SHADER
 	#define WATER_SUN_SPECULAR
 #endif
 
 uniform vec2 texelSize;
-// uniform int moonPhase;
 uniform float frameTimeCounter;
 uniform sampler2D noisetex;
 
-const bool shadowHardwareFiltering = true;
 uniform sampler2DShadow shadow;
 
 uniform sampler2D depthtex0;
 uniform sampler2D depthtex1;
 
 uniform sampler2D colortex12;
-// uniform sampler2D colortex7;
 uniform sampler2D colortex4;
 uniform sampler2D colortex5;
-
-
-#include "/lib/sky_gradient.glsl"
-#include "/lib/waterBump.glsl"
-#include "/lib/Shadow_Params.glsl"
 
 varying vec4 pos;
 varying vec4 gcolor;
@@ -52,36 +38,29 @@ uniform float dhFarPlane;
 uniform float dhNearPlane;
 
 uniform vec3 previousCameraPosition;
-// uniform vec3 cameraPosition;
-
-// uniform mat4 gbufferModelView;
 uniform mat4 gbufferPreviousModelView;
-
-// uniform mat4 shadowModelView;
-// uniform mat4 shadowModelViewInverse;
-// uniform mat4 shadowProjection;
-// uniform mat4 shadowProjectionInverse;
-
-
-
 uniform int frameCounter;
 
-
-// uniform sampler2D colortex4;
 flat varying vec3 averageSkyCol_Clouds;
 flat varying vec4 lightCol;
 flat varying vec3 WsunVec;
 flat varying vec3 WsunVec2;
 
+uniform int isEyeInWater;
+uniform float rainStrength;
 
-
-// uniform mat4 dhPreviousProjection;
-// uniform mat4 dhProjectionInverse;
-// uniform mat4 dhProjection;
-
-
-
+#include "/lib/settings.glsl"
+#include "/lib/util.glsl"
+#include "/lib/res_params.glsl"
+#include "/lib/color_transforms.glsl"
+#include "/lib/sky_gradient.glsl"
+#include "/lib/waterBump.glsl"
+#include "/lib/Shadow_Params.glsl"
+#include "/lib/macro_lod_mod.glsl"
+#include "/lib/projections.glsl"
 #include "/lib/dh_projections.glsl"
+
+const bool shadowHardwareFiltering = true;
 
 vec3 DH_toScreenSpace(vec3 p) {
 	vec4 iProjDiag = vec4(dhProjectionInverse[0].x, dhProjectionInverse[1].y, dhProjectionInverse[2].zw);
@@ -94,9 +73,6 @@ vec3 DH_toClipSpace3(vec3 viewSpacePosition) {
     return projMAD(dhProjection, viewSpacePosition) / -viewSpacePosition.z * 0.5 + 0.5;
 }
 
-float ld(float dist) {
-    return (2.0 * dhNearPlane) / (far + dhNearPlane - dist * (far - dhNearPlane));
-}
 float DH_ld(float dist) {
     return (2.0 * dhNearPlane) / (dhFarPlane + dhNearPlane - dist * (dhFarPlane - dhNearPlane));
 }
@@ -106,9 +82,6 @@ float DH_inv_ld (float lindepth){
 float linearizeDepthFast(const in float depth, const in float dhNearPlane, const in float far) {
     return (dhNearPlane * far) / (depth * (dhNearPlane - far) + far);
 }
-
-uniform int isEyeInWater;
-uniform float rainStrength;
 
 #ifdef OVERWORLD_SHADER
 	#include "/lib/scene_controller.glsl"

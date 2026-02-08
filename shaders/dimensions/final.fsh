@@ -51,10 +51,6 @@ uniform mat4 gbufferPreviousModelView;
 uniform float near;
 uniform float far;
 
-float ld(float dist) {
-    return (2.0 * near) / (far + near - dist * (far - near));
-}
-
 /*
 from https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/
 Copyright 2019 Alan Wolfe
@@ -190,10 +186,10 @@ void main() {
     }
   #endif
   #if DEBUG_VIEW == debug_DEPTHTEX0
-    COLOR = vec3(ld(texture2D(depthtex0, texcoord * RENDER_SCALE).r));
+    COLOR = vec3(linZ(texture2D(depthtex0, texcoord * RENDER_SCALE).r));
   #endif
   #if DEBUG_VIEW == debug_DEPTHTEX1
-    COLOR = vec3(ld(texture2D(LOD_DEPTHTEX1, texcoord * RENDER_SCALE).r));
+    COLOR = vec3(linZ(texture2D(LOD_DEPTHTEX1, texcoord * RENDER_SCALE).r));
   #endif
   #if DEBUG_VIEW == debug_SKYTEX
     COLOR = texture2D(colortex4, texcoord).rgb / 1200;

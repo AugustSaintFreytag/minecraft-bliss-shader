@@ -1,7 +1,5 @@
 #define GAMEPLAY_EFFECTS_RELATED_SETTINGS
 #define ANTIALIASING_RELATED_SETTINGS
-#include "/lib/settings.glsl"
-#include "/lib/res_params.glsl"
 
 /*
 const int colortex0Format = RGBA16F;				// low res clouds (deferred->composite2) + low res VL (composite5->composite15)
@@ -20,6 +18,8 @@ const int colortex13Format = RGBA16F;				// low res VL (composite5->composite15)
 const int colortex14Format = RGBA16;				// rg = SSAO and SS-SSS. a = skylightmap for translucents.
 const int colortex15Format = RGBA8;					// flat normals and vanilla AO
 */
+
+#include "/lib/settings.glsl"
 
 #ifdef SCREENSHOT_MODE
 	/*
@@ -70,25 +70,21 @@ uniform mat4 gbufferPreviousModelViewInverse;
 
 uniform int hideGUI;
 
+uniform float near;
+uniform float far;
+
 #ifdef DAMAGE_TAKEN_EFFECT
 	uniform float CriticalDamageTaken;
 #endif
 
+#include "/lib/res_params.glsl"
 #include "/lib/util.glsl"
 #include "/lib/projections.glsl"
-
-
-
 #include "/lib/TAA_jitter.glsl"
-
 #include "/lib/macro_lod_mod.glsl"
-
-uniform float near;
-uniform float far;
-
 #include "/lib/dh_projections.glsl"
 
-vec2 decodeVec2(float a){
+vec2 decodeVec2(float a) {
     const vec2 constant1 = 65535. / vec2( 256., 65536.);
     const float constant2 = 256. / 255.;
     return fract( a * constant1 ) * constant2 ;
@@ -97,11 +93,12 @@ vec2 decodeVec2(float a){
 float luma(vec3 color) {
 	return dot(color,vec3(0.21, 0.72, 0.07));
 }
-float interleaved_gradientNoise(){
+
+float interleaved_gradientNoise() {
 	return fract(52.9829189*fract(0.06711056*gl_FragCoord.x + 0.00583715*gl_FragCoord.y)+tempOffsets);
 }
-float triangularize(float dither)
-{
+
+float triangularize(float dither) {
     float center = dither*2.0-1.0;
     dither = center*inversesqrt(abs(center));
     return clamp(dither-fsign(center),0.0,1.0);
@@ -115,31 +112,31 @@ vec4 fp10Dither(vec4 color ,float dither){
 vec3 toClipSpace3Prev(vec3 viewSpacePosition) {
     return projMAD(gbufferPreviousProjection, viewSpacePosition) / -viewSpacePosition.z * 0.5 + 0.5;
 }
+
 vec3 tonemap(vec3 col){
 	return col/(1+luma(col));
 }
+
 vec3 invTonemap(vec3 col){
 	return col/(1-luma(col));
 }
+
 void convertHandDepth(inout float depth) {
     float ndcDepth = depth * 2.0 - 1.0;
     ndcDepth /= MC_HAND_DEPTH;
     depth = ndcDepth * 0.5 + 0.5;
 }
+
 float convertHandDepth2( float depth) {
     float ndcDepth = depth * 2.0 - 1.0;
     ndcDepth /= MC_HAND_DEPTH;
     return ndcDepth * 0.5 + 0.5;
 }
 
-
-
-float ld(float dist) {
-    return (2.0 * near) / (far + near - dist * (far - near));
-}
 float DH_ld(float dist) {
     return (2.0 * LOD_NEARPLANE) / (LOD_FARPLANE + LOD_NEARPLANE - dist * (LOD_FARPLANE - LOD_NEARPLANE));
 }
+
 float DH_inv_ld (float lindepth){
 	return -((2.0*LOD_NEARPLANE/lindepth)-LOD_FARPLANE-LOD_NEARPLANE)/(LOD_FARPLANE-LOD_NEARPLANE);
 }
@@ -147,6 +144,7 @@ float DH_inv_ld (float lindepth){
 float linearizeDepthFast(const in float depth, const in float near, const in float far) {
     return (near * far) / (depth * (near - far) + far);
 }
+
 float invertlinearDepthFast(const in float depth, const in float near, const in float far) {
 	return ((2.0*near/depth)-far-near)/(far-near);
 }

@@ -5,8 +5,6 @@
 #define WATER_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/util.glsl"
-#include "/lib/macro_lod_mod.glsl"
 
 flat varying vec3 zMults;
 flat varying vec3 WsunVec;
@@ -44,7 +42,6 @@ uniform float far;
 uniform float near;
 uniform float farPlane;
 
-
 uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferPreviousModelView;
@@ -69,6 +66,8 @@ uniform float fogEnd;
 uniform vec3 fogColor;
 uniform float eyeAltitude;
 
+#include "/lib/util.glsl"
+#include "/lib/macro_lod_mod.glsl"
 #include "/lib/waterBump.glsl"
 #include "/lib/res_params.glsl"
 
@@ -139,20 +138,12 @@ vec3 normVec (vec3 vec){
 	return vec*inversesqrt(dot(vec,vec));
 }
 
-float ld(float depth) {
-  return 1.0 / (zMults.y - depth * zMults.z);		// (-depth * (far - near)) = (2.0 * near)/ld - far - near
-}
-
-float linearize(float dist) {
-  return (2.0 * near) / (far + near - dist * (far - near));
-}
-
 float DH_ld(float dist) {
   return (2.0 * LOD_NEARPLANE) / (LOD_FARPLANE + LOD_NEARPLANE - dist * (LOD_FARPLANE - LOD_NEARPLANE));
 }
 
 float DH_inv_ld (float lindepth){
-	return -((2.0*LOD_NEARPLANE/lindepth)-LOD_FARPLANE-LOD_NEARPLANE)/(LOD_FARPLANE-LOD_NEARPLANE);
+	return -((2.0 * LOD_NEARPLANE / lindepth) - LOD_FARPLANE - LOD_NEARPLANE) / (LOD_FARPLANE - LOD_NEARPLANE);
 }
 
 float linearizeDepthFast(const in float depth, const in float near, const in float far) {
@@ -292,7 +283,7 @@ vec4 bilateralUpsample(vec2 fragcoord, sampler2D colortex, out float outerEdgeRe
 		#ifdef USING_LOD_MOD
 		  float offsetDepth = sqrt(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE,0).a/65000.0);
     #else
-      float offsetDepth = linearize(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE, 0).r);
+      float offsetDepth = linZ(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE, 0).r);
     #endif
 
     float edgeDiff = abs(offsetDepth - referenceDepth) < threshold ? 1.0 : 1e-7;
@@ -474,7 +465,7 @@ void main() {
   bool hand = depth < 0.56;
   float z = depth;
   float z2 = texelFetch(depthtex1, ivec2(gl_FragCoord.xy),0).x;
-  float frDepth = linearize(z);
+  float frDepth = linZ(z);
 
 	float swappedDepth = z;
 
@@ -568,7 +559,7 @@ void main() {
   #ifdef USING_LOD_MOD
     vec4 VLBehindTranslucents = bilateralUpsample(refractedCoord/texelSize, colortex13, blank, DH_mixedLinearZ, depthtex1, hand);
   #else
-    vec4 VLBehindTranslucents = bilateralUpsample(refractedCoord/texelSize, colortex13, blank, linearize(texelFetch(depthtex1, ivec2(refractedCoord/texelSize),0).x), depthtex1, hand);
+    vec4 VLBehindTranslucents = bilateralUpsample(refractedCoord/texelSize, colortex13, blank, linZ(texelFetch(depthtex1, ivec2(refractedCoord/texelSize),0).x), depthtex1, hand);
   #endif
   
   ////// --------------- START BLENDING FOGS AND FORWARD RENDERED COLOR

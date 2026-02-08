@@ -11,11 +11,9 @@
 #define VOLUMETRIC_FOG_RELATED_SETTINGS
 #define WATER_RELATED_SETTINGS
 
-#include "/lib/settings.glsl"
-#include "/lib/macro_lod_mod.glsl"
-#include "/lib/util.glsl"
-
 #define EXCLUDE_WRITE_TO_LUT
+
+#include "/lib/settings.glsl"
 
 flat varying vec4 lightCol;
 flat varying vec3 averageSkyCol;
@@ -33,9 +31,10 @@ uniform sampler2D colortex7;
 uniform sampler2D colortex10;
 uniform sampler2D colortex12;
 uniform sampler2D colortex14;
-
+uniform sampler2D colortex15;
 
 flat varying vec3 WsunVec;
+
 uniform vec3 sunVec;
 uniform float sunElevation;
 
@@ -70,6 +69,9 @@ uniform float eyeAltitude;
 uniform float caveDetection;
 uniform float skyLightLevelSmooth;
 uniform float waterEnteredAltitude;
+
+#include "/lib/macro_lod_mod.glsl"
+#include "/lib/util.glsl"
 
 vec4 blueNoise(vec2 coord){
   return texelFetch(colortex6, ivec2(coord)%512 , 0) ;

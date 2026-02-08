@@ -10,8 +10,6 @@
 #define VOLUMETRIC_FOG_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/macro_lod_mod.glsl"
-#include "/lib/res_params.glsl"
 
 // this is an emergency plain text that will be visible as an the log error when a user tries to use voxy and DH both at once.
 #if defined VOXY && defined DISTANT_HORIZONS 
@@ -34,6 +32,8 @@ flat varying float avgL2;
 flat varying float centerDepth;
 
 uniform sampler2D noisetex;
+uniform sampler2D depthtex0;
+uniform sampler2D depthtex1;
 uniform sampler2D colortex1;
 uniform sampler2D colortex4;
 
@@ -64,7 +64,7 @@ uniform float farPlane;
 uniform float dhFarPlane;
 uniform float dhNearPlane;
 uniform ivec2 eyeBrightnessSmooth;
-// uniform ivec2 eyeBrightness;
+uniform ivec2 eyeBrightness;
 uniform float caveDetection;
 uniform int isEyeInWater;
 
@@ -74,6 +74,8 @@ uniform bool worldTimeChangeCheck;
 uniform int hideGUI;
 
 #include "/lib/util.glsl"
+#include "/lib/res_params.glsl"
+#include "/lib/macro_lod_mod.glsl"
 #include "/lib/color_transforms.glsl"
 #include "/lib/ROBOBO_sky.glsl"
 #include "/lib/sky_gradient.glsl"

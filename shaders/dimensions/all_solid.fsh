@@ -196,11 +196,6 @@ vec3 toLinear(vec3 sRGB){
 	return sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);
 }
 
-
-float ld(float dist) {
-    return (2.0 * near) / (far + near - dist * (far - near));
-}
-
 vec4 readNoise(in vec2 coord){
 	return texture2DGradARB(noisetex,coord*vtexcoordam.pq + vtexcoordam.st,dcdx,dcdy);
 }

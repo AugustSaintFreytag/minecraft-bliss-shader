@@ -4,20 +4,14 @@
 #define SUB_SURFACE_SCATTERING_RELATED_SETTINGS
 #define INDIRECT_EFFECT_RELATED_SETTINGS
 #define AMBIENT_LIGHT_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
-#include "/lib/macro_lod_mod.glsl"
-#include "/lib/TAA_jitter.glsl"
 
 #ifndef DH_AMBIENT_OCCLUSION
 	#undef DISTANT_HORIZONS
 #endif
 
-
 flat varying vec3 WsunVec;
-
-
-#include "/lib/util.glsl"
-#include "/lib/res_params.glsl"
 
 uniform sampler2D depthtex0;
 uniform sampler2D depthtex1;
@@ -40,7 +34,6 @@ uniform sampler2D shadow;
 	uniform sampler2D shadowtex1;
 #endif
 
-
 uniform sampler2D noisetex;
 uniform vec3 sunVec;
 uniform vec2 texelSize;
@@ -50,10 +43,8 @@ uniform int frameCounter;
 uniform ivec2 eyeBrightnessSmooth;
 uniform ivec2 eyeBrightness;
 
-
 uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferModelView;
-
 
 uniform vec3 cameraPosition;
 uniform mat4 gbufferProjection;
@@ -74,11 +65,16 @@ uniform float near;
 uniform float dhFarPlane;
 uniform float dhNearPlane;
 
+#include "/lib/util.glsl"
+#include "/lib/res_params.glsl"
 #include "/lib/Shadows.glsl"
+#include "/lib/macro_lod_mod.glsl"
+#include "/lib/TAA_jitter.glsl"
 
 #define ffstep(x,y) clamp((y - x) * 1e35,0.0,1.0)
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
 #define  projMAD(m, v) (diagonal3(m) * (v) + (m)[3].xyz)
+
 vec3 toScreenSpace(vec3 p) {
 	vec4 iProjDiag = vec4(gbufferProjectionInverse[0].x, gbufferProjectionInverse[1].y, gbufferProjectionInverse[2].zw);
     vec3 p3 = p * 2. - 1.;
@@ -359,11 +355,6 @@ float encodeVec2(vec2 a){
 float encodeVec2(float x,float y){
     return encodeVec2(vec2(x,y));
 }
-
-float ld(float dist) {
-    return (2.0 * near) / (far + near - dist * (far - near));
-}
-
 
 #include "/lib/sky_gradient.glsl"
 
