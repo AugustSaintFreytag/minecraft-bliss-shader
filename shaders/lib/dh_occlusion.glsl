@@ -5,6 +5,7 @@
 
 struct DepthSample {
 	float value;
+	float raw;
 	vec3 pos;
 	bool isLOD;
 };
@@ -44,7 +45,11 @@ DepthSample getDepthSample(in vec2 pos) {
 		depthIsLOD = true;
 	}
 
-	return DepthSample(depth, depthViewPos, depthIsLOD);
+	return DepthSample(depth, depthBase, depthViewPos, depthIsLOD);
+}
+
+float hashNoise(float noise) {
+    return fract(sin(noise) * 43758.5453);
 }
 
 bool isWithinViewBounds(in vec2 pos) {
@@ -81,11 +86,18 @@ float getSunAngleDisocclusionFactor() {
 
 // Sun (New)
 
-float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise) {
-	const int samples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
-	const float stepSize = DH_VOLUMETRIC_OCCLUSION_STEP;
-	const int stepPacing = 2;
-	const float minStepSize = 1.0;
+vec3 bounceSampleClipPosIfBeyondBounds(vec3 clipPos) {
+	vec2 clipPosNorm = clipPos.xy / RENDER_SCALE;
+	vec2 bouncesNum = floor(abs(clipPosNorm));
+	vec2 bouncesRemainder = fract(abs(clipPosNorm));
+	vec2 mirroredClipPos = mix(bouncesRemainder, 1.0 - bouncesRemainder, mod(bouncesNum, 2.0)) * RENDER_SCALE;
+
+	return vec3(mirroredClipPos.x + bouncesNum.x * 0.01, mirroredClipPos.y + bouncesNum.y * 0.01, clipPos.z);
+}
+
+float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
+	const int maxSamples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
+	const float maxSampleDistance = DH_VOLUMETRIC_OCCLUSION_STEP;
 	const float depthBias = 0.001;
 	const float maxDistance = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
 
@@ -93,35 +105,64 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise) {
 	// View position and light direction are in view space.
 
 	float lightFacingFactor = 1.0 - smoothstep(0.0, 1.0, lightDir.z * 2);
+	float lightDistance = length(viewPos);
+	float lightDistanceFactor = clamp(lightDistance / maxDistance, 0.0, 1.0);
+	float lightDistanceFadeFactor = 1.0 - smoothstep(maxDistance * 0.25, maxDistance, lightDistance);
+
+	if (lightDistanceFadeFactor == 0.0) {
+		return 0.0;
+	}
+
+	// Pre-check if current sun angle makes occlusion impossible.
+
+	float sunAngleFactor = getSunAngleDisocclusionFactor();
+
+	if (sunAngleFactor == 1.0) {
+		return 0.0;
+	}
 
 	// If light direction in view space points away from camera, assume light is behind camera.
 	// View space z coordinate is < 0 in front, > 0 behind camera.
 
-	float lightNoise = noise;
-	vec3 lightRayViewPos = viewPos + lightDir * 100.0;
+	vec3 lightRayViewPos = viewPos + lightDir * 1000.0;
 	vec3 lightRayClipPos = viewToClipSpace(lightRayViewPos);
 	vec3 lightSampleStartPos = viewPos;
 
-	// float maxStepSize = mix(minStepSize, stepSize, lightFacingFactor);
-	float maxStepSize = stepSize;
-	float maxRayLength = samples * maxStepSize;
+	int samples = maxSamples;
+	float maxRayLength = maxSampleDistance;
+
+	if (fast) {
+		samples = 2;
+		maxRayLength = maxSampleDistance * 2.0;
+	}
+
+	float stepSize = maxRayLength / samples;
 
 	float occlusionAmount = 0.0;
 	int stepsSinceLastHit = 0;
 
 	for (int i=0; i < samples; i++) {
-		float sampleStepSize = mix(minStepSize, maxStepSize, clamp(stepsSinceLastHit / stepPacing, 0.0, 1.0));
-		vec3 lightDirStep = lightDir * maxStepSize;
-		vec3 sampleViewPos = lightSampleStartPos + lightDirStep * (float(i) + lightNoise);
+		float samplePower = 1.0;
+		float sampleNoise = hashNoise(noise + i);
+		float sampleStepSize = stepSize;
+
+		vec3 lightDirStep = lightDir * sampleStepSize;
+		vec3 sampleViewPos = lightSampleStartPos + sampleNoise + lightDirStep * (float(i) + 0.1);
 		vec3 sampleClipPos = viewToClipSpace(sampleViewPos);
 
-		DepthSample depthSample = getDepthSample(sampleClipPos.xy);
+		// Reject out of bounds with margin to allow for edge fill.
+		if (sampleClipPos.x < -0.05 || sampleClipPos.x > 1.05 || sampleClipPos.y < -0.05 || sampleClipPos.y > 1.05) {
+			break;
+		}
 
-		if (depthSample.pos.z > 10.0) {
+		sampleClipPos = bounceSampleClipPosIfBeyondBounds(sampleClipPos);
+		DepthSample depthSample = getDepthSample(sampleClipPos.xy);
+		
+		// Reject sky at maximum of linearized depth.
+		if (depthSample.value >= DEPTH_FAR_THRESHOLD) {
 			break;
 		}
 		
-		// float sampleDepthBias = mix(depthBias, depthBias * 0.1, lightFacingFactor);
 		float sampleDepthBias = depthBias;
 
 		if (depthSample.pos.z < sampleViewPos.z + sampleDepthBias) {
@@ -132,13 +173,14 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise) {
 
 		// Hit
 
-		float rayLength = i * stepSize;
-		float rayLengthFactor = clamp(1.0 - rayLength / maxRayLength * 0.25, 0.0, 1.0);
+		float rayLength = i * sampleStepSize;
+		float rayLengthFactor = 1.0 - rayLength / maxRayLength;
 
-		occlusionAmount += rayLengthFactor;
+		occlusionAmount += samplePower * 0.25;
 		stepsSinceLastHit = 0;
 	}
 
 	// Clip space is screen space.
-	return smoothstep(0.0, 1.0, occlusionAmount) * lightFacingFactor;
+	float outputOcclusion = (smoothstep(0.0, 1.0, occlusionAmount) * lightDistanceFadeFactor) * (1.0 - sunAngleFactor);
+	return outputOcclusion;
 }
