@@ -97,8 +97,8 @@ vec3 bounceSampleClipPosIfBeyondBounds(vec3 clipPos) {
 
 float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
 	const int maxSamples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
-	const float maxSampleDistance = DH_VOLUMETRIC_OCCLUSION_STEP;
-	const float depthBias = 0.001;
+	const float depthBias = DH_VOLUMETRIC_OCCLUSION_BIAS;
+	const float maxSampleDistance = DH_VOLUMETRIC_OCCLUSION_LENGTH;
 	const float maxDistance = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
 
 	// Light direction is the direction of the sun from the currently sampled position.
@@ -129,6 +129,7 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
 	vec3 lightSampleStartPos = viewPos;
 
 	int samples = maxSamples;
+	float sampleDepthBias = depthBias;
 	float maxRayLength = maxSampleDistance;
 
 	if (fast) {
@@ -162,8 +163,6 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
 		if (depthSample.value >= DEPTH_FAR_THRESHOLD) {
 			break;
 		}
-		
-		float sampleDepthBias = depthBias;
 
 		if (depthSample.pos.z < sampleViewPos.z + sampleDepthBias) {
 			// No Hit
