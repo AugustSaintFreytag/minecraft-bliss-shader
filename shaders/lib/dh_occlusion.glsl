@@ -29,23 +29,29 @@ vec3 viewToClipSpace(in vec3 pos) {
 
 DepthSample getDepthSample(in vec2 pos) {
 	float depth = 0.0;
+	float depthRaw = 0.0;
+
 	vec3 depthViewPos = vec3(0.0);
 	bool depthIsLOD = false;
 
 	ivec2 texcoord = clipToTexCoords(pos);
-	float depthBase = texelFetch(depthtex1, texcoord, 0).r;
+	float z0 = texelFetch(depthtex0, texcoord, 0).r;
+	float z1 = texelFetch(depthtex1, texcoord, 0).r;
+	float depthBase = min(z0, z1);
 
 	if (depthBase < 1.0) {
 		depth = swapperLinZ(depthBase, near, far * 4.0);
 		depthViewPos = clipToViewSpace(pos, depthBase, 0.0);
+		depthRaw = depthBase;
 	} else {
 		float depthLOD = texelFetch(LOD_DEPTHTEX1, texcoord, 0).r;
 		depth = swapperLinZ(depthLOD, LOD_NEARPLANE + far, LOD_FARPLANE);
 		depthViewPos = clipToViewSpace(pos, depthBase, depthLOD);
+		depthRaw = depthLOD;
 		depthIsLOD = true;
 	}
 
-	return DepthSample(depth, depthBase, depthViewPos, depthIsLOD);
+	return DepthSample(depth, depthRaw, depthViewPos, depthIsLOD);
 }
 
 float hashNoise(float noise) {
@@ -87,12 +93,27 @@ float getSunAngleDisocclusionFactor() {
 // Sun (New)
 
 vec3 bounceSampleClipPosIfBeyondBounds(vec3 clipPos) {
-	vec2 clipPosNorm = clipPos.xy / RENDER_SCALE;
+	vec2 clipPosNorm = clipPos.xy;
 	vec2 bouncesNum = floor(abs(clipPosNorm));
 	vec2 bouncesRemainder = fract(abs(clipPosNorm));
-	vec2 mirroredClipPos = mix(bouncesRemainder, 1.0 - bouncesRemainder, mod(bouncesNum, 2.0)) * RENDER_SCALE;
+	vec2 mirroredClipPos = mix(bouncesRemainder, 1.0 - bouncesRemainder, mod(bouncesNum, 2.0));
 
 	return vec3(mirroredClipPos.x + bouncesNum.x * 0.01, mirroredClipPos.y + bouncesNum.y * 0.01, clipPos.z);
+}
+
+bool sampleClipPosIsOutOfBounds(vec3 clipPos) {
+	// Reject out of bounds with margin to allow for edge fill.
+	return clipPos.x < -0.05 || clipPos.x > 1.05 || clipPos.y < -0.05 || clipPos.y > 1.05;
+}
+
+bool checkDepthPlaneHit(DepthSample depthSample, vec3 viewPos, float stepSize, float depthBias) {
+	float sceneZ = depthSample.pos.z;
+	float posZ = viewPos.z;
+	float deltaZ = sceneZ - posZ; // > 0.0 means hit is closer than origin
+	float distance = max(-posZ, 0.0);
+	float thickness = 0.02 + distance * 0.001 + stepSize * 0.5;
+
+	return deltaZ > depthBias && deltaZ < thickness;
 }
 
 float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
@@ -151,8 +172,7 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
 		vec3 sampleViewPos = lightSampleStartPos + sampleNoise + lightDirStep * (float(i) + 0.1);
 		vec3 sampleClipPos = viewToClipSpace(sampleViewPos);
 
-		// Reject out of bounds with margin to allow for edge fill.
-		if (sampleClipPos.x < -0.05 || sampleClipPos.x > 1.05 || sampleClipPos.y < -0.05 || sampleClipPos.y > 1.05) {
+		if (sampleClipPosIsOutOfBounds(sampleClipPos)) {
 			break;
 		}
 
@@ -160,11 +180,11 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
 		DepthSample depthSample = getDepthSample(sampleClipPos.xy);
 		
 		// Reject sky at maximum of linearized depth.
-		if (depthSample.value >= DEPTH_FAR_THRESHOLD) {
-			break;
+		if (depthSample.raw > 0.9999) {
+			continue;
 		}
 
-		if (depthSample.pos.z < sampleViewPos.z + sampleDepthBias) {
+		if (!checkDepthPlaneHit(depthSample, sampleViewPos, sampleStepSize, depthBias)) {
 			// No Hit
 			stepsSinceLastHit ++;
 			continue;
@@ -175,7 +195,7 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
 		float rayLength = i * sampleStepSize;
 		float rayLengthFactor = 1.0 - rayLength / maxRayLength;
 
-		occlusionAmount += samplePower * 0.25;
+		occlusionAmount += samplePower;
 		stepsSinceLastHit = 0;
 	}
 
