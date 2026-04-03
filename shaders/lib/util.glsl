@@ -86,9 +86,9 @@ vec3 saturate(vec3 color, float amount) {
 	return mix(vec3(luminance), color, amount);
 }
 
-vec3 lighten(vec3 color, float boost) {
+vec3 lighten(vec3 color, float boost, float pivot) {
 	float luminance = dot(color, lumCoeff);
-	float attenuation = 1.0 - pow(clamp(luminance, 0.0, 1.0), 3);   
+	float attenuation = pivot - pow(clamp(luminance, 0.0, 1.0), 3);   
 
 	return color * (1.0 + boost * attenuation);
 }
