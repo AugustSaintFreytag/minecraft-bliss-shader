@@ -12,6 +12,10 @@ struct DepthSample {
 
 // Utility
 
+float hashNoise(float noise) {
+    return fract(sin(noise) * 43758.5453);
+}
+
 vec3 clipToViewSpace(in vec2 pos, float depth, float depthLOD) {
 	return toScreenSpace_DH(pos.xy, depth, depthLOD);
 }
@@ -34,28 +38,72 @@ DepthSample getDepthSample(in vec2 pos) {
 	vec3 depthViewPos = vec3(0.0);
 	bool depthIsLOD = false;
 
-	ivec2 texcoord = clipToTexCoords(pos);
-	float z0 = texelFetch(depthtex0, texcoord, 0).r;
-	float z1 = texelFetch(depthtex1, texcoord, 0).r;
-	float depthBase = min(z0, z1);
+	// All clip XY we use are in the same scaled space as other screenspace effects.
+	// Convert back to unscaled UVs for depth fetches + view reconstruction.
+	// Depth buffers are TAA-jittered, apply compensation.
+	vec2 uv = pos / RENDER_SCALE - taaJitter * texelSize * 0.5;
+	ivec2 texcoord = clipToTexCoords(uv);
+
+	// Use small 2x2 sample pattern to catch thin geometry.
+	// Remedy sampling gaps where a single texel fetch hits sky.
+	ivec2 res = textureSize(depthtex0, 0);
+	ivec2 p00 = clamp(texcoord, ivec2(0), res - 1);
+	ivec2 p10 = clamp(texcoord + ivec2(1, 0), ivec2(0), res - 1);
+	ivec2 p01 = clamp(texcoord + ivec2(0, 1), ivec2(0), res - 1);
+	ivec2 p11 = clamp(texcoord + ivec2(1, 1), ivec2(0), res - 1);
+
+	// If we take min depth from a neighbor texel but reconstruct view position
+	// using the center UV, we get a mismatch that presents as light bleed.
+	// Track the UV of the winning texel and reconstruct from that.
+	vec2 uv00 = (vec2(p00) + 0.5) * texelSize;
+	vec2 uv10 = (vec2(p10) + 0.5) * texelSize;
+	vec2 uv01 = (vec2(p01) + 0.5) * texelSize;
+	vec2 uv11 = (vec2(p11) + 0.5) * texelSize;
+
+	float z0_00 = texelFetch(depthtex0, p00, 0).r;
+	float z0_10 = texelFetch(depthtex0, p10, 0).r;
+	float z0_01 = texelFetch(depthtex0, p01, 0).r;
+	float z0_11 = texelFetch(depthtex0, p11, 0).r;
+
+	float z1_00 = texelFetch(depthtex1, p00, 0).r;
+	float z1_10 = texelFetch(depthtex1, p10, 0).r;
+	float z1_01 = texelFetch(depthtex1, p01, 0).r;
+	float z1_11 = texelFetch(depthtex1, p11, 0).r;
+
+	float depthBase = z0_00;
+	vec2 uvMin = uv00;
+	if (z0_10 < depthBase) { depthBase = z0_10; uvMin = uv10; }
+	if (z0_01 < depthBase) { depthBase = z0_01; uvMin = uv01; }
+	if (z0_11 < depthBase) { depthBase = z0_11; uvMin = uv11; }
+
+	if (z1_00 < depthBase) { depthBase = z1_00; uvMin = uv00; }
+	if (z1_10 < depthBase) { depthBase = z1_10; uvMin = uv10; }
+	if (z1_01 < depthBase) { depthBase = z1_01; uvMin = uv01; }
+	if (z1_11 < depthBase) { depthBase = z1_11; uvMin = uv11; }
 
 	if (depthBase < 1.0) {
 		depth = swapperLinZ(depthBase, near, far * 4.0);
-		depthViewPos = clipToViewSpace(pos, depthBase, 0.0);
+		depthViewPos = clipToViewSpace(uvMin, depthBase, 0.0);
 		depthRaw = depthBase;
 	} else {
-		float depthLOD = texelFetch(LOD_DEPTHTEX1, texcoord, 0).r;
+		float zLod00 = texelFetch(LOD_DEPTHTEX1, p00, 0).r;
+		float zLod10 = texelFetch(LOD_DEPTHTEX1, p10, 0).r;
+		float zLod01 = texelFetch(LOD_DEPTHTEX1, p01, 0).r;
+		float zLod11 = texelFetch(LOD_DEPTHTEX1, p11, 0).r;
+
+		float depthLOD = zLod00;
+		vec2 uvLodMin = uv00;
+		if (zLod10 < depthLOD) { depthLOD = zLod10; uvLodMin = uv10; }
+		if (zLod01 < depthLOD) { depthLOD = zLod01; uvLodMin = uv01; }
+		if (zLod11 < depthLOD) { depthLOD = zLod11; uvLodMin = uv11; }
+
 		depth = swapperLinZ(depthLOD, LOD_NEARPLANE + far, LOD_FARPLANE);
-		depthViewPos = clipToViewSpace(pos, depthBase, depthLOD);
+		depthViewPos = clipToViewSpace(uvLodMin, 1.0, depthLOD);
 		depthRaw = depthLOD;
 		depthIsLOD = true;
 	}
 
 	return DepthSample(depth, depthRaw, depthViewPos, depthIsLOD);
-}
-
-float hashNoise(float noise) {
-    return fract(sin(noise) * 43758.5453);
 }
 
 bool isWithinViewBounds(in vec2 pos) {
