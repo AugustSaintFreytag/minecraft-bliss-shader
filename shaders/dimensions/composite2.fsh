@@ -585,7 +585,9 @@ void main() {
 
 	#if defined OVERWORLD_SHADER && defined DH_VOLUMETRIC_OCCLUSION
 		vec3 lightDir = normalize(sunVec * lightCol.a);
-		float sunVisibility = getDHSunVisibility(viewPos0, lightDir, BN.x, z0);
+		bool sunShadowSourceIsLOD = z0 >= 1.0;
+
+		float sunShadow = getSunShadow(viewPos0, lightDir, BN.x, false, sunShadowSourceIsLOD);
 
 		// Sun Angle Factor Debugging Display
 		// if (gl_FragCoord.x < 100 && gl_FragCoord.y < 100) {

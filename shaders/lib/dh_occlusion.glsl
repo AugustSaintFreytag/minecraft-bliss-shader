@@ -21,11 +21,15 @@ ivec2 clipToTexCoords(in vec2 pos) {
 	return ivec2(pos / texelSize);
 }
 
-vec3 viewToClipSpace(in vec3 pos) {
-	vec3 clipPos = toClipSpace3_DH(pos, true);
+vec3 viewToClipSpace(in vec3 pos, bool depthCheck) {
+	vec3 clipPos = toClipSpace3_DH(pos, depthCheck);
 	clipPos.xy *= RENDER_SCALE;
 
 	return clipPos;
+}
+
+vec3 viewToClipSpace(in vec3 pos) {
+	return viewToClipSpace(pos, true);
 }
 
 DepthSample getDepthSample(in vec2 pos) {
@@ -104,8 +108,8 @@ DepthSample getDepthSample(in vec2 pos) {
 }
 
 bool isWithinViewBounds(in vec2 pos) {
-	vec2 viewBounds = 2.0 / vec2(viewWidth, viewHeight);
-	return !(pos.x <= viewBounds.x || pos.x >= 1.0 - viewBounds.x || pos.y <= viewBounds.y || pos.y >= 1.0 - viewBounds.y);
+	vec2 viewBounds = 2.0 / vec2(viewWidth, viewHeight) * RENDER_SCALE;
+	return !(pos.x <= viewBounds.x || pos.x >= RENDER_SCALE.x - viewBounds.x || pos.y <= viewBounds.y || pos.y >= RENDER_SCALE.y - viewBounds.y);
 }
 
 // Daylight Disocclusion
@@ -135,560 +139,240 @@ float getSunAngleDisocclusionFactor() {
 	return clamp(transitionProgress, 0.0, 1.0);
 }
 
-// Sun Shadow (Edition I)
+// Sun Shadow
 
-vec3 bounceSampleClipPosIfBeyondBounds(vec3 clipPos) {
-	vec2 clipPosNorm = clipPos.xy;
-	vec2 bouncesNum = floor(abs(clipPosNorm));
-	vec2 bouncesRemainder = fract(abs(clipPosNorm));
-	vec2 mirroredClipPos = mix(bouncesRemainder, 1.0 - bouncesRemainder, mod(bouncesNum, 2.0));
+struct SunShadowRay {
+	vec3 clipStart;
+	vec3 clipStep;
+	vec3 viewStart;
+	vec3 viewStep;
+	float pointDistance;
+	float rayLength;
+	int sampleCount;
+	bool depthCheck;
+};
 
-	return vec3(mirroredClipPos.x + bouncesNum.x * 0.01, mirroredClipPos.y + bouncesNum.y * 0.01, clipPos.z);
-}
+// Helpers
 
-bool sampleClipPosIsOutOfBounds(vec3 clipPos) {
-	// Reject out of bounds with margin to allow for edge fill.
-	vec2 maxBounds = RENDER_SCALE;
-	return clipPos.x < -0.05 || clipPos.x > maxBounds.x + 0.05 || clipPos.y < -0.05 || clipPos.y > maxBounds.y + 0.05;
-}
+const int SUN_SHADOW_SUPPORT_WINDOW = 4;
+const float SUN_SHADOW_SUPPORT_THRESHOLD = 2.6;
+const float SUN_SHADOW_BOOTSTRAP_STEPS = 2.0;
+const float SUN_SHADOW_START_JITTER = 0.45;
+const float SUN_SHADOW_VANILLA_THICKNESS = 1.25;
+const float SUN_SHADOW_LOD_THICKNESS = 3.0;
 
-bool checkDepthPlaneHit(DepthSample depthSample, vec3 viewPos, float stepSize, float depthBias) {
-	float sceneZ = depthSample.pos.z;
-	float posZ = viewPos.z;
-	float deltaZ = sceneZ - posZ; // > 0.0 means hit is closer than origin
-	float distance = max(-posZ, 0.0);
-	float thickness = 0.02 + distance * 0.001 + stepSize * 0.5;
+float getSunFacingFactor(in vec3 viewPos, in vec3 lightDir) {
+	float pointDistance = length(viewPos);
 
-	return deltaZ > depthBias && deltaZ < thickness;
-}
-
-float getSunShadow_1Level(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
-	const int maxSamples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
-	const float depthBias = DH_VOLUMETRIC_OCCLUSION_BIAS;
-	const float maxSampleDistance = DH_VOLUMETRIC_OCCLUSION_LENGTH;
-	const float maxDistance = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
-
-	// Light direction is the direction of the sun from the currently sampled position.
-	// View position and light direction are in view space.
-
-	float lightFacingFactor = 1.0 - smoothstep(0.0, 1.0, lightDir.z * 2);
-	float lightDistance = length(viewPos);
-	float lightDistanceFactor = clamp(lightDistance / maxDistance, 0.0, 1.0);
-	float lightDistanceFadeFactor = 1.0 - smoothstep(maxDistance * 0.25, maxDistance, lightDistance);
-
-	if (lightDistanceFadeFactor == 0.0) {
+	if (pointDistance <= 1e-4) {
 		return 0.0;
 	}
 
-	// Pre-check if current sun angle makes occlusion impossible.
-
-	float sunAngleFactor = getSunAngleDisocclusionFactor();
-
-	if (sunAngleFactor == 1.0) {
-		return 0.0;
-	}
-
-	// If light direction in view space points away from camera, assume light is behind camera.
-	// View space z coordinate is < 0 in front, > 0 behind camera.
-
-	vec3 lightRayViewPos = viewPos + lightDir * 1000.0;
-	vec3 lightRayClipPos = viewToClipSpace(lightRayViewPos);
-	vec3 lightSampleStartPos = viewPos;
-
-	int samples = maxSamples;
-	float sampleDepthBias = depthBias;
-	float maxRayLength = maxSampleDistance;
-
-	if (fast) {
-		samples = 2;
-		maxRayLength = maxSampleDistance * 2.0;
-	}
-
-	float stepSize = maxRayLength / samples;
-
-	float occlusionAmount = 0.0;
-	int stepsSinceLastHit = 0;
-
-	for (int i=0; i < samples; i++) {
-		float samplePower = 1.0;
-		float sampleNoise = hashNoise(noise + i);
-		float sampleStepSize = stepSize;
-
-		vec3 lightDirStep = lightDir * sampleStepSize;
-		vec3 sampleViewPos = lightSampleStartPos + sampleNoise + lightDirStep * (float(i) + 0.1);
-		vec3 sampleClipPos = viewToClipSpace(sampleViewPos);
-
-		if (sampleClipPosIsOutOfBounds(sampleClipPos)) {
-			break;
-		}
-
-		sampleClipPos = bounceSampleClipPosIfBeyondBounds(sampleClipPos);
-		DepthSample depthSample = getDepthSample(sampleClipPos.xy);
-		
-		// Reject sky at maximum of linearized depth.
-		if (depthSample.raw > 0.9999) {
-			continue;
-		}
-
-		if (!checkDepthPlaneHit(depthSample, sampleViewPos, sampleStepSize, depthBias)) {
-			// No Hit
-			stepsSinceLastHit ++;
-			continue;
-		}
-
-		// Hit
-
-		float rayLength = i * sampleStepSize;
-		float rayLengthFactor = 1.0 - rayLength / maxRayLength;
-
-		occlusionAmount += samplePower;
-		stepsSinceLastHit = 0;
-	}
-
-	// Clip space is screen space.
-	float outputOcclusion = (smoothstep(0.0, 1.0, occlusionAmount) * lightDistanceFadeFactor) * (1.0 - sunAngleFactor);
-	return outputOcclusion;
+	return smoothstep(0.15, 0.65, dot(viewPos / pointDistance, normalize(lightDir)));
 }
 
-// Sun Shadow (Edition II)
-
-bool depthRawIsSky(float rawDepth) {
-	return rawDepth >= 0.9999;
+bool shouldSkipSunShadow(float pointDistance, float sunFacingFactor, float sunAngleFactor, int maxSamples, float maxDistance) {
+	return maxSamples <= 0 || pointDistance > maxDistance || sunAngleFactor >= 0.99 || sunFacingFactor <= 0.0;
 }
 
-bool evalDepthDeltaZ(in vec3 rayViewPos, in vec2 clipPosXY, out float dz, out DepthSample depthSample) {
-	depthSample = getDepthSample(clipPosXY);
-	if (depthRawIsSky(depthSample.raw)) {
-		dz = 0.0;
+float getSunShadowRayDepth(in vec3 viewPos, bool depthCheck) {
+	vec3 clipPos = toClipSpace3_DH(viewPos, depthCheck);
+
+	if (depthCheck) {
+		return swapperLinZ(clipPos.z, LOD_NEARPLANE + far, LOD_FARPLANE);
+	}
+
+	return swapperLinZ(clipPos.z, near, far * 4.0);
+}
+
+DepthSample getSunOcclusionDepthSample(in vec2 pos) {
+	vec2 pixelStep = texelSize * RENDER_SCALE;
+	
+	DepthSample bestSample = getDepthSample(pos + vec2(-pixelStep.x, -pixelStep.y));
+	DepthSample candidateSample = getDepthSample(pos + vec2(0.0, -pixelStep.y));
+
+	if (candidateSample.value < bestSample.value) {
+		bestSample = candidateSample;
+	}
+
+	candidateSample = getDepthSample(pos + vec2(pixelStep.x, -pixelStep.y));
+	if (candidateSample.value < bestSample.value) {
+		bestSample = candidateSample;
+	}
+
+	candidateSample = getDepthSample(pos + vec2(-pixelStep.x, 0.0));
+	if (candidateSample.value < bestSample.value) {
+		bestSample = candidateSample;
+	}
+
+	candidateSample = getDepthSample(pos);
+	if (candidateSample.value < bestSample.value) {
+		bestSample = candidateSample;
+	}
+
+	candidateSample = getDepthSample(pos + vec2(pixelStep.x, 0.0));
+	if (candidateSample.value < bestSample.value) {
+		bestSample = candidateSample;
+	}
+
+	candidateSample = getDepthSample(pos + vec2(-pixelStep.x, pixelStep.y));
+	if (candidateSample.value < bestSample.value) {
+		bestSample = candidateSample;
+	}
+
+	candidateSample = getDepthSample(pos + vec2(0.0, pixelStep.y));
+	if (candidateSample.value < bestSample.value) {
+		bestSample = candidateSample;
+	}
+
+	candidateSample = getDepthSample(pos + vec2(pixelStep.x, pixelStep.y));
+	if (candidateSample.value < bestSample.value) {
+		bestSample = candidateSample;
+	}
+
+	return bestSample;
+}
+
+SunShadowRay setupSunShadowRay(in vec3 viewPos, in vec3 lightDir, float maxSampleDistance, int maxSamples, bool fast, bool sourceIsLOD) {
+	SunShadowRay ray;
+
+	ray.pointDistance = length(viewPos);
+	ray.depthCheck = sourceIsLOD;
+	ray.sampleCount = fast ? max(1, min(maxSamples, max(maxSamples / 2, 4))) : max(1, maxSamples);
+
+	float clipNear = ray.depthCheck ? LOD_NEARPLANE : near;
+	float clipFar = ray.depthCheck ? LOD_FARPLANE : far * 4.0;
+	float rayLength = clipFar * sqrt(3.0);
+
+	if (abs(lightDir.z) > 1e-4 && (viewPos.z + lightDir.z * rayLength) > -clipNear) {
+		rayLength = (-clipNear - viewPos.z) / lightDir.z;
+	}
+
+	ray.rayLength = clamp(min(rayLength, maxSampleDistance), 0.0, maxSampleDistance);
+
+	vec3 rayEndViewPos = viewPos + lightDir * ray.rayLength;
+	vec3 clipStart = viewToClipSpace(viewPos, ray.depthCheck);
+	vec3 clipEnd = viewToClipSpace(rayEndViewPos, ray.depthCheck);
+	float sampleCount = max(float(ray.sampleCount), 1.0);
+
+	ray.clipStart = clipStart;
+	ray.clipStep = (clipEnd - clipStart) / sampleCount;
+	ray.viewStart = viewPos;
+	ray.viewStep = (rayEndViewPos - viewPos) / sampleCount;
+
+	return ray;
+}
+
+bool isSunShadowBlockerCandidate(DepthSample depthSample, float rayDepth, float depthBias) {
+	if (!depthSample.isLOD && depthSample.raw >= 1.0) {
 		return false;
 	}
 
-	// View space z is negative in front of camera.
-	dz = depthSample.pos.z - rayViewPos.z;
-	return true;
-}
-
-bool refineCrossingHit(
-	in vec3 originViewPos,
-	in vec3 lightDir,
-	in vec2 depthJitter,
-	in float tNearIn,
-	in float tFarIn,
-	in float stepForThickness,
-	in float depthBiasBase,
-	out float tHitOut
-) {
-	float tNear = tNearIn;
-	float tFar = tFarIn;
-
-	DepthSample dsMid;
-	for (int j = 0; j < 5; j++) {
-		float tMid = 0.5 * (tNear + tFar);
-		vec3 midViewPos = originViewPos + lightDir * tMid;
-		vec3 midClipPos = viewToClipSpace(midViewPos);
-		midClipPos.xy += depthJitter;
-		if (sampleClipPosIsOutOfBounds(midClipPos)) {
-			tFar = tMid;
-			continue;
-		}
-		float dzMid;
-		bool valid = evalDepthDeltaZ(midViewPos, midClipPos.xy, dzMid, dsMid);
-		if (!valid) {
-			// No surface at this UV (sky): treat as still in front.
-			tNear = tMid;
-			continue;
-		}
-		if (dzMid > 0.0) {
-			tFar = tMid;
-		} else {
-			tNear = tMid;
-		}
-	}
-
-	vec3 hitViewPos = originViewPos + lightDir * tFar;
-	vec3 hitClipPos = viewToClipSpace(hitViewPos);
-	hitClipPos.xy += depthJitter;
-	DepthSample dsHit;
-	float dzHit;
-	bool validHit = evalDepthDeltaZ(hitViewPos, hitClipPos.xy, dzHit, dsHit);
-	if (!validHit) {
+	float depthDelta = rayDepth - depthSample.value;
+	if (depthDelta <= 0.0) {
 		return false;
 	}
 
-	float dist = max(-hitViewPos.z, 0.0);
-	float grazing = 1.0 / max(abs(lightDir.z), 0.15);
+	float thicknessScale = depthSample.isLOD ? SUN_SHADOW_LOD_THICKNESS : SUN_SHADOW_VANILLA_THICKNESS;
+	float blockerThickness = max(thicknessScale, rayDepth * depthBias * thicknessScale);
 
-	float depthBias = depthBiasBase + dist * 0.0005 * grazing + stepForThickness * 0.01;
-	float thickness = 0.03 + dist * 0.0015 * grazing + max(0.25, stepForThickness * 2.0) * grazing;
-
-	if (dzHit > depthBias && dzHit < thickness) {
-		tHitOut = tFar;
-		return true;
-	}
-
-	return false;
+	return depthDelta <= blockerThickness;
 }
 
-float getSunShadow_2Level(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
-	int maxSamples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;
-	float depthBiasBase = DH_VOLUMETRIC_OCCLUSION_BIAS;
-	float maxSampleDistance = DH_VOLUMETRIC_OCCLUSION_LENGTH;
-	float maxDistance = DH_VOLUMETRIC_OCCLUSION_DISTANCE;
-
-	float lightDistance = length(viewPos);
-	float lightDistanceFadeFactor = 1.0 - smoothstep(maxDistance * 0.25, maxDistance, lightDistance);
-
-	if (maxSamples == 0 || lightDistanceFadeFactor == 0.0) {
+float getSunShadowBlockerSupport(DepthSample depthSample, float rayDepth, float depthBias, float sampleIndex) {
+	if (!isSunShadowBlockerCandidate(depthSample, rayDepth, depthBias)) {
 		return 0.0;
 	}
+
+	float thicknessScale = depthSample.isLOD ? SUN_SHADOW_LOD_THICKNESS : SUN_SHADOW_VANILLA_THICKNESS;
+	float blockerThickness = max(thicknessScale, rayDepth * depthBias * thicknessScale);
+	float depthDelta = rayDepth - depthSample.value;
+	float normalizedCoverage = 1.0 - clamp(depthDelta / max(blockerThickness, 1e-4), 0.0, 1.0);
+	float bootstrapWeight = sampleIndex < SUN_SHADOW_BOOTSTRAP_STEPS ? 1.35 : 1.0;
+
+	return max(normalizedCoverage, 0.35) * bootstrapWeight;
+}
+
+float finalizeSunShadow(float baseOcclusion, float sunFacingFactor, float sunAngleFactor) {
+	return clamp(baseOcclusion * sunFacingFactor * (1.0 - sunAngleFactor), 0.0, 1.0);
+}
+
+
+float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bool sourceIsLOD) {
+	// This is the function.
+
+	// It should provide a reasonable level of sun shadowing from the sampled position towards the sun.
+
+	// Occlusion between the player and the sun should be prioritised while arbitrary positions in the 
+	// landscape where the player isn't even facing the sun should be ignored. This will also help us prevent overt artifacting.
+	// Its main job is to detect large occluders (e.g. mountains) while thing occluders (trees) can be safely ignored.
+	// The occlusion value itself should later be usable to suppress volumetric effects caused by direct sunlight.
+
+	// Also use sun angle disocclusion to detect when sun occlusion is practically impossible due to steep angles.
+	// Leave this instruction comment intant and add your code below.
+
+	const int maxSamples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;			// Max number of samples, configurable performance option.
+	const float depthBias = DH_VOLUMETRIC_OCCLUSION_BIAS;			// Relative fraction of ray depth used as occlusion tolerance.
+	const float maxSampleDistance = DH_VOLUMETRIC_OCCLUSION_LENGTH;	// Max length for an occlusion ray cast if applicable.
+	const float maxDistance = DH_VOLUMETRIC_OCCLUSION_DISTANCE;		// Max distance between player camera and sampled point.
 
 	float sunAngleFactor = getSunAngleDisocclusionFactor();
+	float sunFacingFactor = getSunFacingFactor(viewPos, lightDir);
 
-	if (sunAngleFactor == 1.0) {
+	SunShadowRay ray = setupSunShadowRay(viewPos, lightDir, maxSampleDistance, maxSamples, fast, sourceIsLOD);
+
+	if (shouldSkipSunShadow(ray.pointDistance, sunFacingFactor, sunAngleFactor, maxSamples, maxDistance) || ray.rayLength <= 0.0) {
 		return 0.0;
 	}
 
-	int fineSamples = maxSamples;
-	float maxRayLength = maxSampleDistance;
+	float currentStreak = 0.0;
+	float maxStreak = 0.0;
+	float supportWindow[SUN_SHADOW_SUPPORT_WINDOW] = float[](0.0, 0.0, 0.0, 0.0);
+	float supportTotal = 0.0;
+	float maxSupport = 0.0;
+	float stepOffset = hashNoise(noise) * SUN_SHADOW_START_JITTER;
 
-	if (fast) {
-		fineSamples = 2;
-		maxRayLength = maxSampleDistance * 2.0;
-	}
-
-	// Coarse Pass
-
-	// Fewer and longer steps to detect depth crossing as pre-check.
-	// Bound so increasing sample counts don't over-restrict.
-	int coarseSteps = clamp(fineSamples / 2, 4, 16);
-	float coarseStep = maxRayLength / float(coarseSteps);
-	float fineStep = maxRayLength / float(max(fineSamples, 1));
-
-	// Apply stable per-ray depth UV jitter to break banding.
-	// Use a 2D jitter in the ray's screen-space basis (dir + perp) 
-	// so we don't lock to depth texel columns (vertical line artifacts). 
-	// Seed with `taaJitter` so TAA can integrate it over time.
-	vec2 originClipXY = viewToClipSpace(viewPos).xy;
-	vec2 endClipXY = viewToClipSpace(viewPos + lightDir * maxRayLength).xy;
-	vec2 rayDirClip = endClipXY - originClipXY;
-	vec2 rayDirN = rayDirClip / max(length(rayDirClip), 1e-6);
-	vec2 rayPerp = vec2(-rayDirClip.y, rayDirClip.x);
-	
-	float rayPerpLen = max(length(rayPerp), 1e-6);
-	rayPerp /= rayPerpLen;
-
-	vec2 pixelScaled = texelSize * RENDER_SCALE;
-	
-	float pixel = max(pixelScaled.x, pixelScaled.y);
-	float frameSeed = dot(taaJitter, vec2(113.1, 17.7));
-	float jitterA = hashNoise(noise + 91.7 + frameSeed);
-	float jitterB = hashNoise(noise + 93.1 + frameSeed);
-	
-	vec2 depthJitter = (rayDirN * (jitterA - 0.5) + rayPerp * (jitterB - 0.5)) * pixel * 0.85;
-
-	bool occluded = false;
-	bool hasBest = false;
-
-	float bestDzAdj = -1e20;
-	float bestNearMiss = 0.0;
-
-	float tPrev = 0.0;
-	float dzPrev = 0.0;
-	bool hasPrev = false;
-	vec2 clipPrev = vec2(0.0);
+	vec3 marchedClipPos = ray.clipStart + ray.clipStep * stepOffset;
+	vec3 marchedViewPos = ray.viewStart + ray.viewStep * stepOffset;
 
 	for (int i = 0; i < maxSamples; i++) {
-		if (i >= coarseSteps) {
+		if (i >= ray.sampleCount) {
 			break;
 		}
 
-		float sampleNoise = hashNoise(noise + float(i));
-		
-		// Keep jitter conservative so higher sample counts don't overreach thin edges.
-		float jitter = (sampleNoise - 0.5) * coarseStep * 0.25;
-		float t = (float(i) + 1.0) * coarseStep + jitter;
-		
-		t = clamp(t, 0.0, maxRayLength);
-
-		vec3 rayViewPos = viewPos + lightDir * t;
-		vec3 rayClipPos = viewToClipSpace(rayViewPos);
-		
-		rayClipPos.xy += depthJitter;
-
-		if (sampleClipPosIsOutOfBounds(rayClipPos)) {
+		if (!isWithinViewBounds(marchedClipPos.xy)) {
 			break;
 		}
 
-		// Skip sky samples (no surface at this UV). Keep marching.
-		DepthSample dsCoarse;
-		float dz;
-		bool valid = evalDepthDeltaZ(rayViewPos, rayClipPos.xy, dz, dsCoarse);
+		float rayDepth = getSunShadowRayDepth(marchedViewPos, ray.depthCheck);
+		DepthSample depthSample = getSunOcclusionDepthSample(marchedClipPos.xy);
 
-		if (!valid) {
-			continue;
-		}
+		float support = getSunShadowBlockerSupport(depthSample, rayDepth, depthBias, float(i));
 
-		// SSR-style thickness test: if we land within a depth thickness band, accept occlusion
-		// even if we don't catch a clean sign crossing at low sample counts.
-		float dist = max(-rayViewPos.z, 0.0);
-		float grazing = 1.0 / max(abs(lightDir.z), 0.15);
-		float depthBias = depthBiasBase + dist * 0.0005 * grazing + coarseStep * 0.01;
-		float thickness = 0.03 + dist * 0.0015 * grazing + max(0.25, coarseStep * 2.0) * grazing;
-		float nearMiss = thickness * 0.45;
-		float dzAdj = dz - depthBias;
+		supportTotal -= supportWindow[i % SUN_SHADOW_SUPPORT_WINDOW];
+		supportWindow[i % SUN_SHADOW_SUPPORT_WINDOW] = support;
+		supportTotal += support;
+		maxSupport = max(maxSupport, supportTotal);
 
-		if (!hasBest || dzAdj > bestDzAdj) {
-			hasBest = true;
-			bestDzAdj = dzAdj;
-			bestNearMiss = nearMiss;
-		}
+		if (support > 0.0) {
+			currentStreak += 1.0;
+			maxStreak = max(maxStreak, currentStreak);
 
-		if (dzAdj > 0.0 && dz < thickness) {
-			occluded = true;
-			break;
-		}
-
-		if (!hasPrev) {
-			hasPrev = true;
-			// If our very first valid sample is already behind the depth surface,
-			// bracket from the start (t=0) so we don't miss big nearby occluders.
-			if (dz > 0.0) {
-				float tHit;
-				if (refineCrossingHit(viewPos, lightDir, depthJitter, 0.0, t, fineStep, depthBiasBase, tHit)) {
-					occluded = true;
-					break;
-				}
-			}
-
-			tPrev = t;
-			dzPrev = dz;
-			clipPrev = rayClipPos.xy;
-			continue;
-		}
-
-		// Adaptive subdivision: if we advanced multiple pixels since the last valid sample,
-		// insert 1-2 mid probes to avoid skipping thin silhouettes (foliage/ridges) at low sample counts.
-		float deltaPix = length((rayClipPos.xy - clipPrev) / max(pixelScaled, vec2(1e-6)));
-		int extraProbes = (deltaPix > 3.5) ? 2 : ((deltaPix > 1.75) ? 1 : 0);
-		for (int e = 1; e <= 2; e++) {
-			if (e > extraProbes) {
+			if (fast && supportTotal >= SUN_SHADOW_SUPPORT_THRESHOLD) {
 				break;
 			}
-			float tE = mix(tPrev, t, float(e) / float(extraProbes + 1));
-			vec3 eViewPos = viewPos + lightDir * tE;
-			vec3 eClipPos = viewToClipSpace(eViewPos);
-			eClipPos.xy += depthJitter;
-			if (sampleClipPosIsOutOfBounds(eClipPos)) {
-				continue;
-			}
-			DepthSample dsE;
-			float dzE;
-			bool validE = evalDepthDeltaZ(eViewPos, eClipPos.xy, dzE, dsE);
-			if (!validE) {
-				continue;
-			}
-
-			float distE = max(-eViewPos.z, 0.0);
-			float grazingE = 1.0 / max(abs(lightDir.z), 0.15);
-			float depthBiasE = depthBiasBase + distE * 0.0005 * grazingE + coarseStep * 0.01;
-			float thicknessE = 0.03 + distE * 0.0015 * grazingE + max(0.25, coarseStep * 2.0) * grazingE;
-			float nearMissE = thicknessE * 0.45;
-			float dzAdjE = dzE - depthBiasE;
-			if (!hasBest || dzAdjE > bestDzAdj) {
-				hasBest = true;
-				bestDzAdj = dzAdjE;
-				bestNearMiss = nearMissE;
-			}
-			if (dzAdjE > 0.0 && dzE < thicknessE) {
-				occluded = true;
-				break;
-			}
-			if (dzPrev <= 0.0 && dzE > 0.0) {
-				float tHit;
-				if (refineCrossingHit(viewPos, lightDir, depthJitter, tPrev, tE, fineStep, depthBiasBase, tHit)) {
-					occluded = true;
-					break;
-				}
-			}
-
-			tPrev = tE;
-			dzPrev = dzE;
-			clipPrev = eClipPos.xy;
-		}
-		if (occluded) {
-			break;
+		} else {
+			currentStreak = 0.0;
 		}
 
-		// Crossing test: ray went from in front of depth surface to behind it.
-		if (dzPrev <= 0.0 && dz > 0.0) {
-			float tHit;
-			if (refineCrossingHit(viewPos, lightDir, depthJitter, tPrev, t, fineStep, depthBiasBase, tHit)) {
-				occluded = true;
-				break;
-			}
-		}
-
-		tPrev = t;
-		dzPrev = dz;
-		clipPrev = rayClipPos.xy;
+		marchedClipPos += ray.clipStep;
+		marchedViewPos += ray.viewStep;
 	}
 
-	// Optional Fine Pass
+	float streakThreshold = fast ? 3.0 : 4.0;
+	float streakOcclusion = smoothstep(2.0, streakThreshold, maxStreak);
+	float supportOcclusion = smoothstep(1.8, SUN_SHADOW_SUPPORT_THRESHOLD, maxSupport);
+	float baseOcclusion = max(streakOcclusion * 0.6, supportOcclusion);
 
-	// If no occlusion was found in coarse pass, do a higher-res march.
-	// Scale with `DH_VOLUMETRIC_OCCLUSION_SAMPLES`. 
-	// This makes higher sample counts strictly better for thin/far silhouettes.
-	if (!occluded && fineSamples > coarseSteps) {
-		float tPrevFine = 0.0;
-		float dzPrevFine = 0.0;
-		bool hasPrevFine = false;
-		vec2 clipPrevFine = vec2(0.0);
-
-		for (int i = 0; i < maxSamples; i++) {
-			if (i >= fineSamples) {
-				break;
-			}
-
-			float sampleNoise = hashNoise(noise + 17.0 + float(i));
-			float jitter = (sampleNoise - 0.5) * fineStep * 0.25;
-			float t = (float(i) + 1.0) * fineStep + jitter;
-			t = clamp(t, 0.0, maxRayLength);
-
-			vec3 rayViewPos = viewPos + lightDir * t;
-			vec3 rayClipPos = viewToClipSpace(rayViewPos);
-			rayClipPos.xy += depthJitter;
-
-			if (sampleClipPosIsOutOfBounds(rayClipPos)) {
-				break;
-			}
-
-			DepthSample ds;
-			float dz;
-			bool valid = evalDepthDeltaZ(rayViewPos, rayClipPos.xy, dz, ds);
-
-			if (!valid) {
-				continue;
-			}
-
-			float dist = max(-rayViewPos.z, 0.0);
-			float grazing = 1.0 / max(abs(lightDir.z), 0.15);
-			float depthBias = depthBiasBase + dist * 0.0005 * grazing + fineStep * 0.01;
-			float thickness = 0.03 + dist * 0.0015 * grazing + max(0.25, fineStep * 2.0) * grazing;
-			float nearMiss = thickness * 0.45;
-			float dzAdj = dz - depthBias;
-
-			if (!hasBest || dzAdj > bestDzAdj) {
-				hasBest = true;
-				bestDzAdj = dzAdj;
-				bestNearMiss = nearMiss;
-			}
-			
-			if (dzAdj > 0.0 && dz < thickness) {
-				occluded = true;
-				break;
-			}
-
-			if (!hasPrevFine) {
-				hasPrevFine = true;
-				tPrevFine = t;
-				dzPrevFine = dz;
-				clipPrevFine = rayClipPos.xy;
-				continue;
-			}
-
-			float deltaPixFine = length((rayClipPos.xy - clipPrevFine) / max(pixelScaled, vec2(1e-6)));
-			int extraProbesFine = (deltaPixFine > 3.5) ? 2 : ((deltaPixFine > 1.75) ? 1 : 0);
-
-			for (int e = 1; e <= 2; e++) {
-				if (e > extraProbesFine) {
-					break;
-				}
-
-				float tE = mix(tPrevFine, t, float(e) / float(extraProbesFine + 1));
-				vec3 eViewPos = viewPos + lightDir * tE;
-				vec3 eClipPos = viewToClipSpace(eViewPos);
-				
-				eClipPos.xy += depthJitter;
-				
-				if (sampleClipPosIsOutOfBounds(eClipPos)) {
-					continue;
-				}
-				
-				DepthSample dsE;
-				float dzE;
-				bool validE = evalDepthDeltaZ(eViewPos, eClipPos.xy, dzE, dsE);
-				
-				if (!validE) {
-					continue;
-				}
-
-				float distE = max(-eViewPos.z, 0.0);
-				float grazingE = 1.0 / max(abs(lightDir.z), 0.15);
-				float depthBiasE = depthBiasBase + distE * 0.0005 * grazingE + fineStep * 0.01;
-				float thicknessE = 0.03 + distE * 0.0015 * grazingE + max(0.25, fineStep * 2.0) * grazingE;
-				float nearMissE = thicknessE * 0.45;
-				float dzAdjE = dzE - depthBiasE;
-				
-				if (!hasBest || dzAdjE > bestDzAdj) {
-					hasBest = true;
-					bestDzAdj = dzAdjE;
-					bestNearMiss = nearMissE;
-				}
-				
-				if (dzAdjE > 0.0 && dzE < thicknessE) {
-					occluded = true;
-					break;
-				}
-				
-				if (dzPrevFine <= 0.0 && dzE > 0.0) {
-					float tHit;
-					if (refineCrossingHit(viewPos, lightDir, depthJitter, tPrevFine, tE, fineStep, depthBiasBase, tHit)) {
-						occluded = true;
-						break;
-					}
-				}
-
-				tPrevFine = tE;
-				dzPrevFine = dzE;
-				clipPrevFine = eClipPos.xy;
-			}
-
-			if (occluded) {
-				break;
-			}
-
-			if (dzPrevFine <= 0.0 && dz > 0.0) {
-				float tHit;
-				
-				if (refineCrossingHit(viewPos, lightDir, depthJitter, tPrevFine, t, fineStep, depthBiasBase, tHit)) {
-					occluded = true;
-					break;
-				}
-			}
-
-			tPrevFine = t;
-			dzPrevFine = dz;
-			clipPrevFine = rayClipPos.xy;
-		}
-	}
-
-	float occlusion = 0.0;
-	
-	if (occluded) {
-		occlusion = 1.0;
-	} else if (hasBest) {
-		// Fallback: if we never caught a crossing, shadow based on closest approach.
-		// This clamps down light-bleed near ridges when step sizes are large.
-		float x = smoothstep(-bestNearMiss, 0.0, bestDzAdj);
-		occlusion = x * x; // sharpen transition (fewer "half-shadow" cases)
-	}
-	
-	float outputOcclusion = (occlusion * lightDistanceFadeFactor) * (1.0 - sunAngleFactor);
-	return outputOcclusion;
-}
-
-// Switch
-
-float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast) {
-	return getSunShadow_2Level(viewPos, lightDir, noise, fast);
+	return finalizeSunShadow(baseOcclusion, sunFacingFactor, sunAngleFactor);
 }
