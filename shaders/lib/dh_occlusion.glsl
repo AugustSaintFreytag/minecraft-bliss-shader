@@ -158,8 +158,10 @@ const int SUN_SHADOW_SUPPORT_WINDOW = 4;
 const float SUN_SHADOW_SUPPORT_THRESHOLD = 2.6;
 const float SUN_SHADOW_BOOTSTRAP_STEPS = 2.0;
 const float SUN_SHADOW_START_JITTER = 0.45;
+const float SUN_SHADOW_FETCH_JITTER = 0.65;
 const float SUN_SHADOW_VANILLA_THICKNESS = 1.25;
 const float SUN_SHADOW_LOD_THICKNESS = 3.0;
+const int SUN_SHADOW_KERNEL_TAPS = 7;
 
 float getSunFacingFactor(in vec3 viewPos, in vec3 lightDir) {
 	float pointDistance = length(viewPos);
@@ -185,49 +187,116 @@ float getSunShadowRayDepth(in vec3 viewPos, bool depthCheck) {
 	return swapperLinZ(clipPos.z, near, far * 4.0);
 }
 
-DepthSample getSunOcclusionDepthSample(in vec2 pos) {
+vec2 getSunShadowKernelOffset(int kernelIndex, int tapIndex) {
+	if (kernelIndex == 0) {
+		if (tapIndex == 0) {
+			return vec2(0.0, 0.0);
+		}
+		if (tapIndex == 1) {
+			return vec2(-1.0, 0.0);
+		}
+		if (tapIndex == 2) {
+			return vec2(1.0, 0.0);
+		}
+		if (tapIndex == 3) {
+			return vec2(0.0, -1.0);
+		}
+		if (tapIndex == 4) {
+			return vec2(0.0, 1.0);
+		}
+		if (tapIndex == 5) {
+			return vec2(-1.0, -1.0);
+		}
+		return vec2(1.0, 1.0);
+	}
+
+	if (kernelIndex == 1) {
+		if (tapIndex == 0) {
+			return vec2(0.0, 0.0);
+		}
+		if (tapIndex == 1) {
+			return vec2(-1.0, 0.0);
+		}
+		if (tapIndex == 2) {
+			return vec2(1.0, 0.0);
+		}
+		if (tapIndex == 3) {
+			return vec2(0.0, -1.0);
+		}
+		if (tapIndex == 4) {
+			return vec2(0.0, 1.0);
+		}
+		if (tapIndex == 5) {
+			return vec2(1.0, -1.0);
+		}
+		return vec2(-1.0, 1.0);
+	}
+
+	if (kernelIndex == 2) {
+		if (tapIndex == 0) {
+			return vec2(0.0, 0.0);
+		}
+		if (tapIndex == 1) {
+			return vec2(-1.0, -1.0);
+		}
+		if (tapIndex == 2) {
+			return vec2(1.0, -1.0);
+		}
+		if (tapIndex == 3) {
+			return vec2(-1.0, 1.0);
+		}
+		if (tapIndex == 4) {
+			return vec2(1.0, 1.0);
+		}
+		if (tapIndex == 5) {
+			return vec2(-1.0, 0.0);
+		}
+		return vec2(1.0, 0.0);
+	}
+
+	if (tapIndex == 0) {
+		return vec2(0.0, 0.0);
+	}
+	if (tapIndex == 1) {
+		return vec2(-1.0, -1.0);
+	}
+	if (tapIndex == 2) {
+		return vec2(1.0, -1.0);
+	}
+	if (tapIndex == 3) {
+		return vec2(-1.0, 1.0);
+	}
+	if (tapIndex == 4) {
+		return vec2(1.0, 1.0);
+	}
+	if (tapIndex == 5) {
+		return vec2(0.0, -1.0);
+	}
+	return vec2(0.0, 1.0);
+}
+
+vec2 getSunShadowFetchJitter(float stepSeed, int stepIndex) {
 	vec2 pixelStep = texelSize * RENDER_SCALE;
-	
-	DepthSample bestSample = getDepthSample(pos + vec2(-pixelStep.x, -pixelStep.y));
-	DepthSample candidateSample = getDepthSample(pos + vec2(0.0, -pixelStep.y));
+	float sequenceIndex = float(stepIndex) + stepSeed * 17.0 + 1.0;
+	vec2 r2 = fract(vec2(0.75487765, 0.56984026) * sequenceIndex) - 0.5;
 
-	if (candidateSample.value < bestSample.value) {
-		bestSample = candidateSample;
-	}
+	return r2 * pixelStep * SUN_SHADOW_FETCH_JITTER;
+}
 
-	candidateSample = getDepthSample(pos + vec2(pixelStep.x, -pixelStep.y));
-	if (candidateSample.value < bestSample.value) {
-		bestSample = candidateSample;
-	}
+DepthSample getSunOcclusionDepthSample(in vec2 pos, float kernelNoise, vec2 fetchJitter) {
+	vec2 pixelStep = texelSize * RENDER_SCALE;
+	int kernelIndex = min(int(floor(kernelNoise * 4.0)), 3);
 
-	candidateSample = getDepthSample(pos + vec2(-pixelStep.x, 0.0));
-	if (candidateSample.value < bestSample.value) {
-		bestSample = candidateSample;
-	}
+	vec2 kernelOffset = getSunShadowKernelOffset(kernelIndex, 0) * pixelStep;
+	DepthSample bestSample = getDepthSample(pos + fetchJitter + kernelOffset);
 
-	candidateSample = getDepthSample(pos);
-	if (candidateSample.value < bestSample.value) {
-		bestSample = candidateSample;
-	}
+	for (int tapIndex = 1; tapIndex < SUN_SHADOW_KERNEL_TAPS; tapIndex++) {
+		kernelOffset = getSunShadowKernelOffset(kernelIndex, tapIndex) * pixelStep;
+		DepthSample candidateSample = getDepthSample(pos + fetchJitter + kernelOffset);
 
-	candidateSample = getDepthSample(pos + vec2(pixelStep.x, 0.0));
-	if (candidateSample.value < bestSample.value) {
-		bestSample = candidateSample;
-	}
-
-	candidateSample = getDepthSample(pos + vec2(-pixelStep.x, pixelStep.y));
-	if (candidateSample.value < bestSample.value) {
-		bestSample = candidateSample;
-	}
-
-	candidateSample = getDepthSample(pos + vec2(0.0, pixelStep.y));
-	if (candidateSample.value < bestSample.value) {
-		bestSample = candidateSample;
-	}
-
-	candidateSample = getDepthSample(pos + vec2(pixelStep.x, pixelStep.y));
-	if (candidateSample.value < bestSample.value) {
-		bestSample = candidateSample;
+		if (candidateSample.value < bestSample.value) {
+			bestSample = candidateSample;
+		}
 	}
 
 	return bestSample;
@@ -263,7 +332,20 @@ SunShadowRay setupSunShadowRay(in vec3 viewPos, in vec3 lightDir, float maxSampl
 	return ray;
 }
 
-bool isSunShadowBlockerCandidate(DepthSample depthSample, float rayDepth, float depthBias) {
+float getSunShadowThinGeometryScale() {
+	float thinGeometryRejection = clamp(DH_VOLUMETRIC_OCCLUSION_BIAS, 0.0, 1.0);
+	return mix(1.0, 0.35, thinGeometryRejection);
+}
+
+float getSunShadowBlockerThickness(DepthSample depthSample, float rayDepth) {
+	const float depthBias = 0.05;
+	float thicknessScale = depthSample.isLOD ? SUN_SHADOW_LOD_THICKNESS : SUN_SHADOW_VANILLA_THICKNESS;
+	float blockerThickness = max(thicknessScale, rayDepth * depthBias * thicknessScale);
+
+	return blockerThickness * getSunShadowThinGeometryScale();
+}
+
+bool isSunShadowBlockerCandidate(DepthSample depthSample, float rayDepth) {
 	if (!depthSample.isLOD && depthSample.raw >= 1.0) {
 		return false;
 	}
@@ -273,24 +355,23 @@ bool isSunShadowBlockerCandidate(DepthSample depthSample, float rayDepth, float 
 		return false;
 	}
 
-	float thicknessScale = depthSample.isLOD ? SUN_SHADOW_LOD_THICKNESS : SUN_SHADOW_VANILLA_THICKNESS;
-	float blockerThickness = max(thicknessScale, rayDepth * depthBias * thicknessScale);
+	float blockerThickness = getSunShadowBlockerThickness(depthSample, rayDepth);
 
 	return depthDelta <= blockerThickness;
 }
 
-float getSunShadowBlockerSupport(DepthSample depthSample, float rayDepth, float depthBias, float sampleIndex) {
-	if (!isSunShadowBlockerCandidate(depthSample, rayDepth, depthBias)) {
+float getSunShadowBlockerSupport(DepthSample depthSample, float rayDepth, float sampleIndex) {
+	if (!isSunShadowBlockerCandidate(depthSample, rayDepth)) {
 		return 0.0;
 	}
 
-	float thicknessScale = depthSample.isLOD ? SUN_SHADOW_LOD_THICKNESS : SUN_SHADOW_VANILLA_THICKNESS;
-	float blockerThickness = max(thicknessScale, rayDepth * depthBias * thicknessScale);
+	float blockerThickness = getSunShadowBlockerThickness(depthSample, rayDepth);
 	float depthDelta = rayDepth - depthSample.value;
 	float normalizedCoverage = 1.0 - clamp(depthDelta / max(blockerThickness, 1e-4), 0.0, 1.0);
+	float coverageWeight = smoothstep(0.05, 0.85, normalizedCoverage);
 	float bootstrapWeight = sampleIndex < SUN_SHADOW_BOOTSTRAP_STEPS ? 1.35 : 1.0;
 
-	return max(normalizedCoverage, 0.35) * bootstrapWeight;
+	return coverageWeight * bootstrapWeight;
 }
 
 float finalizeSunShadow(float baseOcclusion, float sunFacingFactor, float sunAngleFactor) {
@@ -312,12 +393,14 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 	// Leave this instruction comment intant and add your code below.
 
 	const int maxSamples = DH_VOLUMETRIC_OCCLUSION_SAMPLES;			// Max number of samples, configurable performance option.
-	const float depthBias = DH_VOLUMETRIC_OCCLUSION_BIAS;			// Relative fraction of ray depth used as occlusion tolerance.
 	const float maxSampleDistance = DH_VOLUMETRIC_OCCLUSION_LENGTH;	// Max length for an occlusion ray cast if applicable.
 	const float maxDistance = DH_VOLUMETRIC_OCCLUSION_DISTANCE;		// Max distance between player camera and sampled point.
 
 	float sunAngleFactor = getSunAngleDisocclusionFactor();
 	float sunFacingFactor = getSunFacingFactor(viewPos, lightDir);
+	float startNoise = hashNoise(noise + 0.17);
+	float kernelNoise = hashNoise(noise + 11.13);
+	float stepSeed = hashNoise(noise + 23.71);
 
 	SunShadowRay ray = setupSunShadowRay(viewPos, lightDir, maxSampleDistance, maxSamples, fast, sourceIsLOD);
 
@@ -330,7 +413,7 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 	float supportWindow[SUN_SHADOW_SUPPORT_WINDOW] = float[](0.0, 0.0, 0.0, 0.0);
 	float supportTotal = 0.0;
 	float maxSupport = 0.0;
-	float stepOffset = hashNoise(noise) * SUN_SHADOW_START_JITTER;
+	float stepOffset = startNoise * SUN_SHADOW_START_JITTER;
 
 	vec3 marchedClipPos = ray.clipStart + ray.clipStep * stepOffset;
 	vec3 marchedViewPos = ray.viewStart + ray.viewStep * stepOffset;
@@ -345,9 +428,10 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 		}
 
 		float rayDepth = getSunShadowRayDepth(marchedViewPos, ray.depthCheck);
-		DepthSample depthSample = getSunOcclusionDepthSample(marchedClipPos.xy);
+		vec2 fetchJitter = getSunShadowFetchJitter(stepSeed, i);
+		DepthSample depthSample = getSunOcclusionDepthSample(marchedClipPos.xy, kernelNoise, fetchJitter);
 
-		float support = getSunShadowBlockerSupport(depthSample, rayDepth, depthBias, float(i));
+		float support = getSunShadowBlockerSupport(depthSample, rayDepth, float(i));
 
 		supportTotal -= supportWindow[i % SUN_SHADOW_SUPPORT_WINDOW];
 		supportWindow[i % SUN_SHADOW_SUPPORT_WINDOW] = support;
