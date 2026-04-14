@@ -251,7 +251,7 @@ void main() {
 			}
 		}
 
-		if (matchesCoords(gl_FragCoord, SKY_AVERAGE_COLOR_COORDS)) {
+		if (matchesCoords(gl_FragCoord, LIGHT_COLOR_COORDS)) {
 			gl_FragData[0] = vec4((skyGroundCol / 150.0) * AmbientLightTint, 1.0);
 			
 			if(worldTimeChangeCheck) {
