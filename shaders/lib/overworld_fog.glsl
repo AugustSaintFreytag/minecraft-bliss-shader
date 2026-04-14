@@ -1,16 +1,13 @@
-uniform ivec2 eyeBrightness;
-
-#include "/lib/fog_utils.glsl"
-
 #define FOG_USE_SHAPING 1
 #define FOG_USE_TURBULENCE 1
 
+#define FOG_TURBULENCE_MIX 0.85
+#define FOG_SHAPING_INTENSITY 1.0
+
+#include "/lib/fog_utils.glsl"
+
 uniform bool isInSpecialEnvironment;
 uniform vec3 exitedBiomePos;
-
-const float FOG_TURBULENCE_MIX = 0.95;
-const float FOG_SHAPING_INTENSITY = 0.75;
-
 
 // Utilities
 
@@ -20,7 +17,7 @@ float phaseRayleigh(float cosTheta) {
 	return cosTheta * mul_add.x + mul_add.y; // optimized version from [Elek09], divided by 4 pi for energy conservation
 }
 
-float fogPhase(float lightPoint){
+float fogPhase(float lightPoint) {
 	float linear = clamp(-lightPoint*0.5+0.5,0.0,1.0);
 	float linear2 = 1.0 - clamp(lightPoint,0.0,1.0);
 
@@ -30,12 +27,12 @@ float fogPhase(float lightPoint){
 	return exponential;
 }
 
-float phaseCloudFog(float x, float g){
+float phaseCloudFog(float x, float g) {
     float gg = g * g;
     return (gg * -0.25 + 0.25) * pow(-2.0 * (g * x) + (gg + 1.0), -1.5) / 3.14;
 }
 
-float densityAtPosFog(in vec3 pos){
+float densityAtPosFog(in vec3 pos) {
 	pos /= 24.0;
 	pos.xz *= 0.5;
 	
@@ -51,14 +48,14 @@ float densityAtPosFog(in vec3 pos){
 	return mix(xy.r, xy.g, f.y);
 }
 
-float turbulentFogNoise(in vec3 pos){
 	vec3 p = pos * 0.5;
+float turbulentFogNoise(in vec3 pos) {
 	float noise = 0.0;
 	float amplitude = 0.6;
 	float frequency = 1.0;
 	vec3 warp = frameTimeCounter * 10 * Cloud_Speed * vec3(-0.02, 0.004, -0.006);
 
-	for(int i = 0; i < 3; i++){
+	for(int i = 0; i < 3; i++) {
 		float n = densityAtPosFog(p * frequency + warp);
 
 		n = 1.0 - abs(n * 2.0 - 1.0);
@@ -72,15 +69,15 @@ float turbulentFogNoise(in vec3 pos){
 	return noise;
 }
 
-float shapeFogNoise(float noise, float coverage, float intensity){
 	float noiseFloor = mix(0, 0.2, coverage - 0.5);
 	float noiseCeiling = mix(0.3, 0.9, coverage);
+float shapeFogNoise(float noise, float coverage, float intensity) {
 	float shapedNoise = smoothstep(noiseFloor, noiseCeiling, noise);
 
 	return mix(noise, shapedNoise, intensity);
 }
 
-float applyFogShaping(float noise, float coverage, float intensity){
+float applyFogShaping(float noise, float coverage, float intensity) {
 #if FOG_USE_SHAPING
 	return clamp(shapeFogNoise(noise, coverage, intensity), 0.0, 1.0);
 #else
@@ -88,7 +85,7 @@ float applyFogShaping(float noise, float coverage, float intensity){
 #endif
 }
 
-float applyFogTurbulence(float baseNoise, vec3 pos){
+float applyFogTurbulence(float baseNoise, vec3 pos) {
 #if FOG_USE_TURBULENCE
 	float turbulentNoise = turbulentFogNoise(pos);
 	return mix(baseNoise, turbulentNoise, FOG_TURBULENCE_MIX);
@@ -100,14 +97,14 @@ float applyFogTurbulence(float baseNoise, vec3 pos){
 
 float getLocalEffectDensity(
 	in vec3 playerPos
-){	
+) {	
 	float uniformFog = scaleFogSetting(parameters.localFog.x, FOG_UNIFORM_SCALE * 0.1);
 	float clumpyFog = scaleFogSetting(parameters.localFog.y, FOG_CLUMPY_SCALE * 0.1);
 	float clumpyCoverage = clamp(parameters.localFog.z, 0.0, 1.0);
 
 	float fogResult = uniformFog;
 	
-	if(clumpyFog > 0.0){
+	if(clumpyFog > 0.0) {
 		vec3 pos = playerPos;
 		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) * 24.0 * 7.0;
 
@@ -126,14 +123,14 @@ float getLocalEffectDensity(
 float getFogDensities(
 	in vec3 playerPos,
 	float localEffectRadius
-){	
+) {	
 	float uniformFog = scaleFogSetting(parameters.fog.x, FOG_UNIFORM_SCALE);
 	float clumpyFog = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
 	float clumpyCoverage = parameters.fog.z;
 
 	float fogResult = pow(uniformFog, 3);
 
-	if(clumpyFog > 0.0){
+	if(clumpyFog > 0.0) {
 		vec3 movement = vec3(1.0, -0.01, 1.0) * frameTimeCounter * Cloud_Speed;
 		vec3 pos = playerPos;
 		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 24.0, 1.0) + movement;
@@ -168,14 +165,14 @@ vec3 sampleShadowmapVL(vec3 shadowMapZeroPos, vec3 shadowMapRayStartPos, vec3 sh
 
 	vec3 shadowPos = vec3(shadowMapRayProgress.xy*distortFactor, shadowMapRayProgress.z);
 
-	if (abs(shadowPos.x) < 1.0-0.5/2048. && abs(shadowPos.y) < 1.0-0.5/2048){
+	if (abs(shadowPos.x) < 1.0-0.5/2048. && abs(shadowPos.y) < 1.0-0.5/2048) {
 
 		shadowPos = shadowPos * vec3(0.5, 0.5, 0.5/6.0) + 0.5;
 
 		#ifdef TRANSLUCENT_COLORED_SHADOWS
 			shadowColor = vec3(shadow2D(shadowtex0, shadowPos).x);
 
-			if(shadow2D(shadowtex1, shadowPos).x > shadowPos.z && shadowColor.x < 1.0){
+			if(shadow2D(shadowtex1, shadowPos).x > shadowPos.z && shadowColor.x < 1.0) {
 				vec4 translucentShadow = texture(shadowcolor0, shadowPos.xy);
 				if(translucentShadow.a < 0.9) shadowColor = normalize(translucentShadow.rgb+0.0001);
 			}
@@ -195,7 +192,7 @@ vec3 getShadows(
 	vec3 shadowMapRayProgress,
 	float flatPhase,
 	inout float sunPhase
-){
+) {
 	vec3 shadows = vec3(1.0);
 	shadows *= sampleShadowmapVL(shadowMapZeroPos, shadowMapRayStartPos, shadowMapRayProgress);
 	
@@ -211,14 +208,13 @@ vec4 GetVolumetricFog(
 	in vec3 viewPos,
 	in vec2 dither,
 	in vec3 sunVector,
-	in float sunVisibility,
-	
+	in float sunShadow,
 	in vec3 lightColor,
 	in vec3 ambientColor,
 	in vec3 averagedAmbientColor,
 	
 	in float cloudPlaneDistance
-){
+) {
 	#ifndef TOGGLE_VL_FOG
 		return vec4(0.0, 0.0, 0.0, 1.0);
 	#endif
@@ -266,7 +262,7 @@ vec4 GetVolumetricFog(
 
 	float flatPhase = clamp(SdotV * 0.5 + 0.5, 0.0, 1.0);
 	float fullSunPhase = fogPhase(SdotV) * 5.0;
-	float sunPhase = mix(flatPhase, fullSunPhase, sunVisibility);
+	float sunPhase = mix(fullSunPhase, flatPhase, sunShadow);
 
 	float absorbance = 1.0;
 	float localAbsorbance = 1.0;
