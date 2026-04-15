@@ -704,12 +704,19 @@ void main() {
 
 		if(isInWater && isEyeInWater != 1) {
 			vec4 waterVolumetricFog = waterVolumetricsTranslucent(viewPos0, viewPos1, estimatedDepth, estimatedSunDepth, Vdiff, noise_1, totEpsilon, scatterCoef, indirectLight, directLightColor, sunShadow, dot(normalize(viewPos0), normalize(sunVec * lightCol.a)));
-			vec4 waterVolumetricFogDistant = translucentVolumetricFog * vec4(vec3(0.5), 1.0);
 
-			float distanceFactor = smoothstep(0.0, far * 0.5, far - length(viewPos1));
-			waterVolumetricFog = mix(waterVolumetricFogDistant, waterVolumetricFog, clamp(distanceFactor, 0.0, 1.0));
+			// Darken distant DH/LOD water fog with a smooth transition starting at the vanilla render boundary.
+			// #ifdef USING_LOD_MOD
+			// vec4 waterVolumetricFogDistant = translucentVolumetricFog * 0.1;
+			// 	bool isDHWater = (z1 >= 1.0) && (DH_z1 < 1.0);
+			// 	if (isDHWater) {
+			// 		float dhDistanceFactor = smoothstep(far, far + (LOD_FARPLANE - far) * 0.5, length(viewPos1));
+			// 		// waterVolumetricFog = mix(waterVolumetricFog, waterVolumetricFogDistant, dhDistanceFactor);
+			// 		waterVolumetricFog = waterVolumetricFogDistant;
+			// 	}
+			// #endif
 
-			gl_FragData[1] = clamp(waterVolumetricFog, 0.0, 65000.0);
+			gl_FragData[1] = clamp(waterVolumetricFog, 0.0, 68000.0);
 		}
 	}
 }
