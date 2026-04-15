@@ -422,11 +422,14 @@ float handHeldLight_SSRT_Shadows(vec3 viewPos, vec3 shadowHandPos, float noise){
 	
 	vec3 newPos = position + direction*noise;
 	newPos += direction * 0.3;
-	for (int i = 0; i < int(steps); i++) {
-		
-		float samplePos = texture(depthtex2, newPos.xy).x;
 
-		if(samplePos < newPos.z) return 0.0;
+	for (int i = 0; i < int(steps); i++) {
+		ivec2 sampleCoord = ivec2(newPos.xy / texelSize);
+		float samplePos = texelFetch(depthtex0, sampleCoord, 0).x;
+
+		if(samplePos < newPos.z && texelFetch(colortex2, sampleCoord, 0).a < 0.01) {
+			return 0.0;
+		}
 
 		newPos += direction;
 	}
