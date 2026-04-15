@@ -421,7 +421,7 @@ float handHeldLight_SSRT_Shadows(vec3 viewPos, vec3 shadowHandPos, float noise){
 	direction.xy *= RENDER_SCALE;
 	
 	vec3 newPos = position + direction*noise;
-	newPos += direction*0.3;
+	newPos += direction * 0.3;
 	for (int i = 0; i < int(steps); i++) {
 		
 		float samplePos = texture(depthtex2, newPos.xy).x;
@@ -765,22 +765,19 @@ void main() {
 	bool isDHRange = z >= 1.0;
 
 	#ifdef USING_LOD_MOD
-		float DH_mixedLinearZ = sqrt(texture(colortex12,texcoord).a / 65000.0);
+		float DH_mixedLinearZ = sqrt(texture(colortex12, texcoord).a / 65000.0);
 		float DH_depth0 = texture(LOD_DEPTHTEX0, texcoord).x;
-		float DH_depth1 = texture(LOD_DEPTHTEX1 ,texcoord).x;
+		float DH_depth1 = texture(LOD_DEPTHTEX1, texcoord).x;
 
 		float depthOpaque = z;
 		float depthOpaqueL = linearizeDepthFast(depthOpaque, near, farPlane);
-		
-		#ifdef USING_LOD_MOD
-			float dhDepthOpaque = DH_depth1;
-			float dhDepthOpaqueL = linearizeDepthFast(dhDepthOpaque, dhNearPlane, dhFarPlane);
+		float dhDepthOpaque = DH_depth1;
+		float dhDepthOpaqueL = linearizeDepthFast(dhDepthOpaque, dhNearPlane, dhFarPlane);
 
-			if (depthOpaque >= 1.0 || (dhDepthOpaqueL < depthOpaqueL && dhDepthOpaque > 0.0)){
-				depthOpaque = dhDepthOpaque;
-				depthOpaqueL = dhDepthOpaqueL;
-			}
-		#endif
+		if ((depthOpaque >= 1.0 || dhDepthOpaqueL < depthOpaqueL) && dhDepthOpaque > 0.0) {
+			depthOpaque = dhDepthOpaque;
+			depthOpaqueL = dhDepthOpaqueL;
+		}
 
 		swappedDepth = depthOpaque;
 	#else
@@ -808,7 +805,7 @@ void main() {
 	// special curve to give more precision on high/low values of the gradient. this curve will be inverted after sampling and decoding.
 	// lightmap = 1.0-pow(1.0-pow(lightmap,vec2(2)),vec2(2));
 	// small offset to hide flickering from precision error in the encoding/decoding on values close to 1.0 or 0.0
-	lightmap.xy = min(max(lightmap.xy - 0.05,0.0)*1.06,1.0);
+	lightmap.xy = min(max(lightmap.xy - 0.05, 0.0) * 1.06, 1.0);
 	
 	#if MC_VERSION < 12109
 		#if !defined OVERWORLD_SHADER
@@ -1405,15 +1402,14 @@ void main() {
 		#endif
 
 		gl_FragData[0].rgb = FINAL_COLOR;
-
 	} else {
-		vec3 Background = vec3(0.0);
+		vec3 background = vec3(0.0);
 
 		#ifdef OVERWORLD_SHADER
 
 			float atmosphereGround = 1.0 - exp2(-50.0 * pow(clamp(feetPlayerPos_normalized.y+0.025,0.0,1.0),2.0)); // darken the ground in the sky.
 			
-			#if RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 0 || RESOURCEPACK_SKY == 3
+			#if RESOURCEPACK_SKY == 0 || RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 3
 				// vec3 orbitstar = vec3(feetPlayerPos_normalized.x,abs(feetPlayerPos_normalized.y),feetPlayerPos_normalized.z); orbitstar.x -= WsunVec.x*0.2;
 				vec3 orbitstar = normalize(mat3(gbufferModelViewInverse) * toScreenSpace(vec3(texcoord/RENDER_SCALE,1.0)));
 				// float radiance = 2.39996 - (worldTime + worldDay*24000.0) / 24000.0;
@@ -1424,25 +1420,23 @@ void main() {
 				orbitstar.xy *= rotationMatrix;
 				
   				#if defined OVERWORLD_SHADER && defined TWILIGHT_FOREST_FLAG
-					Background += stars(orbitstar) * 100.0;
+					background += stars(orbitstar) * 100.0;
   				#else
-					Background += stars(orbitstar) * 10.0 * clamp(-unsigned_WsunVec.y*2.0,0.0,1.0);
+					background += stars(orbitstar) * 10.0 * clamp(-unsigned_WsunVec.y*2.0,0.0,1.0);
 				#endif
 
 				#if !defined ambientLight_only && (RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 0)
-					Background += drawSun(dot(unsigned_WsunVec, feetPlayerPos_normalized), 0, DirectLightColor,vec3(0.0));
-
+					background += drawSun(dot(unsigned_WsunVec, feetPlayerPos_normalized), 0, DirectLightColor,vec3(0.0));
 					vec3 moonLightCol = moonCol / 2400.0;
-
-					Background += drawMoon(feetPlayerPos_normalized, WmoonVec, moonLightCol, Background); 
+					background += drawMoon(feetPlayerPos_normalized, WmoonVec, moonLightCol, background); 
 				#endif
 
-				Background *= atmosphereGround;
+				background *= atmosphereGround;
 			#endif
 			
 			#ifndef ISOLATE_RESOURCEPACK_SKY
 				vec3 Sky = skyFromTex(feetPlayerPos_normalized, colortex4)/1200.0 * Sky_Brightness;
-				Background += Sky;
+				background += Sky;
 			#endif
 			
 			#if RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 2 || RESOURCEPACK_SKY == 3
@@ -1452,12 +1446,12 @@ void main() {
 					resourcePackskyBox *= atmosphereGround;
 				#endif
 
-				Background += resourcePackskyBox;
+				background += resourcePackskyBox;
 			#endif
 
 		#endif
 
-		gl_FragData[0].rgb = clamp(fp10Dither(Background, triangularize(noise_2)), 0.0, 65000.0);
+		gl_FragData[0].rgb = clamp(fp10Dither(background, triangularize(noise_2)), 0.0, 65000.0);
 	}
 
 

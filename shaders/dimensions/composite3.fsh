@@ -380,9 +380,9 @@ void blendAllFogTypes(inout vec3 color, inout float bloomyFogMult, vec4 volumetr
   /// water absorption; it is completed when volumetrics are blended.
   if(isEyeInWater == 1){
     vec3 totEpsilon = vec3(Water_Absorb_R, Water_Absorb_G, Water_Absorb_B);
-		vec3 scatterCoef = Dirt_Amount * vec3(Dirt_Scatter_R, Dirt_Scatter_G, Dirt_Scatter_B) / 3.14;
+		vec3 scatterCoef = Dirt_Amount * vec3(Dirt_Scatter_R, Dirt_Scatter_G, Dirt_Scatter_B) / PI;
 
-	  float distanceFromWaterSurface = playerPos.y + 1.0 + (cameraPosition.y - waterEnteredAltitude)/waterEnteredAltitude;
+	  float distanceFromWaterSurface = playerPos.y + 1.0 + (cameraPosition.y - waterEnteredAltitude) / waterEnteredAltitude;
     distanceFromWaterSurface = clamp(distanceFromWaterSurface,0,1);
 
     vec3 transmittance = exp(-totEpsilon * linearDistance);
@@ -394,19 +394,6 @@ void blendAllFogTypes(inout vec3 color, inout float bloomyFogMult, vec4 volumetr
     
     bloomyFogMult *= dot(transmittance,vec3(0.3333))*0.75 + 0.25;
   }
-
-  #if defined OVERWORLD_SHADER
-    if(isSky && volumetrics.a < 0.99) {
-      float fogDensity = 1.0 - volumetrics.a;
-      float viewAngle = 1.0 - clamp(playerPos.y, 0.0, 1.0);  // Stronger effect when looking horizontally
-      
-      // Amplify fog opacity for sky pixels
-      float skyFogBoost = fogDensity * viewAngle * 0.5;  // 0.5 = intensity (0.3-0.7 range recommended)
-      
-      volumetrics.rgb += volumetrics.rgb * skyFogBoost * 0.5;  // Add extra inscatter
-      volumetrics.a += skyFogBoost * 8.0;
-    }
-  #endif
   
   // make bloomy fog only work outside of the overworld (unless underwater)
   #if !defined OVERWORLD_SHADER
@@ -457,12 +444,13 @@ void main() {
   
   #if DEBUG_VIEW == debug_DEFERRED_RENDERING
     gl_FragData[0].r = 1.0; // pass fog alpha so bloom can do bloomy fog
-    gl_FragData[1].rgb = clamp(texture(colortex3, texcoord).rgb, 0.0,68000.0);
+    gl_FragData[1].rgb = clamp(texture(colortex3, texcoord).rgb, 0.0, 68000.0);
     return;
   #endif
   
   float depth = texelFetch(depthtex0, ivec2(gl_FragCoord.xy),0).x;
   bool hand = depth < 0.56;
+
   float z = depth;
   float z2 = texelFetch(depthtex1, ivec2(gl_FragCoord.xy),0).x;
   float frDepth = linZ(z);
@@ -499,8 +487,8 @@ void main() {
 	vec3 playerPos_alt = mat3(gbufferModelViewInverse) * viewPos_alt + gbufferModelViewInverse[3].xyz;
   float linearDistance_cylinder_alt = length(playerPos_alt.xz);
 
-	float lightleakfix = clamp(pow(eyeBrightnessSmooth.y/240.,2) ,0.0,1.0);
-	float lightleakfixfast = clamp(eyeBrightness.y/240.,0.0,1.0);
+	float lightleakfix = clamp(pow(eyeBrightnessSmooth.y / 240., 2) , 0.0, 1.0);
+	float lightleakfixfast = clamp(eyeBrightness.y / 240., 0.0, 1.0);
 
 	////// --------------- UNPACK OPAQUE GBUFFERS --------------- //////
 	// float opaqueMasks = decodeVec2(texture(colortex1,texcoord).a).y;
@@ -517,7 +505,9 @@ void main() {
 	bool nameTagMask = abs(unpack1.a - 0.1) < 0.01;
   float nametagbackground = nameTagMask ? 0.25 : 1.0;
 
-  if(albedo.a < 0.01) tangentNormals = vec2(0.0);
+  if(albedo.a < 0.01) {
+    tangentNormals = vec2(0.0);
+  }
 
 	////// --------------- UNPACK MISC --------------- //////
 	// 1.0 = water mask
@@ -630,7 +620,7 @@ void main() {
   float rainDrops = texelFetch(colortex9,ivec2(texcoord/texelSize),0).a;
   
   if(rainDrops > 0.0) {
-    bloomyFogMult *= clamp(1.0 - pow(rainDrops*5.0,2),0.0,1.0);
+    bloomyFogMult *= clamp(1.0 - pow(rainDrops * 5.0, 2), 0.0, 1.0);
     color.rgb += color.rgb * 0.2 * rainDrops;
   }
 #endif
@@ -638,7 +628,7 @@ void main() {
 ////// --------------- FINALIZE
   #ifdef display_LUT
       vec2 coord = (gl_FragCoord.xy/2.0);
-      vec3 thingy = texelFetch2D(colortex4,ivec2(coord),0).rgb /1200.0;
+      vec3 thingy = texelFetch2D(colortex4, ivec2(coord), 0).rgb / 1200.0;
       coord *= texelSize;
 
       if(coord.x < 1 && coord.x > 0 && coord.y < 1 && coord.y > 0){
@@ -653,8 +643,8 @@ void main() {
     #endif
   #endif
 
-  gl_FragData[0] = vec4(bloomyFogMult,0.0,0.0,1.0); // pass fog alpha so bloom can do bloomy fog
-  gl_FragData[1].rgb = clamp(color.rgb, 0.0,68000.0);
+  gl_FragData[0] = vec4(bloomyFogMult, 0.0, 0.0, 1.0); // pass fog alpha so bloom can do bloomy fog
+  gl_FragData[1].rgb = clamp(color.rgb, 0.0, 68000.0);
 
 
 
