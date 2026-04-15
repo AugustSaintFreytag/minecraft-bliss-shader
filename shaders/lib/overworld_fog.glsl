@@ -1,7 +1,7 @@
 #define FOG_USE_SHAPING 1
 #define FOG_USE_TURBULENCE 1
 
-#define FOG_TURBULENCE_MIX 0.85
+#define FOG_TURBULENCE_MIX 1.0
 #define FOG_SHAPING_INTENSITY 1.0
 
 #include "/lib/fog_utils.glsl"
@@ -33,7 +33,7 @@ float phaseCloudFog(float x, float g) {
 }
 
 float densityAtPosFog(in vec3 pos) {
-	pos /= 24.0;
+	pos /= 16.0;
 	pos.xz *= 0.5;
 	
 	vec3 p = floor(pos);
@@ -48,15 +48,15 @@ float densityAtPosFog(in vec3 pos) {
 	return mix(xy.r, xy.g, f.y);
 }
 
-	vec3 p = pos * 0.5;
 float turbulentFogNoise(in vec3 pos) {
+	pos /= 8;
 	float noise = 0.0;
-	float amplitude = 0.6;
-	float frequency = 1.0;
+	float amplitude = 0.65;
+	float frequency = 1.2;
 	vec3 warp = frameTimeCounter * 10 * Cloud_Speed * vec3(-0.02, 0.004, -0.006);
 
 	for(int i = 0; i < 3; i++) {
-		float n = densityAtPosFog(p * frequency + warp);
+		float n = densityAtPosFog(pos * frequency + warp);
 
 		n = 1.0 - abs(n * 2.0 - 1.0);
 		n = n * n;
@@ -69,9 +69,9 @@ float turbulentFogNoise(in vec3 pos) {
 	return noise;
 }
 
-	float noiseFloor = mix(0, 0.2, coverage - 0.5);
-	float noiseCeiling = mix(0.3, 0.9, coverage);
 float shapeFogNoise(float noise, float coverage, float intensity) {
+	float noiseFloor = mix(0, 0.25, coverage - 0.5);
+	float noiseCeiling = mix(0.25, 0.7, coverage);
 	float shapedNoise = smoothstep(noiseFloor, noiseCeiling, noise);
 
 	return mix(noise, shapedNoise, intensity);
@@ -88,10 +88,14 @@ float applyFogShaping(float noise, float coverage, float intensity) {
 float applyFogTurbulence(float baseNoise, vec3 pos) {
 #if FOG_USE_TURBULENCE
 	float turbulentNoise = turbulentFogNoise(pos);
-	return mix(baseNoise, turbulentNoise, FOG_TURBULENCE_MIX);
+	return mix(baseNoise, baseNoise * 0.25 + turbulentNoise * 0.75, FOG_TURBULENCE_MIX);
 #else
 	return baseNoise;
 #endif
+}
+
+float getFogStartHeightFade(float height) {
+	return clamp(height - float(FOG_START_HEIGHT), 0.0, 1.0);
 }
 
 
@@ -112,12 +116,12 @@ float getLocalEffectDensity(
 
 		float baseNoise = densityAtPosFog(samplePos);
 		float localClumpyNoise = applyFogTurbulence(baseNoise, samplePos);
-		float localClumpyFog = min(max(1.0 - applyFogShaping(localClumpyNoise, clumpyCoverage, FOG_SHAPING_INTENSITY) - 0.2, 0.0) / 0.8, 1.0);
+		float localClumpyFog = min(max(1.0 - applyFogShaping(localClumpyNoise, clumpyCoverage, FOG_SHAPING_INTENSITY), 0.0), 1.0);
 
 		fogResult += localClumpyFog * clumpyFog;
 	}
 	
-	return fogResult;
+	return pow(fogResult, 2) * getFogStartHeightFade(playerPos.y);
 }
 
 float getFogDensities(
@@ -142,12 +146,12 @@ float getFogDensities(
 		float shape2BaseNoise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0, 1.0) * 200.0));
 		float shape2Noise = applyFogTurbulence(shape2BaseNoise, samplePos2 * 150.0);
 		float shape2 = 1.0 - applyFogShaping(shape2Noise, clumpyCoverage, FOG_SHAPING_INTENSITY);
-		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - 60, 0.0));
+		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - float(FOG_START_HEIGHT), 0.0));
 
 		fogResult += finalShape * pow(clumpyFog, 3);
 	}
 	
-	return fogResult;
+	return fogResult * getFogStartHeightFade(playerPos.y);
 }
 
 // Shadows
@@ -270,10 +274,10 @@ vec4 GetVolumetricFog(
 	vec3 airAbsorbance = vec3(1.0);
 	
 	float indoors = clamp(eyeBrightnessSmooth.y / 240.0, 0, 1);
-	float daylightFactor = clamp(sunElevation * 4.0, 0.0, 1.0);
-
-	vec3 masterLightColor = lightColor;
-	vec3 ambientLightColor = ambientColor;
+	float daylightFactor = clamp(sunElevation * 2.0, 0.0, 1.0);
+	
+	vec3 masterLightColor = saturate(lightColor * 1.5, 0.85) * (1.0 + (1.0 - daylightFactor) * 1.0);
+	vec3 ambientLightColor = saturate(ambientColor * 1.25, 0.25) + (0.25 * saturate(lightColor, 0.35));
 
 	vec3 localFogColor = parameters.localFogColor.rgb;
 	vec3 localFogColor_lightCol = localFogColor * dot(masterLightColor, vec3(0.33333));
@@ -315,16 +319,17 @@ vec4 GetVolumetricFog(
 		
 		// (I) Atmosphere
 
-		float planetVolume = clamp(1.0 - length((rayProgress-cameraPosition) - vec3(0.0, 250.0, 0.0)) / 2500.0, 0.0,1.0);
+		float planetVolume = clamp(1.0 - length((rayProgress - cameraPosition) - vec3(0.0, 250.0, 0.0)) / 2500.0, 0.0, 1.0);
+		float fogStartHeightFade = getFogStartHeightFade(rayProgress.y);
 
 		#ifdef USING_LOD_MOD
-			vec2 airCoef = exp2(-max(rayProgress.y - 62.0, 0.0) / vec2(8.0e3, 1.2e3) * vec2(6.0, 7.0)) * planetVolume * 12.5 * ATMOSPHERIC_HAZE_AMOUNT;
+			vec2 airCoef = exp2(-max(rayProgress.y - float(FOG_START_HEIGHT), 0.0) / vec2(8.0e3, 1.2e3) * vec2(6.0, 7.0)) * planetVolume * 12.5 * ATMOSPHERIC_HAZE_AMOUNT;
 		#else
-			vec2 airCoef = exp2(-max(rayProgress.y - 62.0, 0.0) / vec2(8.0e3, 1.2e3) * vec2(6.0, 7.0)) * planetVolume * 25.0 * ATMOSPHERIC_HAZE_AMOUNT;
+			vec2 airCoef = exp2(-max(rayProgress.y - float(FOG_START_HEIGHT), 0.0) / vec2(8.0e3, 1.2e3) * vec2(6.0, 7.0)) * planetVolume * 25.0 * ATMOSPHERIC_HAZE_AMOUNT;
 		#endif
 
 		vec3 rayleigh = rayleighCoeffs * airCoef.x;
-		vec3 mie = mieCoeffs * (airCoef.y + min(ATMOSPHERIC_HAZE_AMOUNT, 1.0));
+		vec3 mie = mieCoeffs * (airCoef.y + min(ATMOSPHERIC_HAZE_AMOUNT, 1.0) * fogStartHeightFade);
 		vec3 airDensity = kill * (rayleigh + mie);
 		vec3 airDensityPhased = rayleighPhase * rayleigh + sunPhase * mie;
 		vec3 airVolumeCoeff = exp(-airDensity * volumeSampleOffset * rayLength);
@@ -340,18 +345,11 @@ vec4 GetVolumetricFog(
 
 		// (II) Global Fog
 
-		float fogDensity = kill * getFogDensities(rayProgress, 0.0);
-		float fogVolumeCoeff = exp(-fogDensity * volumeSampleOffset * rayLength);
+		float fogDensity = kill * getFogDensities(rayProgress, 0.0) * pow(indoors, 3);
+		float fogVolumeCoeff = clamp(exp(-fogDensity * volumeSampleOffset * rayLength), 0.0, 1.0);
+		float fogSunPhase = mix(sunPhase, sunPhase, smoothstep(0.0, 1.0, fogVolumeCoeff * 1.5));
 
-		vec3 fogLighting = masterLightColor * sunPhase * shadows + ambientLightColor * skyPhase;
-
-		// Brightness Boost
-		
-		float fogLuminance = dot(lumCoeff, fogLighting);
-		float minFogLuminance = 0.65;
-		float fogLuminanceDelta = clamp(minFogLuminance - fogLuminance, 0.0, 100.0);
-
-		fogLighting += vec3(fogLuminanceDelta) * saturate(ambientColor, 0.5);
+		vec3 fogLighting = masterLightColor * fogSunPhase * shadows * 0.85 + ambientLightColor * skyPhase;
 
 		// Lightning
 		

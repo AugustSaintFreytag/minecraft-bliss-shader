@@ -239,7 +239,7 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.5;
 
             uniformFogDensity = 0.12;
-            clumpyFogDensity = 0.9;
+            clumpyFogDensity = 0.8;
             clumpyFogCoverage = 0.6;
             break;
         }
@@ -343,7 +343,7 @@ float RNG = hash11(worldDay + 0.2);
     // clumpyFogCoverage = mix(todClumpyFogDensity * (TOD_FOG_BOOST * 0.5), clumpyFogDensity, TOD_FOG_MIX);
     uniformFogDensity += todUniformFogDensity;
     clumpyFogDensity += todClumpyFogDensity;
-    clumpyFogCoverage += (1.0 - todClumpyFogDensity) * 0.25;
+    clumpyFogCoverage = clamp(clumpyFogCoverage + (1.0 - todClumpyFogDensity) * 0.5, 0.0, 1.0);
 
 #endif
 
