@@ -72,17 +72,16 @@ vec3 rodSample(vec2 Xi)
 }
 
 //Low discrepancy 2D sequence, integration error is as low as sobol but easier to compute : http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
-vec2 R2_samples(int n){
+vec2 R2_samples(int n) {
 	vec2 alpha = vec2(0.75487765, 0.56984026);
 	return fract(alpha * n);
 }
 
-float tanh(float x){
+float tanh(float x) {
 	return (exp(x) - exp(-x))/(exp(x) + exp(-x));
 }
 
-float hash11(float p)
-{
+float hash11(float p) {
     p = fract(p * .1031);
     p *= p + 33.33;
     p *= p + p;

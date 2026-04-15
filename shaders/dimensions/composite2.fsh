@@ -97,7 +97,7 @@ uniform int hideGUI;
 #include "/lib/sky_gradient.glsl"
 #include "/lib/Shadow_Params.glsl"
 #include "/lib/waterBump.glsl"
-
+#include "/lib/TAA_jitter.glsl"
 #include "/lib/dh_projections.glsl"
 #include "/lib/dh_occlusion.glsl"
 
@@ -228,9 +228,6 @@ uniform float nightVision;
 #define fsign(a)  (clamp((a)*1e35,0.,1.)*2.-1.)
 
 
-#include "/lib/TAA_jitter.glsl"
-
-
 /*
 from https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/
 Copyright 2019 Alan Wolfe
@@ -264,7 +261,7 @@ float R2_dither(){
 	return fract(alpha.x * coord.x + alpha.y * coord.y);
 }
 
-vec4 waterVolumetrics(vec3 rayStart, vec3 rayEnd, float rayLength, vec2 dither, vec3 waterCoefs, vec3 scatterCoef, vec3 ambient, vec3 lightSource, float sunVisibility, float VdotL, vec3 LPV){
+vec4 waterVolumetrics(vec3 rayStart, vec3 rayEnd, float rayLength, vec2 dither, vec3 waterCoefs, vec3 scatterCoef, vec3 ambient, vec3 lightSource, float sunShadow, float VdotL, vec3 LPV){
 	int spCount = 8;
 
 	vec3 start = toShadowSpaceProjected(rayStart);
@@ -345,7 +342,7 @@ vec4 waterVolumetrics(vec3 rayStart, vec3 rayEnd, float rayLength, vec2 dither, 
 		vec3 WaterAbsorbance = exp(-waterCoefs * (distanceFromWaterSurface + downwardAbsorbtionBias));
 
 		vec3 Directlight = lightSource * phase * caustics * sunAbsorbance;
-		vec3 Indirectlight = ambient * (0.25 + sunVisibility * 4) * WaterAbsorbance;
+		vec3 Indirectlight = ambient * (0.25 + (1.0 - sunShadow) * 4.0) * WaterAbsorbance;
 
 		vec3 light = (Indirectlight + Directlight + LPV) * scatterCoef;
 		
@@ -358,7 +355,7 @@ vec4 waterVolumetrics(vec3 rayStart, vec3 rayEnd, float rayLength, vec2 dither, 
 	return vec4(vL, dot(absorbance,vec3(0.335)));
 }
 
-vec4 waterVolumetricsTranslucent( vec3 rayStart, vec3 rayEnd, float estEndDepth, float estSunDepth, float rayLength, float dither, vec3 waterCoefs, vec3 scatterCoef, vec3 ambient, vec3 lightSource, float sunVisibility, float VdotL){
+vec4 waterVolumetricsTranslucent(vec3 rayStart, vec3 rayEnd, float estEndDepth, float estSunDepth, float rayLength, float dither, vec3 waterCoefs, vec3 scatterCoef, vec3 ambient, vec3 lightSource, float sunShadow, float VdotL){
 	int spCount = rayMarchSampleCount;
 
 	vec3 start = toShadowSpaceProjected(rayStart);
@@ -436,7 +433,7 @@ vec4 waterVolumetricsTranslucent( vec3 rayStart, vec3 rayEnd, float estEndDepth,
 		vec3 ambientAbsorbance = exp(-waterCoefs * (estEndDepth * d + downwardAbsorbtionBias));
 
 		vec3 directLight = lightSource * sh * cloudShadow * phase * sunAbsorbance;
-		vec3 indirectLight = ambient * (0.25 + sunVisibility * 4) * ambientAbsorbance;
+		vec3 indirectLight = ambient * (0.25 + (1.0 - sunShadow) * 4) * ambientAbsorbance;
 
 		vec3 light = (directLight + indirectLight) * scatterCoef;
 		
@@ -585,7 +582,9 @@ void main() {
 
 	#if defined OVERWORLD_SHADER && defined DH_VOLUMETRIC_OCCLUSION
 		vec3 lightDir = normalize(sunVec * lightCol.a);
-		float sunVisibility = getDHSunVisibility(viewPos0, lightDir, BN.x, z0);
+		bool sunShadowSourceIsLOD = z0 >= 1.0;
+
+		float sunShadow = getSunShadow(viewPos0, lightDir, BN.x, false, sunShadowSourceIsLOD);
 
 		// Sun Angle Factor Debugging Display
 		// if (gl_FragCoord.x < 100 && gl_FragCoord.y < 100) {
@@ -600,7 +599,7 @@ void main() {
 		// 	return;
 		// }
 	#else
-		float sunVisibility = 1.0;
+		float sunShadow = 0.0;
 	#endif
 
 	float cloudPlaneDistance = 0.0;
@@ -616,7 +615,7 @@ void main() {
   		  }
   		#endif
 
-		vec4 volumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, sunVisibility, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
+		vec4 volumetricFog = GetVolumetricFog(viewPos0, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
 		volumetricFog = clamp(volumetricFog, 0.0, 65000.0);
 
@@ -638,7 +637,7 @@ void main() {
 	#endif
 
 	if (isEyeInWater == 1){
-		vec4 underWaterFog =  waterVolumetrics(vec3(0.0), viewPos0, length(viewPos0), vec2(noise_1), totEpsilon, scatterCoef, indirectLightColor_dynamic, directLightColor, sunVisibility, dot(normalize(viewPos0), normalize(sunVec* lightCol.a)), LPV_ILLUMINATION.rgb);
+		vec4 underWaterFog =  waterVolumetrics(vec3(0.0), viewPos0, length(viewPos0), vec2(noise_1), totEpsilon, scatterCoef, indirectLightColor_dynamic, directLightColor, sunShadow, dot(normalize(viewPos0), normalize(sunVec* lightCol.a)), LPV_ILLUMINATION.rgb);
 		volumetricFog = vec4(underWaterFog.rgb, 1.0);
 	}
 	
@@ -658,7 +657,7 @@ void main() {
 
 		#if defined OVERWORLD_SHADER
 			translucentVolumetricClouds = GetVolumetricClouds(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
-			translucentVolumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, sunVisibility, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
+			translucentVolumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
 			translucentVolumetricFog = vec4(translucentVolumetricClouds.rgb * translucentVolumetricFog.a + translucentVolumetricFog.rgb, translucentVolumetricFog.a * translucentVolumetricClouds.a);
 		#endif
 		
@@ -669,7 +668,7 @@ void main() {
 		gl_FragData[1] = clamp(translucentVolumetricFog, 0.0, 65000.0);
 
 		if(isInWater && isEyeInWater != 1) {
-			vec4 waterVolumetricFog = waterVolumetricsTranslucent(viewPos0, viewPos1, estimatedDepth, estimatedSunDepth, Vdiff, noise_1, totEpsilon, scatterCoef, indirectLight, directLightColor, sunVisibility, dot(normalize(viewPos0), normalize(sunVec * lightCol.a)));
+			vec4 waterVolumetricFog = waterVolumetricsTranslucent(viewPos0, viewPos1, estimatedDepth, estimatedSunDepth, Vdiff, noise_1, totEpsilon, scatterCoef, indirectLight, directLightColor, sunShadow, dot(normalize(viewPos0), normalize(sunVec * lightCol.a)));
 			vec4 waterVolumetricFogDistant = translucentVolumetricFog * vec4(vec3(0.5), 1.0);
 
 			float distanceFactor = smoothstep(0.0, far * 0.5, far - length(viewPos1));

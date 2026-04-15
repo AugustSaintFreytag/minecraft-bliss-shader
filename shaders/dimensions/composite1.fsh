@@ -17,8 +17,6 @@
 #define WATER_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/macro_lod_mod.glsl"
-#include "/lib/TAA_jitter.glsl"
 
 // #if defined END_SHADER || defined NETHER_SHADER
 // 	#undef IS_LPV_ENABLED
@@ -153,6 +151,7 @@ float convertHandDepth_2(in float depth, bool hand) {
     return ndcDepth * 0.5 + 0.5;
 }
 
+#include "/lib/macro_lod_mod.glsl"
 #include "/lib/projections.glsl"
 #include "/lib/color_transforms.glsl"
 #include "/lib/waterBump.glsl"
@@ -160,6 +159,7 @@ float convertHandDepth_2(in float depth, bool hand) {
 #include "/lib/Shadows.glsl"
 #include "/lib/stars.glsl"
 #include "/lib/sky_gradient.glsl"
+#include "/lib/TAA_jitter.glsl"
 
 #ifdef OVERWORLD_SHADER
 	#include "/lib/scene_controller.glsl"
@@ -558,6 +558,7 @@ vec3 ComputeShadowMap_COLOR(in vec3 projectedShadowPosition, float distortFactor
 
 	vec3 shadowColor = vec3(0.0);
 	vec3 translucentTint = vec3(0.0);
+	vec3 baseShadowPos = projectedShadowPosition;
 
 	#ifdef BASIC_SHADOW_FILTER
 		int samples = SHADOW_FILTER_SAMPLE_COUNT;
@@ -565,15 +566,17 @@ vec3 ComputeShadowMap_COLOR(in vec3 projectedShadowPosition, float distortFactor
 		
 		for(int i = 0; i < samples; i++){
 			vec2 offsetS = CleanSample(i, samples - 1, noise) * rdMul;
-			projectedShadowPosition.xy += offsetS;
+			vec3 shadowPos = baseShadowPos;
+			shadowPos.xy += offsetS;
 	#else
 		int samples = 1;
+		vec3 shadowPos = baseShadowPos;
 	#endif
 
 	#ifdef TRANSLUCENT_COLORED_SHADOWS
-		float opaqueShadow = shadow2D(shadowtex0, projectedShadowPosition).x;
-		float opaqueShadowT = shadow2D(shadowtex1, projectedShadowPosition).x;
-		vec4 translucentShadow = texture2D(shadowcolor0, projectedShadowPosition.xy);
+		float opaqueShadow = shadow2D(shadowtex0, shadowPos).x;
+		float opaqueShadowT = shadow2D(shadowtex1, shadowPos).x;
+		vec4 translucentShadow = texture2D(shadowcolor0, shadowPos.xy);
 
 		float shadowAlpha = pow(1.0-pow(1.0-translucentShadow.a,2.0),5.0);
 		translucentShadow.rgb = normalize(translucentShadow.rgb*translucentShadow.rgb + 0.0001) * (1.0-shadowAlpha);
@@ -586,7 +589,7 @@ vec3 ComputeShadowMap_COLOR(in vec3 projectedShadowPosition, float distortFactor
 		FUNNYSHADOW += ((1.0-shadowAlpha) * opaqueShadowT)/samples;
 	#else
 		// shadowColor += directLightColor * shadow2D(shadow, projectedShadowPosition).x;
-		shadowColor += vec3(1.0) * shadow2D(shadow, projectedShadowPosition).x;
+		shadowColor += vec3(1.0) * shadow2D(shadow, shadowPos).x;
 	#endif
 
 
@@ -595,7 +598,7 @@ vec3 ComputeShadowMap_COLOR(in vec3 projectedShadowPosition, float distortFactor
 	#endif
 
 	#ifdef debug_SHADOWMAP
-		shadowDebug = shadow2D(shadow, projectedShadowPosition).x;
+		shadowDebug = shadow2D(shadow, baseShadowPos).x;
 	#endif
 	// #ifdef TRANSLUCENT_COLORED_SHADOWS
 		// directLightColor *= mix(vec3(1.0), translucentTint.rgb / samples, maxDistFade);
@@ -1137,7 +1140,7 @@ void main() {
 				#ifdef DISTANT_HORIZONS
 					if (sunSSS_density > 0.0 && DH_SSS_OCCLUSION_INTENSITY > 0.0) {
 						vec3 sunDirection = normalize(WsunVec * mat3(gbufferModelViewInverse));
-						float sunVisibility = getDHSunVisibility(viewPos, sunDirection, BN.x, z0);
+						float sunVisibility = clamp(1.0 - getSunShadow(viewPos, sunDirection, BN.y, true, isDHRange), 0.0, 1.0);
 
 						SSSColor = mix(SSSColor, SSSColor * sunVisibility, DH_SSS_OCCLUSION_INTENSITY);
 					}

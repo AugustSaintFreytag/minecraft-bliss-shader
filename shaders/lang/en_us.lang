@@ -1114,7 +1114,8 @@ screen.MOD_SETTINGS = Supported Mods
         value.DH_VOLUMETRIC_LIGHT_OCCLUSION.0 = §cOFF
     option.DH_VOLUMETRIC_OCCLUSION_SAMPLES = Volumetric Occlusion Samples
         value.DH_VOLUMETRIC_OCCLUSION_SAMPLES.0 = §cOFF
-    option.DH_VOLUMETRIC_OCCLUSION_STEP = Volumetric Occlusion Step Size
+    option.DH_VOLUMETRIC_OCCLUSION_LENGTH = Volumetric Occlusion Length
+    option.DH_VOLUMETRIC_OCCLUSION_BIAS = Volumetric Occlusion Depth Bias
     option.DH_VOLUMETRIC_OCCLUSION_DISTANCE = Volumetric Occlusion Max Distance
 
     screen.PHYSICS_MOD_OCEAN = Physics Mod §c⚠ READ DESCRIPTION§r
@@ -1127,6 +1128,7 @@ screen.MOD_SETTINGS = Supported Mods
     screen.PHYSICS_MOD_OCEAN.comment = The ocean of physics mod is supported. The mod has its own settings for it located in §bgame options -> physics settings -> ocean§r
 
     option.DH_VOLUMETRIC_OCCLUSION_SAMPLES.comment = Number of depth samples taken when evaluating DH volumetric occlusion. Higher values produce smoother masking at the cost of slightly more work.
+    option.DH_VOLUMETRIC_OCCLUSION_BIAS.comment = Controls how aggressively small and thin geometry is ignored when masking sun volumetrics. Higher values reject more fine detail and preserve only broader occluders.
     option.DH_VOLUMETRIC_OCCLUSION.comment = Uses Distant Horizons depth buffer when sampling for sun-produced volumetrics. Allows DH terrain to obscure sunlight. §a⚠ PERFORMANCE COST:§r medium
     
  ###################################################### ↓↓↓ THIS SUBMENU'S LABELS

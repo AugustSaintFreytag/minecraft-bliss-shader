@@ -1,5 +1,3 @@
-uniform float far;
-
 float rand(float co) {
 	return fract(sin(co*(91.3458)) * 47453.5453);
 }

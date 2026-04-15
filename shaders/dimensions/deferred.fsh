@@ -10,6 +10,7 @@
 #define VOLUMETRIC_FOG_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
+#include "/lib/TAA_jitter.glsl"
 
 // this is an emergency plain text that will be visible as an the log error when a user tries to use voxy and DH both at once.
 #if defined VOXY && defined DISTANT_HORIZONS 
@@ -251,7 +252,7 @@ void main() {
 			}
 		}
 
-		if (matchesCoords(gl_FragCoord, SKY_AVERAGE_COLOR_COORDS)) {
+		if (matchesCoords(gl_FragCoord, LIGHT_COLOR_COORDS)) {
 			gl_FragData[0] = vec4((skyGroundCol / 150.0) * AmbientLightTint, 1.0);
 			
 			if(worldTimeChangeCheck) {
@@ -367,7 +368,7 @@ void main() {
 		float volumetricFogLightBoost = 2.5;
 
 		vec4 volumetricClouds = GetVolumetricClouds(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, cloudPlaneDistance);
-		vec4 volumetricFog = GetVolumetricFog(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, 1.0, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, averageSkyCol_Clouds * 5.0, cloudPlaneDistance);
+		vec4 volumetricFog = GetVolumetricFog(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, 0.0, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, averageSkyCol_Clouds * 5.0, cloudPlaneDistance);
 
 		vec3 finalSky = skyColBase * volumetricClouds.a + volumetricClouds.rgb / 5.0;
 		finalSky = finalSky * volumetricFog.a + volumetricFog.rgb / 5.0;
