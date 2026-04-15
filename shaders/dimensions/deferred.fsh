@@ -365,7 +365,7 @@ void main() {
 		#endif
 
 		float cloudPlaneDistance = 0.0;
-		float volumetricFogLightBoost = 2.5;
+		float volumetricFogLightBoost = 2.0;
 
 		vec4 volumetricClouds = GetVolumetricClouds(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, cloudPlaneDistance);
 		vec4 volumetricFog = GetVolumetricFog(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, 0.0, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, averageSkyCol_Clouds * 5.0, cloudPlaneDistance);
