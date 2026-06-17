@@ -1,8 +1,8 @@
+#define FOG_USE_TURBULENCE 0
 #define FOG_USE_SHAPING 1
-#define FOG_USE_TURBULENCE 1
 
-#define FOG_TURBULENCE_MIX 1.0
-#define FOG_SHAPING_INTENSITY 1.0
+#define FOG_TURBULENCE_MIX 0.0
+#define FOG_SHAPING_INTENSITY 0.6
 
 #include "/lib/fog_utils.glsl"
 
@@ -33,7 +33,7 @@ float phaseCloudFog(float x, float g) {
 }
 
 float densityAtPosFog(in vec3 pos) {
-	pos /= 16.0;
+	pos /= 36.0;
 	pos.xz *= 0.5;
 	
 	vec3 p = floor(pos);
@@ -70,8 +70,8 @@ float turbulentFogNoise(in vec3 pos) {
 }
 
 float shapeFogNoise(float noise, float coverage, float intensity) {
-	float noiseFloor = mix(0, 0.25, coverage - 0.5);
-	float noiseCeiling = mix(0.25, 0.7, coverage);
+	float noiseFloor = mix(0, 0.25, pow((coverage - 0.5) / 0.5, 2.0));
+	float noiseCeiling = mix(0.15, 0.7, pow(coverage, 2.0));
 	float shapedNoise = smoothstep(noiseFloor, noiseCeiling, noise);
 
 	return mix(noise, shapedNoise, intensity);
@@ -82,15 +82,6 @@ float applyFogShaping(float noise, float coverage, float intensity) {
 	return clamp(shapeFogNoise(noise, coverage, intensity), 0.0, 1.0);
 #else
 	return clamp(noise, 0.0, 1.0);
-#endif
-}
-
-float applyFogTurbulence(float baseNoise, vec3 pos) {
-#if FOG_USE_TURBULENCE
-	float turbulentNoise = turbulentFogNoise(pos);
-	return mix(baseNoise, baseNoise * 0.25 + turbulentNoise * 0.75, FOG_TURBULENCE_MIX);
-#else
-	return baseNoise;
 #endif
 }
 
@@ -114,8 +105,7 @@ float getLocalEffectDensity(
 
 		samplePos += vec3(1.0, -0.01, 1.0) * frameTimeCounter * 500.0 * Cloud_Speed;
 
-		float baseNoise = densityAtPosFog(samplePos);
-		float localClumpyNoise = applyFogTurbulence(baseNoise, samplePos);
+		float localClumpyNoise = densityAtPosFog(samplePos);
 		float localClumpyFog = min(max(1.0 - applyFogShaping(localClumpyNoise, clumpyCoverage, FOG_SHAPING_INTENSITY), 0.0), 1.0);
 
 		fogResult += localClumpyFog * clumpyFog;
@@ -140,11 +130,9 @@ float getFogDensities(
 		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 24.0, 1.0) + movement;
 		vec3 samplePos2 = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) + movement;
 
-		float shapeBaseNoise = densityAtPosFog(samplePos * 24.0);
-		float shapeNoise = applyFogTurbulence(shapeBaseNoise, samplePos * 18.0);
+		float shapeNoise = densityAtPosFog(samplePos * 24.0);;
 		float shape = 1.0 - applyFogShaping(shapeNoise, clumpyCoverage, FOG_SHAPING_INTENSITY);
-		float shape2BaseNoise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0, 1.0) * 200.0));
-		float shape2Noise = applyFogTurbulence(shape2BaseNoise, samplePos2 * 150.0);
+		float shape2Noise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0, 1.0) * 200.0));
 		float shape2 = 1.0 - applyFogShaping(shape2Noise, clumpyCoverage, FOG_SHAPING_INTENSITY);
 		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - float(FOG_START_HEIGHT), 0.0));
 
@@ -349,7 +337,8 @@ vec4 GetVolumetricFog(
 		float fogVolumeCoeff = clamp(exp(-fogDensity * volumeSampleOffset * rayLength), 0.0, 1.0);
 		float fogSunPhase = mix(sunPhase, sunPhase, smoothstep(0.0, 1.0, fogVolumeCoeff * 1.5));
 
-		vec3 fogLighting = masterLightColor * fogSunPhase * shadows * 0.85 + ambientLightColor * skyPhase;
+		// vec3 fogLighting = masterLightColor * fogSunPhase * shadows * 0.85 + ambientLightColor * skyPhase;
+		vec3 fogLighting = masterLightColor * sunPhase * shadows + ambientLightColor * skyPhase;
 
 		// Lightning
 		
