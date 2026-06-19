@@ -282,6 +282,7 @@ vec4 waterVolumetrics(vec3 rayStart, vec3 rayEnd, float rayLength, vec2 dither, 
 	#ifdef OVERWORLD_SHADER
 		float lowlightlevel  = clamp(eyeBrightnessSmooth.y / 240.0, 0.1, 1.0);
 		float phase = fogPhase(VdotL) * 5.0;
+		phase = mix(0.1, phase, 1.0 - sunShadow);
 	#else
 		float lowlightlevel  = 1.0;
 		float phase = 0.0;
@@ -344,9 +345,6 @@ vec4 waterVolumetrics(vec3 rayStart, vec3 rayEnd, float rayLength, vec2 dither, 
 
 		vec3 directLight = lightSource * phase * caustics * sunAbsorbance;
 		vec3 indirectLight = ambient * waterAbsorbance;
-		// vec3 indirectLight = ambient * (0.25 + (1.0 - sunShadow) * 4.0) * waterAbsorbance;
-
-
 		vec3 light = (indirectLight + directLight + LPV) * scatterCoef;
 		
 		vec3 volumeCoeff = exp(-waterCoefs * length(dd * dVWorld));
@@ -378,6 +376,7 @@ vec4 waterVolumetricsTranslucent(vec3 rayStart, vec3 rayEnd, float estEndDepth, 
 	
     #ifdef OVERWORLD_SHADER
 		float phase = fogPhase(VdotL) * 5.0;
+		phase = mix(0.1, phase, 1.0 - sunShadow);
 	#else
 		float phase = 1.0;
 	#endif
@@ -437,7 +436,6 @@ vec4 waterVolumetricsTranslucent(vec3 rayStart, vec3 rayEnd, float estEndDepth, 
 		vec3 ambientAbsorbance = exp(-waterCoefs * (estEndDepth * d + downwardAbsorbtionBias));
 
 		vec3 directLight = lightSource * sh * cloudShadow * phase * sunAbsorbance;
-		// vec3 indirectLight = ambient * (0.25 + (1.0 - sunShadow) * 4) * ambientAbsorbance;
 		vec3 indirectLight = ambient * ambientAbsorbance;
 
 		vec3 light = (directLight + indirectLight) * scatterCoef;
@@ -645,10 +643,6 @@ void main() {
   		  }
   		#endif
 
-		if (isEyeInWater == 1) {
-			sunShadow = 0.0;
-		}
-
 		vec4 volumetricFog = GetVolumetricFog(airFogViewPos, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
 		if (isSky) {
@@ -687,10 +681,11 @@ void main() {
 	
 	if(blendedAlpha > 0.0 || isInWater){
 		// Translucents
-		vec4 translucentVolumetricClouds = volumetricClouds;
 		vec4 translucentVolumetricFog = vec4(0.0, 0.0, 0.0, 1.0);
 
 		#if defined OVERWORLD_SHADER
+			vec4 translucentVolumetricClouds = volumetricClouds;
+
 			translucentVolumetricClouds = GetVolumetricClouds(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
 			translucentVolumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
 			translucentVolumetricFog = vec4(translucentVolumetricClouds.rgb * translucentVolumetricFog.a + translucentVolumetricFog.rgb, translucentVolumetricFog.a * translucentVolumetricClouds.a);
@@ -704,18 +699,6 @@ void main() {
 
 		if(isInWater && isEyeInWater != 1) {
 			vec4 waterVolumetricFog = waterVolumetricsTranslucent(viewPos0, viewPos1, estimatedDepth, estimatedSunDepth, Vdiff, noise_1, totEpsilon, scatterCoef, indirectLight, directLightColor, sunShadow, dot(normalize(viewPos0), normalize(sunVec * lightCol.a)));
-
-			// Darken distant DH/LOD water fog with a smooth transition starting at the vanilla render boundary.
-			// #ifdef USING_LOD_MOD
-			// vec4 waterVolumetricFogDistant = translucentVolumetricFog * 0.1;
-			// 	bool isDHWater = (z1 >= 1.0) && (DH_z1 < 1.0);
-			// 	if (isDHWater) {
-			// 		float dhDistanceFactor = smoothstep(far, far + (LOD_FARPLANE - far) * 0.5, length(viewPos1));
-			// 		// waterVolumetricFog = mix(waterVolumetricFog, waterVolumetricFogDistant, dhDistanceFactor);
-			// 		waterVolumetricFog = waterVolumetricFogDistant;
-			// 	}
-			// #endif
-
 			gl_FragData[1] = clamp(waterVolumetricFog, 0.0, 68000.0);
 		}
 	}
