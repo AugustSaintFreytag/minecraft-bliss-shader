@@ -2,7 +2,7 @@
 #define FOG_USE_SHAPING 1
 
 #define FOG_TURBULENCE_MIX 0.0
-#define FOG_SHAPING_INTENSITY 0.6
+#define FOG_SHAPING_INTENSITY 0.8
 
 #include "/lib/fog_utils.glsl"
 
@@ -13,6 +13,7 @@ uniform vec3 exitedBiomePos;
 #define LOCAL_FOG_EXTINCTION_MULT 1.35
 #define WEATHER_FOG_SINGLE_SCATTER_ALBEDO 0.98
 #define LOCAL_FOG_SINGLE_SCATTER_ALBEDO 0.98
+#define CLUMPY_FOG_MAX_DISTANCE 512.0
 
 // Utilities
 
@@ -23,10 +24,10 @@ float phaseRayleigh(float cosTheta) {
 }
 
 float fogPhase(float lightPoint) {
-	float linear = clamp(-lightPoint*0.5+0.5,0.0,1.0);
-	float linear2 = 1.0 - clamp(lightPoint,0.0,1.0);
+	float linear = clamp(-lightPoint * 0.5 + 0.5, 0.0, 1.0);
+	float linear2 = 1.0 - clamp(lightPoint, 0.0, 1.0);
 
-	float exponential = exp2(pow(linear,0.3) * -15.0 ) * 1.5;
+	float exponential = exp2(pow(linear, 0.3) * -15.0 ) * 1.5;
 	exponential += sqrt(exp2(sqrt(linear) * -12.5));
 
 	return exponential;
@@ -119,15 +120,21 @@ float getLocalEffectDensity(
 	return pow(fogResult, 2) * getFogStartHeightFade(playerPos.y);
 }
 
-float getFogDensities(
-	in vec3 playerPos,
-	float localEffectRadius
-) {	
+float getUniformFogDensity(
+	in vec3 playerPos
+) {
 	float uniformFog = scaleFogSetting(parameters.fog.x, FOG_UNIFORM_SCALE);
+
+	return pow(uniformFog, 3) * getFogStartHeightFade(playerPos.y);
+}
+
+float getClumpyFogDensity(
+	in vec3 playerPos
+) {
 	float clumpyFog = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
 	float clumpyCoverage = parameters.fog.z;
 
-	float fogResult = pow(uniformFog, 3);
+	float fogResult = 0.0;
 
 	if(clumpyFog > 0.0) {
 		vec3 movement = vec3(1.0, -0.01, 1.0) * frameTimeCounter * Cloud_Speed;
@@ -267,8 +274,16 @@ vec4 GetVolumetricFog(
 		weatherRayLength = length(weatherRayStartPos);
 	}
 
+	vec3 clumpyRayStartPos = weatherRayStartPos;
+	float clumpyRayLength = weatherRayLength;
+	float clumpyMaxLength = min(clumpyRayLength, CLUMPY_FOG_MAX_DISTANCE) / max(clumpyRayLength, 1e-6);
+
+	clumpyRayStartPos *= clumpyMaxLength;
+	clumpyRayLength = length(clumpyRayStartPos);
+
 	vec3 rayProgress = vec3(0.0);
 	vec3 weatherRayProgress = vec3(0.0);
+	vec3 clumpyRayProgress = vec3(0.0);
 	vec3 localRayProgress = vec3(0.0);
 	vec3 shadowMapRayProgress = vec3(0.0);
 
@@ -318,13 +333,16 @@ vec4 GetVolumetricFog(
 		#if defined CloudLayer0 || defined CloudLayer1 || defined CloudLayer2
 			float airKill = length(sampleOffset * rayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
 			float weatherKill = length(sampleOffset * weatherRayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
+			float clumpyKill = length(sampleOffset * clumpyRayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
 		#else
 			float airKill = 1.0;
 			float weatherKill = 1.0;
+			float clumpyKill = 1.0;
 		#endif
 
 		rayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * rayStartPos;
 		weatherRayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * weatherRayStartPos;
+		clumpyRayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * clumpyRayStartPos;
 		localRayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * localRayStartPos;
 		
 		#ifdef FAKE_PLANET
@@ -366,11 +384,6 @@ vec4 GetVolumetricFog(
 
 		// (II) Global Fog
 
-		float weatherStepLength = volumeSampleOffset * weatherRayLength;
-		float fogDensity = weatherKill * getFogDensities(weatherRayProgress, 0.0) * pow(indoors, 3);
-		float fogSigmaT = fogDensity * WEATHER_FOG_EXTINCTION_MULT;
-		float fogVolumeCoeff = clamp(exp(-fogSigmaT * weatherStepLength), 0.0, 1.0);
-
 		vec3 fogLighting = masterLightColor * sunPhase * shadows + ambientLightColor * skyPhase;
 
 		// Lightning
@@ -378,10 +391,22 @@ vec4 GetVolumetricFog(
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			fogLighting += lightningFlash;
 		#endif
-		
-		fogLighting *= (1.0 - fogVolumeCoeff) * WEATHER_FOG_SINGLE_SCATTER_ALBEDO * absorbance;
 
-		color += fogLighting;
+		float uniformStepLength = volumeSampleOffset * weatherRayLength;
+		float uniformDensity = weatherKill * getUniformFogDensity(weatherRayProgress) * pow(indoors, 3);
+		float uniformSigmaT = uniformDensity * WEATHER_FOG_EXTINCTION_MULT;
+		float uniformFogVolumeCoeff = clamp(exp(-uniformSigmaT * uniformStepLength), 0.0, 1.0);
+		
+		color += fogLighting * (1.0 - uniformFogVolumeCoeff) * WEATHER_FOG_SINGLE_SCATTER_ALBEDO * absorbance;
+
+		float clumpyStepLength = volumeSampleOffset * clumpyRayLength;
+		float clumpyDensity = clumpyKill * getClumpyFogDensity(clumpyRayProgress) * pow(indoors, 3);
+		float clumpySigmaT = clumpyDensity * WEATHER_FOG_EXTINCTION_MULT;
+		float clumpyFogVolumeCoeff = clamp(exp(-clumpySigmaT * clumpyStepLength), 0.0, 1.0);
+
+		color += fogLighting * (1.0 - clumpyFogVolumeCoeff) * WEATHER_FOG_SINGLE_SCATTER_ALBEDO * absorbance * uniformFogVolumeCoeff;
+
+		float fogVolumeCoeff = uniformFogVolumeCoeff * clumpyFogVolumeCoeff;
 
 		// (III) Local Fog
 
