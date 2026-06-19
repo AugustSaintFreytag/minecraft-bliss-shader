@@ -263,9 +263,16 @@ vec4 GetVolumetricFog(
 	
 	float indoors = clamp(eyeBrightnessSmooth.y / 240.0, 0, 1);
 	float daylightFactor = clamp(sunElevation * 2.0, 0.0, 1.0);
+	float daylightAmp = (1.0 + (1.0 - daylightFactor) * 1.0);
 	
-	vec3 masterLightColor = saturate(lightColor * 1.5, 0.85) * (1.0 + (1.0 - daylightFactor) * 1.0);
+	vec3 masterLightColor = saturate(lightColor * 1.5, 0.85) * daylightAmp;
 	vec3 ambientLightColor = saturate(ambientColor * 1.25, 0.25) + (0.25 * saturate(lightColor, 0.35));
+
+	// vec3 masterLightColor = lightColor * 1.5 * daylightAmp;
+	// vec3 ambientLightColor = ambientColor * 1.25 + (0.25 * lightColor);
+
+	// vec3 masterLightColor = lightColor;
+	// vec3 ambientLightColor = ambientColor;
 
 	vec3 localFogColor = parameters.localFogColor.rgb;
 	vec3 localFogColor_lightCol = localFogColor * dot(masterLightColor, vec3(0.33333));
@@ -273,8 +280,8 @@ vec4 GetVolumetricFog(
 
 	float skyPhase = 0.5 + pow(1.0 - pow(1.0 - clamp(normalize(playerPos).y * 0.5 + 0.5, 0.0, 1.0), 2.0), 2.0) * 2.0;
 
-	vec3 rayleighCoeffs = vec3(sky_coefficientRayleighR*1e-6, sky_coefficientRayleighG*1e-5, sky_coefficientRayleighB*1e-5);
-	vec3 mieCoeffs = vec3(sky_coefficientMieR*1e-6, sky_coefficientMieG*1e-6, sky_coefficientMieB*1e-6);
+	vec3 rayleighCoeffs = vec3(sky_coefficientRayleighR * 1e-6, sky_coefficientRayleighG * 1e-5, sky_coefficientRayleighB * 1e-5);
+	vec3 mieCoeffs = vec3(sky_coefficientMieR * 1e-6, sky_coefficientMieG * 1e-6, sky_coefficientMieB * 1e-6);
 
 	// If current fog parameters include any local fog.
 	float localFogDensityFactor = (parameters.localFog.x > 0.0 || parameters.localFog.y > 0.0) ? 1.0 : 0.0;
