@@ -1,7 +1,6 @@
 #define FOG_USE_TURBULENCE 0
 #define FOG_USE_SHAPING 1
-
-#define FOG_SHAPING_INTENSITY 0.8
+#define FOG_SHAPING_INTENSITY 0.9
 
 #include "/lib/fog_utils.glsl"
 
@@ -12,7 +11,7 @@ uniform vec3 exitedBiomePos;
 #define LOCAL_FOG_EXTINCTION_MULT 1.35
 #define WEATHER_FOG_SINGLE_SCATTER_ALBEDO 0.98
 #define LOCAL_FOG_SINGLE_SCATTER_ALBEDO 0.98
-#define CLUMPY_FOG_MAX_DISTANCE 512.0
+#define CLUMPY_FOG_MAX_DISTANCE 1024.0
 
 // Utilities
 
@@ -38,13 +37,13 @@ float phaseCloudFog(float x, float g) {
 }
 
 float densityAtPosFog(in vec3 pos) {
-	pos /= 36.0;
+	pos /= 32.0;
 	pos.xz *= 0.5;
 	
 	vec3 p = floor(pos);
 	vec3 f = fract(pos);
 	
-	f = (f*f) * (3.-2.*f);
+	f = (f*f) * (3.0 - 2.0 * f);
 	
 	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0, 193.0);
 	vec2 coord =  uv / 512.0;
@@ -53,10 +52,9 @@ float densityAtPosFog(in vec3 pos) {
 	return mix(xy.r, xy.g, f.y);
 }
 
-
 float shapeFogNoise(float noise, float coverage, float intensity) {
-	float noiseFloor = mix(0, 0.25, pow((coverage - 0.5) / 0.5, 2.0));
-	float noiseCeiling = mix(0.15, 0.7, pow(coverage, 2.0));
+	float noiseFloor = mix(0, 0.20, pow((coverage - 0.5) / 0.5, 2.0));
+	float noiseCeiling = mix(0.10, 0.85, pow(coverage, 2.0));
 	float shapedNoise = smoothstep(noiseFloor, noiseCeiling, noise);
 
 	return mix(noise, shapedNoise, intensity);
@@ -282,14 +280,8 @@ vec4 GetVolumetricFog(
 	float daylightFactor = clamp(sunElevation * 2.0, 0.0, 1.0);
 	float daylightAmp = (1.0 + (1.0 - daylightFactor) * 1.0);
 	
-	vec3 masterLightColor = saturate(lightColor * 1.4, 0.85) * daylightAmp;
-	vec3 ambientLightColor = saturate(ambientColor * 1.2, 0.25) + (0.25 * saturate(lightColor, 0.35));
-
-	// vec3 masterLightColor = lightColor * 1.5 * daylightAmp;
-	// vec3 ambientLightColor = ambientColor * 1.25 + (0.25 * lightColor);
-
-	// vec3 masterLightColor = lightColor;
-	// vec3 ambientLightColor = ambientColor;
+	vec3 masterLightColor = lightColor * 1.5 * daylightAmp;
+	vec3 ambientLightColor = ambientColor * 1.2 + 0.25 * lightColor);
 
 	vec3 localFogColor = parameters.localFogColor.rgb;
 	vec3 localFogColor_lightCol = localFogColor * dot(masterLightColor, vec3(0.33333));
