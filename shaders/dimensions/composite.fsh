@@ -424,13 +424,14 @@ void main() {
 		}
 	#endif
 
-	vec3 FlatNormals = normalize(texture(colortex15,texcoord).rgb * 2.0 - 1.0);
+	vec3 flatNormals = normalize(texture(colortex15,texcoord).rgb * 2.0 - 1.0);
 	
 	#if indirect_effect == SSAO_FILTERED || indirect_effect == SSAO_HQ
-		if(z >= 1.0) FlatNormals = normal;
+		if(z >= 1.0) {
+			flatNormals = normal;
+		}
 
-		vec2 SSAO_SSS = SSAO(viewPos, worldToView(normal), worldToView(FlatNormals), hand, noise, z >= 1.0);
-		
+		vec2 SSAO_SSS = SSAO(viewPos, worldToView(normal), worldToView(flatNormals), hand, noise, z >= 1.0);
 		SSAO_SSS.y = clamp(SSAO_SSS.y + 0.5 * lightmap.y*lightmap.y,0.0,1.0);
 
 		if(swappedDepth >= 1.0) SSAO_SSS = vec2(1.0,0.0);
@@ -476,7 +477,7 @@ void main() {
 				vec3 feetPlayerPos = mat3(gbufferModelViewInverse) * viewPos + gbufferModelViewInverse[3].xyz;
 				
 				#if LIGHTLEAKFIX_MODE == 1
-					if(!hand) GriAndEminShadowFix(feetPlayerPos, FlatNormals, lightLeakFix);
+					if(!hand) GriAndEminShadowFix(feetPlayerPos, flatNormals, lightLeakFix);
 				#endif
 
 				vec3 projectedShadowPosition = mat3(shadowModelView) * feetPlayerPos  + shadowModelView[3].xyz;

@@ -39,10 +39,8 @@ uniform float frameTimeCounter;
 
 void main() {
 	gl_Position = ftransform();
+	gl_Position.xy = (gl_Position.xy * 0.5 + 0.5) * (0.01 + VL_RENDERING_RESOLUTION_SCALE) * 2.0 - 1.0;
 
-	gl_Position.xy = (gl_Position.xy*0.5+0.5)*(0.01+VL_RENDERING_RESOLUTION_SCALE)*2.0-1.0;
-
-	
 	#ifdef OVERWORLD_SHADER
 		lightCol.rgb = texelFetch(colortex4, LIGHT_COLOR_COORDS, 0).rgb;
 		averageSkyCol = texelFetch(colortex4, SKY_AVERAGE_COLOR_COORDS, 0).rgb;

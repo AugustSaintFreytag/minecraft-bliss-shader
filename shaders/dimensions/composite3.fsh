@@ -389,10 +389,10 @@ void blendAllFogTypes(inout vec3 color, inout float bloomyFogMult, vec4 volumetr
     color.rgb *= transmittance;
 
     vec3 transmittance2 = exp(-totEpsilon * 50.0);
-    float fogfade = 1.0 - max((1.0 - linearDistance / min(far, 16.0*7.0) ),0);
+    float fogfade = 1.0 - max((1.0 - linearDistance / min(far, 16.0 * 7.0) ),0);
     color.rgb += (transmittance2 * scatterCoef) * fogfade;
     
-    bloomyFogMult *= dot(transmittance,vec3(0.3333))*0.75 + 0.25;
+    bloomyFogMult *= dot(transmittance, vec3(0.3333)) * 0.75 + 0.25;
   }
   
   // make bloomy fog only work outside of the overworld (unless underwater)

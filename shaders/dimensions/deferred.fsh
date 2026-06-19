@@ -159,8 +159,6 @@ float linearizeDepthFast(const in float depth, const in float near, const in flo
 
 #ifdef OVERWORLD_SHADER
 
-	// uniform sampler2D colortex4;
-	// uniform sampler2D colortex12;
 	// const bool shadowHardwareFiltering = true;
 	uniform sampler2DShadow shadow;
 
@@ -182,14 +180,13 @@ float linearizeDepthFast(const in float depth, const in float near, const in flo
 	#include "/lib/volumetricClouds.glsl"
 	#include "/lib/climate_settings.glsl"
 	#include "/lib/overworld_fog.glsl"
-	
 #endif
+
 #ifdef NETHER_SHADER
-	uniform sampler2D colortex4;
 	#include "/lib/nether_fog.glsl"
 #endif
+
 #ifdef END_SHADER
-	uniform sampler2D colortex4;
 	#include "/lib/end_fog.glsl"
 #endif
 

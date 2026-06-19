@@ -36,7 +36,6 @@ void main() {
 
 	#ifdef OVERWORLD_SHADER
 		#ifdef BorderFog
-			// skyGroundColor = (texelFetch(colortex4, SKY_AVERAGE_COLOR_COORDS, 0).rgb / 1200) * Sky_Brightness;
 			skyGroundColor = (texelFetch(colortex4, SKY_AND_CLOUDS_AVERAGE_COLOR_COORDS, 0).rgb / 1200) * Sky_Brightness;
 		#endif
 
