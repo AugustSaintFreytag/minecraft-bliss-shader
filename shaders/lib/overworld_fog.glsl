@@ -9,6 +9,11 @@
 uniform bool isInSpecialEnvironment;
 uniform vec3 exitedBiomePos;
 
+#define WEATHER_FOG_EXTINCTION_MULT 1.25
+#define LOCAL_FOG_EXTINCTION_MULT 1.35
+#define WEATHER_FOG_SINGLE_SCATTER_ALBEDO 0.98
+#define LOCAL_FOG_SINGLE_SCATTER_ALBEDO 0.98
+
 // Utilities
 
 float phaseRayleigh(float cosTheta) {
@@ -205,7 +210,8 @@ vec4 GetVolumetricFog(
 	in vec3 ambientColor,
 	in vec3 averagedAmbientColor,
 	
-	in float cloudPlaneDistance
+	in float cloudPlaneDistance,
+	in bool isSkyRay
 ) {
 	#ifndef TOGGLE_VL_FOG
 		return vec4(0.0, 0.0, 0.0, 1.0);
@@ -221,7 +227,7 @@ vec4 GetVolumetricFog(
 	vec3 localRayStartPos = rayStartPos;
 	float localRayLength = length(localRayStartPos);
 
-	localRayStartPos *= min(localRayLength, 64.0) / localRayLength;
+	localRayStartPos *= min(localRayLength, 64.0) / max(localRayLength, 1e-6);
 	localRayLength = length(localRayStartPos); 
 
 	// Shadow Map
@@ -232,12 +238,13 @@ vec4 GetVolumetricFog(
 	vec3 shadowMapZeroPos = toShadowSpaceProjected(vec3(0.0));
 	vec3 shadowMapRayStartPos = shadowViewPos - shadowMapZeroPos;
 
-	float rayLength = length(rayStartPos);
+	float fullRayLength = length(rayStartPos);
+	float rayLength = fullRayLength;
 
 	#ifdef USING_LOD_MOD
-		float maxLength = min(rayLength, max(far, LOD_RENDERDISTANCE)) / rayLength;
+		float maxLength = min(rayLength, max(far, LOD_RENDERDISTANCE)) / max(rayLength, 1e-6);
 	#else
-		float maxLength = min(rayLength, far)/rayLength;
+		float maxLength = min(rayLength, far) / max(rayLength, 1e-6);
 	#endif
 
 	shadowMapRayStartPos *= maxLength;
@@ -245,7 +252,23 @@ vec4 GetVolumetricFog(
 
 	rayLength = length(rayStartPos);
 
+	vec3 weatherRayStartPos = rayStartPos;
+	float weatherRayLength = rayLength;
+
+	if(isSkyRay) {
+		#ifdef USING_LOD_MOD
+			float skyWeatherDistance = max(far, LOD_RENDERDISTANCE);
+		#else
+			float skyWeatherDistance = far;
+		#endif
+
+		float weatherMaxLength = min(fullRayLength, skyWeatherDistance) / max(fullRayLength, 1e-6);
+		weatherRayStartPos = (playerPos - gbufferModelViewInverse[3].xyz) * weatherMaxLength;
+		weatherRayLength = length(weatherRayStartPos);
+	}
+
 	vec3 rayProgress = vec3(0.0);
+	vec3 weatherRayProgress = vec3(0.0);
 	vec3 localRayProgress = vec3(0.0);
 	vec3 shadowMapRayProgress = vec3(0.0);
 
@@ -293,12 +316,15 @@ vec4 GetVolumetricFog(
 		float volumeSampleOffset = pow(expFactor, float(i + dither.y) / float(sampleCount)) * log(expFactor) / float(sampleCount) / (expFactor - 1.0);
 	
 		#if defined CloudLayer0 || defined CloudLayer1 || defined CloudLayer2
-			float kill = length(sampleOffset * rayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
+			float airKill = length(sampleOffset * rayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
+			float weatherKill = length(sampleOffset * weatherRayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
 		#else
-			float kill = 1.0;
+			float airKill = 1.0;
+			float weatherKill = 1.0;
 		#endif
 
 		rayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * rayStartPos;
+		weatherRayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * weatherRayStartPos;
 		localRayProgress = gbufferModelViewInverse[3].xyz + cameraPosition + sampleOffset * localRayStartPos;
 		
 		#ifdef FAKE_PLANET
@@ -306,7 +332,7 @@ vec4 GetVolumetricFog(
 		#endif
 
 		// Receives: Sampled position, sun vector, sampling distance, shadow map zero position, shadow map max ray length position, shadow map progress, ambient light phase, sun light phase
-		vec3 shadows = getShadows(mix(rayProgress, localRayProgress, localFogDensityFactor), sunVector, shadowMapZeroPos, shadowMapRayStartPos * sampleOffset, shadowMapRayProgress, flatPhase, sunPhase);
+		vec3 shadows = getShadows(mix(weatherRayProgress, localRayProgress, localFogDensityFactor), sunVector, shadowMapZeroPos, shadowMapRayStartPos * sampleOffset, shadowMapRayProgress, flatPhase, sunPhase);
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
 			vec3 lightningFlash = createLightningPointLight(rayProgress - cameraPosition, lightningBoltPosition.xyz, 1.0, 1.0) * indoors;
@@ -325,7 +351,7 @@ vec4 GetVolumetricFog(
 
 		vec3 rayleigh = rayleighCoeffs * airCoef.x;
 		vec3 mie = mieCoeffs * (airCoef.y + min(ATMOSPHERIC_HAZE_AMOUNT, 1.0) * fogStartHeightFade);
-		vec3 airDensity = kill * (rayleigh + mie);
+		vec3 airDensity = airKill * (rayleigh + mie);
 		vec3 airDensityPhased = rayleighPhase * rayleigh + sunPhase * mie;
 		vec3 airVolumeCoeff = exp(-airDensity * volumeSampleOffset * rayLength);
 		vec3 airLighting = masterLightColor * shadows * sunPhase * airDensityPhased + averagedAmbientColor * airDensity * 0.666;
@@ -340,11 +366,11 @@ vec4 GetVolumetricFog(
 
 		// (II) Global Fog
 
-		float fogDensity = kill * getFogDensities(rayProgress, 0.0) * pow(indoors, 3);
-		float fogVolumeCoeff = clamp(exp(-fogDensity * volumeSampleOffset * rayLength), 0.0, 1.0);
-		float fogSunPhase = mix(sunPhase, sunPhase, smoothstep(0.0, 1.0, fogVolumeCoeff * 1.5));
+		float weatherStepLength = volumeSampleOffset * weatherRayLength;
+		float fogDensity = weatherKill * getFogDensities(weatherRayProgress, 0.0) * pow(indoors, 3);
+		float fogSigmaT = fogDensity * WEATHER_FOG_EXTINCTION_MULT;
+		float fogVolumeCoeff = clamp(exp(-fogSigmaT * weatherStepLength), 0.0, 1.0);
 
-		// vec3 fogLighting = masterLightColor * fogSunPhase * shadows * 0.85 + ambientLightColor * skyPhase;
 		vec3 fogLighting = masterLightColor * sunPhase * shadows + ambientLightColor * skyPhase;
 
 		// Lightning
@@ -353,26 +379,30 @@ vec4 GetVolumetricFog(
 			fogLighting += lightningFlash;
 		#endif
 		
-		fogLighting = (fogLighting - fogLighting * fogVolumeCoeff) * absorbance;
+		fogLighting *= (1.0 - fogVolumeCoeff) * WEATHER_FOG_SINGLE_SCATTER_ALBEDO * absorbance;
 
 		color += fogLighting;
 
 		// (III) Local Fog
 
 		#if (defined CloudLayer0 || defined CloudLayer1 || defined CloudLayer2)
-			kill = length(sampleOffset * localRayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
+			float localKill = length(sampleOffset * localRayStartPos) > cloudPlaneDistance ? 0.0 : 1.0;
+		#else
+			float localKill = 1.0;
 		#endif
 
-		float localEffectDensity = kill * getLocalEffectDensity(localRayProgress);
+		float localStepLength = volumeSampleOffset * localRayLength;
+		float localEffectDensity = localKill * getLocalEffectDensity(localRayProgress);
 
 		#ifdef EXCLUDE_WRITE_TO_LUT
 			localEffectDensity *= indoors;
 		#endif
 
-		float localFogVolumeCoeff = exp(-localEffectDensity * volumeSampleOffset * localRayLength);
+		float localFogSigmaT = localEffectDensity * LOCAL_FOG_EXTINCTION_MULT;
+		float localFogVolumeCoeff = exp(-localFogSigmaT * localStepLength);
 		vec3 localFogLighting = localFogColor_lightCol * shadows * sunPhase + localFogColor_ambientCol * skyPhase;
 		
-		color += (localFogLighting - localFogLighting * localFogVolumeCoeff) * localAbsorbance;
+		color += localFogLighting * (1.0 - localFogVolumeCoeff) * LOCAL_FOG_SINGLE_SCATTER_ALBEDO * localAbsorbance;
 		
 		localAbsorbance *= localFogVolumeCoeff;
 		airAbsorbance *= airVolumeCoeff * fogVolumeCoeff * localFogVolumeCoeff;

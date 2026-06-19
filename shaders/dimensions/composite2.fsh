@@ -544,7 +544,13 @@ void main() {
 		float DH_z1 = 0.0;
 	#endif
 
-	bool isSky = min(z0, DH_z0) >= 1.0;
+	#ifdef USING_LOD_MOD
+		bool isSky = min(z0, DH_z0) >= 1.0;
+		bool isTranslucentSky = min(z1, DH_z1) >= 1.0;
+	#else
+		bool isSky = z0 >= 1.0;
+		bool isTranslucentSky = z1 >= 1.0;
+	#endif
 	
 	vec3 viewPos0 = toScreenSpace_DH(rawTexelCoord, z0, DH_z0);
 	vec3 viewPos1 = toScreenSpace_DH(rawTexelCoord, z1, DH_z1);
@@ -643,11 +649,7 @@ void main() {
   		  }
   		#endif
 
-		vec4 volumetricFog = GetVolumetricFog(airFogViewPos, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
-
-		if (isSky) {
-			// Possibility of explicit fog boost by daylight: volumetricFog.rgb *= mix(1.0, 2.0, daylightFactor);
-		}
+		vec4 volumetricFog = GetVolumetricFog(airFogViewPos, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance, isSky);
 
 		#if defined LPV_VL_FOG_ILLUMINATION
 			volumetricFog.a *= LPV_ILLUMINATION.a;
@@ -687,7 +689,7 @@ void main() {
 			vec4 translucentVolumetricClouds = volumetricClouds;
 
 			translucentVolumetricClouds = GetVolumetricClouds(viewPos1, vec2(noise_1), WsunVec, directLightColor, indirectLightColor, cloudPlaneDistance);
-			translucentVolumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
+			translucentVolumetricFog = GetVolumetricFog(viewPos1, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance, isTranslucentSky);
 			translucentVolumetricFog = vec4(translucentVolumetricClouds.rgb * translucentVolumetricFog.a + translucentVolumetricFog.rgb, translucentVolumetricFog.a * translucentVolumetricClouds.a);
 		#endif
 		

@@ -365,15 +365,17 @@ void blendAllFogTypes(inout vec3 color, inout float bloomyFogMult, vec4 volumetr
   #if defined OVERWORLD_SHADER && defined CAVE_FOG
     if (isEyeInWater == 0 && eyeAltitude < 1500){
       vec3 cavefogCol = vec3(CaveFogColor_R, CaveFogColor_G, CaveFogColor_B) * 0.3;
-      cavefogCol *= 1.0-pow(1.0-pow(1.0 - max(1.0 - linearDistance/far,0),2),CaveFogFallOff);
-      cavefogCol *= exp(-7.0*clamp(playerPos.y*0.5+0.5,0,1)) * 0.999 + 0.001;
+      float caveDistanceShape = 1.0 - pow(1.0 - pow(1.0 - max(1.0 - linearDistance / far, 0), 2), CaveFogFallOff);
+      float caveHeightShape = exp(-7.0 * clamp(playerPos.y * 0.5 + 0.5, 0, 1)) * 0.999 + 0.001;
+      float caveTau = caveDetection * caveDistanceShape * caveHeightShape;
 
       #ifdef CAVE_FOG_DARKEN_SKY
-        float skyhole = pow(clamp(1.0-pow(max(playerPos.y - 0.6,0.0)*5.0,2.0),0.0,1.0),2);
-        color.rgb = mix(color.rgb + cavefogCol * caveDetection, cavefogCol, isSky ? skyhole * caveDetection : 0.0);
-      #else
-        color.rgb += cavefogCol * caveDetection;
+        float skyhole = pow(clamp(1.0 - pow(max(playerPos.y - 0.6, 0.0) * 5.0, 2.0), 0.0, 1.0), 2);
+        caveTau *= isSky ? mix(1.0, 4.0, skyhole) : 1.0;
       #endif
+
+      float caveT = exp(-caveTau);
+      color.rgb = color.rgb * caveT + cavefogCol * (1.0 - caveT);
     }
   #endif
 
@@ -401,7 +403,8 @@ void blendAllFogTypes(inout vec3 color, inout float bloomyFogMult, vec4 volumetr
   #endif
 
   /// blend volumetrics
-  color = color * volumetrics.a + volumetrics.rgb;
+  float volumetricT = clamp(volumetrics.a, 0.0, 1.0);
+  color = color * volumetricT + volumetrics.rgb;
 
   // blend vanilla fogs (blindness, darkness, lava, powdered snow)
   if(isEyeInWater > 1 || blindness > 0 || darknessFactor > 0){
@@ -421,14 +424,12 @@ void blendForwardRendering( inout vec3 color, vec4 translucentShader ){
   }
 }
 
-float getBorderFogDensity(float linearDistance, vec3 playerPos, bool sky){
-
-  if(sky) return 0.0;
+float getBorderFogDensity(float linearDistance, vec3 playerPos){
 
   #ifdef USING_LOD_MOD
-  	float borderFogDensity = smoothstep(1.0, 0.0, min(max(1.0 - linearDistance / LOD_RENDERDISTANCE,0.0)*3.0,1.0)   );
+  	float borderFogDensity = smoothstep(1.0, 0.0, min(max(1.0 - linearDistance / LOD_RENDERDISTANCE,0.0) * 3.0, 1.0));
   #else
-  	float borderFogDensity = smoothstep(1.0, 0.0, min(max(1.0 - linearDistance / far,0.0)*3.0,1.0)   );
+  	float borderFogDensity = smoothstep(1.0, 0.0, min(max(1.0 - linearDistance / far, 0.0) * 3.0, 1.0));
   #endif
   
   borderFogDensity *= exp(-10.0 * pow(clamp(playerPos.y,0.0,1.0)*4.0,2.0));
@@ -436,6 +437,15 @@ float getBorderFogDensity(float linearDistance, vec3 playerPos, bool sky){
 
   return borderFogDensity;
 }
+
+void applyBorderFog(inout vec3 color, vec3 borderFogColor, float borderFogDensity){
+  float borderAmount = clamp(borderFogDensity, 0.0, 0.9999);
+  float borderTau = -log(max(1.0 - borderAmount, 1e-4));
+  float borderT = exp(-borderTau);
+
+  color = color * borderT + borderFogColor * (1.0 - borderT);
+}
+
 void main() {
   /* RENDERTARGETS:7,3,10 */
 
@@ -571,13 +581,16 @@ void main() {
 
   // blend border fog. be sure to blend before and after forward rendered color blends.
   #if defined BorderFog && defined OVERWORLD_SHADER
-    vec4 borderFog = vec4(skyGroundColor, getBorderFogDensity(linearDistance_cylinder, playerPos_normalized, swappedDepth >= 1.0));
+    vec4 borderFog = vec4(skyGroundColor, getBorderFogDensity(linearDistance_cylinder, playerPos_normalized));
 
     #if !defined SKY_GROUND
       borderFog.rgb = skyFromTex(playerPos_normalized, colortex4)/1200.0 * Sky_Brightness;
     #endif
     #if !defined USING_LOD_MOD
-     if(!isWater) color = mix(color, borderFog.rgb, getBorderFogDensity(linearDistance_cylinder_alt, normalize(playerPos_alt), z2 >= 1.0 || TranslucentShader.a <= 0));
+      if(!isWater) {
+        float borderFogDensityAlt = getBorderFogDensity(linearDistance_cylinder_alt, normalize(playerPos_alt));
+        applyBorderFog(color, borderFog.rgb, borderFogDensityAlt);
+      }
     #endif
   #else
     vec4 borderFog = vec4(0.0);
@@ -595,7 +608,7 @@ void main() {
   blendForwardRendering(color, TranslucentShader);
 
   #if defined BorderFog && defined OVERWORLD_SHADER
-    color = mix(color, borderFog.rgb, getBorderFogDensity(linearDistance_cylinder, playerPos_normalized, swappedDepth >= 1.0));
+    applyBorderFog(color, borderFog.rgb, borderFog.a);
   #endif
   
   // tweaks to VL for nametag rendering
