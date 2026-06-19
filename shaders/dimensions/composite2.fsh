@@ -646,7 +646,7 @@ void main() {
 		vec4 volumetricFog = GetVolumetricFog(airFogViewPos, vec2(noise_1), WsunVec, sunShadow, directLightColor, indirectLight_fog, indirectLight, cloudPlaneDistance);
 
 		if (isSky) {
-			volumetricFog.rgb *= 1 + (daylightFactor * 4.0);
+			// Possibility of explicit fog boost by daylight: volumetricFog.rgb *= mix(1.0, 2.0, daylightFactor);
 		}
 
 		#if defined LPV_VL_FOG_ILLUMINATION
