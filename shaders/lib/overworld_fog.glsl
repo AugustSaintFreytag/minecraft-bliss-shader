@@ -303,8 +303,8 @@ vec4 GetVolumetricFog(
 	float daylightFactor = clamp(sunElevation * 2.0, 0.0, 1.0);
 	float daylightAmp = (1.0 + (1.0 - daylightFactor) * 1.0);
 	
-	vec3 masterLightColor = saturate(lightColor * 1.5, 0.85) * daylightAmp;
-	vec3 ambientLightColor = saturate(ambientColor * 1.25, 0.25) + (0.25 * saturate(lightColor, 0.35));
+	vec3 masterLightColor = saturate(lightColor * 1.4, 0.85) * daylightAmp;
+	vec3 ambientLightColor = saturate(ambientColor * 1.2, 0.25) + (0.25 * saturate(lightColor, 0.35));
 
 	// vec3 masterLightColor = lightColor * 1.5 * daylightAmp;
 	// vec3 ambientLightColor = ambientColor * 1.25 + (0.25 * lightColor);
