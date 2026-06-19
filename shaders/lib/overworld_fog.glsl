@@ -1,7 +1,6 @@
 #define FOG_USE_TURBULENCE 0
 #define FOG_USE_SHAPING 1
 
-#define FOG_TURBULENCE_MIX 0.0
 #define FOG_SHAPING_INTENSITY 0.8
 
 #include "/lib/fog_utils.glsl"
@@ -54,26 +53,6 @@ float densityAtPosFog(in vec3 pos) {
 	return mix(xy.r, xy.g, f.y);
 }
 
-float turbulentFogNoise(in vec3 pos) {
-	pos /= 8;
-	float noise = 0.0;
-	float amplitude = 0.65;
-	float frequency = 1.2;
-	vec3 warp = frameTimeCounter * 10 * Cloud_Speed * vec3(-0.02, 0.004, -0.006);
-
-	for(int i = 0; i < 3; i++) {
-		float n = densityAtPosFog(pos * frequency + warp);
-
-		n = 1.0 - abs(n * 2.0 - 1.0);
-		n = n * n;
-		noise += n * amplitude;
-		warp += vec3(n) * 0.35;
-		frequency *= 2.2;
-		amplitude *= 0.5;
-	}
-
-	return noise;
-}
 
 float shapeFogNoise(float noise, float coverage, float intensity) {
 	float noiseFloor = mix(0, 0.25, pow((coverage - 0.5) / 0.5, 2.0));
