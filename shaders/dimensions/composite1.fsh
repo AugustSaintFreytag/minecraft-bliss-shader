@@ -427,7 +427,8 @@ float handHeldLight_SSRT_Shadows(vec3 viewPos, vec3 shadowHandPos, float noise){
 		ivec2 sampleCoord = ivec2(newPos.xy / texelSize);
 		float samplePos = texelFetch(depthtex0, sampleCoord, 0).x;
 
-		if(samplePos < newPos.z && texelFetch(colortex2, sampleCoord, 0).a < 0.01) {
+		bool isHandPixel = abs(decodeVec2(texelFetch(colortex1, sampleCoord, 0).w).y - 0.75) < 0.01;
+		if(samplePos < newPos.z && texelFetch(colortex2, sampleCoord, 0).a < 0.01 && !isHandPixel) {
 			return 0.0;
 		}
 
@@ -1302,18 +1303,18 @@ void main() {
 		#endif
 
 		#if indirect_effect == SSAO_FILTERED || indirect_effect == SSAO_HQ
-			float vanillaAO_curve = pow(1.0 - vanilla_AO*vanilla_AO,5.0);
+			float vanillaAO_curve = pow(1.0 - vanilla_AO * vanilla_AO, 5.0);
 			float SSAO_curve = pow(SSAO_SSS.x, 4.0);
 
 			// use the min of vanilla ao so they dont overdarken eachother
 			// AO = vec3( min(vanillaAO_curve, SSAO_curve) );
-			AO = vec3( SSAO_curve );
+			AO = vec3(SSAO_curve);
 			Indirect_lighting *= AO;
 		#endif
 
-		// // GTAO... this is so dumb but whatevverrr
+		// GTAO
 		#if indirect_effect == GTAO
-			float vanillaAO_curve = pow(1.0 - vanilla_AO*vanilla_AO,5.0);
+			float vanillaAO_curve = pow(1.0 - vanilla_AO * vanilla_AO, 5.0);
 
 			vec2 r2 = fract(R2_samples((frameCounter%40000) + frameCounter*2) + bnoise);
 			float getGTAO = !hand ? ambient_occlusion(vec3(texcoord/RENDER_SCALE-taaJitter*texelSize*0.5, z), viewPos, worldToView(slopednormal), r2) : 1.0;
@@ -1381,7 +1382,7 @@ void main() {
 				// return;
 				
 				// Blend all factors with smooth falloffs
-				float occlusionFactor = clamp(shadowFactor * 0.75 + (1.0 - lightPower) * 0.3 + skylightFactor * 0.3 + distanceFactor * 0.75, 0.0, 2.0);
+				float occlusionFactor = clamp(shadowFactor + (1.0 - lightPower) * 0.3 + skylightFactor * 0.3 + distanceFactor * 0.75, 0.0, 2.0);
 				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL * shadowColor) * mix(vec3(1.0), AO, occlusionFactor);
 			#else
 				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL * shadowColor);
@@ -1490,17 +1491,21 @@ void main() {
 	#if DEBUG_VIEW == debug_SSAO
 		// if(hideGUI == 0){
 			float value = SSAO_SSS.y;
-			value = pow(value,3.5);
-			value = 1-pow(1-value,5);
+			value = pow(value, 3.5);
+			value = 1 - pow(1 - value, 5);
 
-			if(hideGUI == 1) value = pow(SSAO_SSS.x,6);
+			if (hideGUI == 1) {
+				value = pow(SSAO_SSS.x, 6);
+			}
 
 			// value = filteredShadow.x;
 			// value = exp(-10*sqrt(filteredShadow.y));
 			// value = 1.0-filteredShadow.z;
 			gl_FragData[0].rgb = vec3(value);
 
-			if(swappedDepth >= 1.0) gl_FragData[0].rgb  = vec3(1.0);
+			if(swappedDepth >= 1.0) {
+				gl_FragData[0].rgb  = vec3(1.0);
+			}
 		// }
 	#endif
 
