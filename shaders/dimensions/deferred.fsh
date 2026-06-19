@@ -10,8 +10,7 @@
 #define VOLUMETRIC_FOG_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/macro_lod_mod.glsl"
-#include "/lib/res_params.glsl"
+#include "/lib/TAA_jitter.glsl"
 
 // this is an emergency plain text that will be visible as an the log error when a user tries to use voxy and DH both at once.
 #if defined VOXY && defined DISTANT_HORIZONS 
@@ -34,12 +33,16 @@ flat varying float avgL2;
 flat varying float centerDepth;
 
 uniform sampler2D noisetex;
+uniform sampler2D depthtex0;
+uniform sampler2D depthtex1;
 uniform sampler2D colortex1;
 uniform sampler2D colortex4;
 
 uniform float frameTime;
 uniform int frameCounter;
 uniform float frameTimeCounter;
+uniform float viewWidth;
+uniform float viewHeight;
 uniform float rainStrength;
 uniform float eyeAltitude;
 uniform vec3 sunVec;
@@ -57,8 +60,12 @@ uniform vec3 sunPosition;
 uniform vec3 moonPosition;
 uniform vec3 cameraPosition;
 uniform float far;
+uniform float near;
+uniform float farPlane;
+uniform float dhFarPlane;
+uniform float dhNearPlane;
 uniform ivec2 eyeBrightnessSmooth;
-// uniform ivec2 eyeBrightness;
+uniform ivec2 eyeBrightness;
 uniform float caveDetection;
 uniform int isEyeInWater;
 
@@ -66,13 +73,17 @@ uniform float dayChangeSmooth;
 uniform bool worldTimeChangeCheck;
 
 uniform int hideGUI;
-uniform float near;
 
 #include "/lib/util.glsl"
+#include "/lib/res_params.glsl"
+#include "/lib/macro_lod_mod.glsl"
 #include "/lib/color_transforms.glsl"
 #include "/lib/ROBOBO_sky.glsl"
 #include "/lib/sky_gradient.glsl"
 #include "/lib/Shadow_Params.glsl"
+
+#include "/lib/dh_projections.glsl"
+#include "/lib/dh_occlusion.glsl"
 
 vec4 lightCol = vec4(lightSourceColor, float(sunElevation > 1e-5)*2-1.);
 vec3 WsunVec = mat3(gbufferModelViewInverse)*sunVec;
@@ -120,8 +131,6 @@ vec3 toScreenSpace(vec3 p) {
     return viewPos.xyz / viewPos.w;
 }
 
-#include "/lib/DistantHorizons_projections.glsl"
-
 vec3 DH_toScreenSpace(vec3 p) {
 	vec4 iProjDiag = vec4(LOD_PROJECTION_INVERSE[0].x, LOD_PROJECTION_INVERSE[1].y, LOD_PROJECTION_INVERSE[2].zw);
     vec3 feetPlayerPos = p * 2. - 1.;
@@ -150,8 +159,6 @@ float linearizeDepthFast(const in float depth, const in float near, const in flo
 
 #ifdef OVERWORLD_SHADER
 
-	// uniform sampler2D colortex4;
-	// uniform sampler2D colortex12;
 	// const bool shadowHardwareFiltering = true;
 	uniform sampler2DShadow shadow;
 
@@ -173,14 +180,13 @@ float linearizeDepthFast(const in float depth, const in float near, const in flo
 	#include "/lib/volumetricClouds.glsl"
 	#include "/lib/climate_settings.glsl"
 	#include "/lib/overworld_fog.glsl"
-	
 #endif
+
 #ifdef NETHER_SHADER
-	uniform sampler2D colortex4;
 	#include "/lib/nether_fog.glsl"
 #endif
+
 #ifdef END_SHADER
-	uniform sampler2D colortex4;
 	#include "/lib/end_fog.glsl"
 #endif
 
@@ -243,7 +249,7 @@ void main() {
 			}
 		}
 
-		if (matchesCoords(gl_FragCoord, SKY_AVERAGE_COLOR_COORDS)) {
+		if (matchesCoords(gl_FragCoord, LIGHT_COLOR_COORDS)) {
 			gl_FragData[0] = vec4((skyGroundCol / 150.0) * AmbientLightTint, 1.0);
 			
 			if(worldTimeChangeCheck) {
@@ -356,10 +362,10 @@ void main() {
 		#endif
 
 		float cloudPlaneDistance = 0.0;
-		float volumetricFogLightBoost = 2.5;
+		float volumetricFogLightBoost = 2.0;
 
 		vec4 volumetricClouds = GetVolumetricClouds(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, cloudPlaneDistance);
-		vec4 volumetricFog = GetVolumetricFog(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, 1.0, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, averageSkyCol_Clouds * 5.0, cloudPlaneDistance);
+		vec4 volumetricFog = GetVolumetricFog(viewPos, vec2(noise, 1.0 - noise), WsunVec_local, 0.0, suncol * volumetricFogLightBoost, skyGroundCol / 30.0, averageSkyCol_Clouds * 5.0, cloudPlaneDistance, true);
 
 		vec3 finalSky = skyColBase * volumetricClouds.a + volumetricClouds.rgb / 5.0;
 		finalSky = finalSky * volumetricFog.a + volumetricFog.rgb / 5.0;

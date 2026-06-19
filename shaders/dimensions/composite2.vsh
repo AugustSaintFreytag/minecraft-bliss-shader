@@ -2,14 +2,10 @@
 #define SHADOWMAP_CONSTANT_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/util.glsl"
-#include "/lib/res_params.glsl"
 
 flat varying vec4 lightCol;
 flat varying vec3 averageSkyCol;
 flat varying vec3 averageSkyCol_Clouds;
-
-#include "/lib/scene_controller.glsl"
 
 flat varying vec3 WsunVec;
 flat varying vec3 refractedSunVec;
@@ -18,6 +14,8 @@ uniform vec2 texelSize;
 
 uniform sampler2D colortex4;
 
+uniform float near;
+uniform float far;
 uniform float sunElevation;
 uniform vec3 sunPosition;
 uniform vec3 moonPosition;
@@ -26,6 +24,9 @@ uniform int frameCounter;
 
 uniform float frameTimeCounter;
 
+#include "/lib/util.glsl"
+#include "/lib/res_params.glsl"
+#include "/lib/scene_controller.glsl"
 #include "/lib/Shadow_Params.glsl"
 #include "/lib/sky_gradient.glsl"
 
@@ -38,10 +39,8 @@ uniform float frameTimeCounter;
 
 void main() {
 	gl_Position = ftransform();
+	gl_Position.xy = (gl_Position.xy * 0.5 + 0.5) * (0.01 + VL_RENDERING_RESOLUTION_SCALE) * 2.0 - 1.0;
 
-	gl_Position.xy = (gl_Position.xy*0.5+0.5)*(0.01+VL_RENDERING_RESOLUTION_SCALE)*2.0-1.0;
-
-	
 	#ifdef OVERWORLD_SHADER
 		lightCol.rgb = texelFetch(colortex4, LIGHT_COLOR_COORDS, 0).rgb;
 		averageSkyCol = texelFetch(colortex4, SKY_AVERAGE_COLOR_COORDS, 0).rgb;

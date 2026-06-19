@@ -4,6 +4,7 @@
 #define VOLUMETRIC_CLOUD_RELATED_SETTINGS
 #define WATER_RELATED_SETTINGS
 #define ANTIALIASING_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
 
 // #if defined END_SHADER || defined NETHER_SHADER
@@ -47,21 +48,16 @@ uniform sampler2D texture;
 uniform sampler2D noisetex;
 uniform sampler2D colortex4;
 
+uniform float near;
+uniform float far;
+
 #ifdef IS_LPV_ENABLED
 	uniform usampler1D texBlockData;
 	uniform sampler3D texLpv1;
 	uniform sampler3D texLpv2;
 #endif
 
-// uniform mat4 gbufferProjectionInverse;
-// uniform mat4 gbufferModelViewInverse;
-// uniform mat4 gbufferModelView;
-// uniform mat4 shadowModelView;
-// uniform mat4 shadowProjection;
-// uniform vec3 cameraPosition;
-
 uniform float frameTimeCounter;
-#include "/lib/Shadow_Params.glsl"
 
 uniform vec2 texelSize;
 
@@ -77,16 +73,13 @@ uniform vec3 previousCameraPosition;
 
 #include "/lib/util.glsl"
 #include "/lib/projections.glsl"
+#include "/lib/Shadow_Params.glsl"
 
 #ifdef OVERWORLD_SHADER
-	
 	#include "/lib/scene_controller.glsl"
-
 	#define CLOUDSHADOWSONLY
-	
 	#include "/lib/volumetricClouds.glsl"
 #endif
-
 
 uniform int heldItemId;
 uniform int heldItemId2;
@@ -102,25 +95,12 @@ uniform int heldBlockLightValue2;
 #endif
 
 #include "/lib/diffuse_lighting.glsl"
-
 #include "/lib/sky_gradient.glsl"
+#include "/lib/TAA_jitter.glsl"
 
 vec3 toLinear(vec3 sRGB){
 	return sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);
 }
-
-// #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
-
-// vec3 toScreenSpace(vec3 p) {
-// 	vec4 iProjDiag = vec4(gbufferProjectionInverse[0].x, gbufferProjectionInverse[1].y, gbufferProjectionInverse[2].zw);
-//     vec3 p3 = p * 2. - 1.;
-//     vec4 fragposition = iProjDiag * p3.xyzz + gbufferProjectionInverse[3];
-//     return fragposition.xyz / fragposition.w;
-// }
-
-
-
-#include "/lib/TAA_jitter.glsl"
 
 
 //Mie phase function
@@ -138,7 +118,6 @@ float encodeVec2(vec2 a){
 float encodeVec2(float x,float y){
     return encodeVec2(vec2(x,y));
 }
-
 
 
 // #undef BASIC_SHADOW_FILTER
@@ -248,12 +227,6 @@ float ComputeShadowMap(inout vec3 directLightColor, vec3 playerPos, float maxDis
 		return texture2DGradARB(texture,fract(coord)*vtexcoordam.pq+vtexcoordam.st,dcdx,dcdy);
 	}
 #endif
-
-uniform float near;
-// uniform float far;
-float ld(float dist) {
-    return (2.0 * near) / (far + near - dist * (far - near));
-}
 
 vec4 texture2D_POMSwitch(
 	sampler2D sampler, 

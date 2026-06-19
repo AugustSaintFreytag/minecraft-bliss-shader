@@ -4,20 +4,14 @@
 #define SUB_SURFACE_SCATTERING_RELATED_SETTINGS
 #define INDIRECT_EFFECT_RELATED_SETTINGS
 #define AMBIENT_LIGHT_RELATED_SETTINGS
+
 #include "/lib/settings.glsl"
-#include "/lib/macro_lod_mod.glsl"
-#include "/lib/TAA_jitter.glsl"
 
 #ifndef DH_AMBIENT_OCCLUSION
 	#undef DISTANT_HORIZONS
 #endif
 
-
 flat varying vec3 WsunVec;
-
-
-#include "/lib/util.glsl"
-#include "/lib/res_params.glsl"
 
 uniform sampler2D depthtex0;
 uniform sampler2D depthtex1;
@@ -40,7 +34,6 @@ uniform sampler2D shadow;
 	uniform sampler2D shadowtex1;
 #endif
 
-
 uniform sampler2D noisetex;
 uniform vec3 sunVec;
 uniform vec2 texelSize;
@@ -50,10 +43,8 @@ uniform int frameCounter;
 uniform ivec2 eyeBrightnessSmooth;
 uniform ivec2 eyeBrightness;
 
-
 uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferModelView;
-
 
 uniform vec3 cameraPosition;
 uniform mat4 gbufferProjection;
@@ -74,11 +65,16 @@ uniform float near;
 uniform float dhFarPlane;
 uniform float dhNearPlane;
 
+#include "/lib/util.glsl"
+#include "/lib/res_params.glsl"
 #include "/lib/Shadows.glsl"
+#include "/lib/macro_lod_mod.glsl"
+#include "/lib/TAA_jitter.glsl"
 
 #define ffstep(x,y) clamp((y - x) * 1e35,0.0,1.0)
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
 #define  projMAD(m, v) (diagonal3(m) * (v) + (m)[3].xyz)
+
 vec3 toScreenSpace(vec3 p) {
 	vec4 iProjDiag = vec4(gbufferProjectionInverse[0].x, gbufferProjectionInverse[1].y, gbufferProjectionInverse[2].zw);
     vec3 p3 = p * 2. - 1.;
@@ -229,7 +225,7 @@ vec2 CleanSample(
 
 
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 
 float DH_ld(float dist) {
     return (2.0 * dhNearPlane) / (dhFarPlane + dhNearPlane - dist * (dhFarPlane - dhNearPlane));
@@ -360,11 +356,6 @@ float encodeVec2(float x,float y){
     return encodeVec2(vec2(x,y));
 }
 
-float ld(float dist) {
-    return (2.0 * near) / (far + near - dist * (far - near));
-}
-
-
 #include "/lib/sky_gradient.glsl"
 
 /* RENDERTARGETS:3,14,12,10*/
@@ -433,13 +424,14 @@ void main() {
 		}
 	#endif
 
-	vec3 FlatNormals = normalize(texture(colortex15,texcoord).rgb * 2.0 - 1.0);
+	vec3 flatNormals = normalize(texture(colortex15,texcoord).rgb * 2.0 - 1.0);
 	
 	#if indirect_effect == SSAO_FILTERED || indirect_effect == SSAO_HQ
-		if(z >= 1.0) FlatNormals = normal;
+		if(z >= 1.0) {
+			flatNormals = normal;
+		}
 
-		vec2 SSAO_SSS = SSAO(viewPos, worldToView(normal), worldToView(FlatNormals), hand, noise, z >= 1.0);
-		
+		vec2 SSAO_SSS = SSAO(viewPos, worldToView(normal), worldToView(flatNormals), hand, noise, z >= 1.0);
 		SSAO_SSS.y = clamp(SSAO_SSS.y + 0.5 * lightmap.y*lightmap.y,0.0,1.0);
 
 		if(swappedDepth >= 1.0) SSAO_SSS = vec2(1.0,0.0);
@@ -485,7 +477,7 @@ void main() {
 				vec3 feetPlayerPos = mat3(gbufferModelViewInverse) * viewPos + gbufferModelViewInverse[3].xyz;
 				
 				#if LIGHTLEAKFIX_MODE == 1
-					if(!hand) GriAndEminShadowFix(feetPlayerPos, FlatNormals, lightLeakFix);
+					if(!hand) GriAndEminShadowFix(feetPlayerPos, flatNormals, lightLeakFix);
 				#endif
 
 				vec3 projectedShadowPosition = mat3(shadowModelView) * feetPlayerPos  + shadowModelView[3].xyz;

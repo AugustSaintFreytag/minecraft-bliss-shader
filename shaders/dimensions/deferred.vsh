@@ -12,12 +12,8 @@
 #define ANTIALIASING_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/util.glsl"
-#include "/lib/res_params.glsl"
-#include "/lib/Shadow_Params.glsl"
 
 flat varying vec3 averageSkyCol_Clouds;
-
 flat varying vec3 averageSkyCol;
 
 flat varying vec3 sunColor;
@@ -26,7 +22,6 @@ flat varying vec3 moonColor;
 flat varying vec3 lightSourceColor;
 flat varying vec3 zenithColor;
 flat varying vec3 WsunVec;
-
 
 flat varying float exposure;
 flat varying float avgBrightness;
@@ -57,12 +52,17 @@ uniform float frameTimeCounter;
 
 vec3 sunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);
 
+#include "/lib/util.glsl"
+#include "/lib/res_params.glsl"
+#include "/lib/macro_lod_mod.glsl"
+#include "/lib/Shadow_Params.glsl"
 #include "/lib/sky_gradient.glsl"
 #include "/lib/ROBOBO_sky.glsl"
 
 float luma(vec3 color) {
 	return dot(color,vec3(0.21, 0.72, 0.07));
 }
+
 vec3 rodSample(vec2 Xi)
 {
 	float r = sqrt(1.0f - Xi.x*Xi.y);
@@ -70,19 +70,18 @@ vec3 rodSample(vec2 Xi)
 
     return normalize(vec3(cos(phi) * r, sin(phi) * r, Xi.x)).xzy;
 }
+
 //Low discrepancy 2D sequence, integration error is as low as sobol but easier to compute : http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
-vec2 R2_samples(int n){
+vec2 R2_samples(int n) {
 	vec2 alpha = vec2(0.75487765, 0.56984026);
 	return fract(alpha * n);
 }
-float tanh(float x){
+
+float tanh(float x) {
 	return (exp(x) - exp(-x))/(exp(x) + exp(-x));
 }
-float ld(float depth) {
-    return (2.0 * near) / (far + near - depth * (far - near));		// (-depth * (far - near)) = (2.0 * near)/ld - far - near
-}
-float hash11(float p)
-{
+
+float hash11(float p) {
     p = fract(p * .1031);
     p *= p + 33.33;
     p *= p + p;
@@ -215,7 +214,7 @@ void main() {
 
 	exposure = max(targetExposure * EXPOSURE_MULTIPLIER, 0.0);
 
-	float currCenterDepth = ld(texture(depthtex2, vec2(0.5) * RENDER_SCALE).r);
+	float currCenterDepth = linZ(texture(depthtex2, vec2(0.5) * RENDER_SCALE).r);
 	centerDepth = mix(sqrt(texelFetch(colortex4, AUTO_EXPOSURE_COORDS,0).g / 65000.0), currCenterDepth, clamp(DoF_Adaptation_Speed * exp(-0.016 / frameTime + 1.0) / (6.0 + currCenterDepth * far), 0.0, 1.0));
 	centerDepth = centerDepth * centerDepth * 65000.0;
 

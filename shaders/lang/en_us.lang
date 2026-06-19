@@ -548,7 +548,7 @@ screen.Fog = Fog Settings
     suffix.VL_RENDERING_RESOLUTION_SCALE = x
     option.VL_SAMPLES = Fog Samples
     option.BLOOMY_FOG = Bloomy Fog Multiplier
-    option.Haze_amount = Atmospheric Haze Density
+    option.ATMOSPHERIC_HAZE_AMOUNT = Atmospheric Haze Density
     option.RainFog_amount = Rain Fog Multiplier
     option.BorderFog = Chunk Border Fog
     option.UNDERWATER_BLOOMY_FOG = Underwater Bloomy Fog
@@ -586,7 +586,7 @@ screen.Fog = Fog Settings
     option.VL_RENDERING_RESOLUTION_SCALE.comment = §bⓘ What is this?§r Configure what fraction of the screen resolution of the volumetric effects (clouds, fog) render at. §a⚠ PERFORMANCE COST:§r high
     option.VL_SAMPLES.comment = Configure the quality of the volumetric fog. §a⚠ PERFORMANCE COST:§r high
     option.BLOOMY_FOG.comment = Configure the strength of bloom that is applied to fog. §bⓘ What is this?§r This effect makes the fog look soft, it helps hide a little noise too. can cause some visible flickering on detailed edges. §a⚠ PERFORMANCE COST:§r very low
-    option.Haze_amount.comment = Configure how dense the atmosphere around you is. §bⓘ What is this?§r This is the blue haze you see in the distance.
+    option.ATMOSPHERIC_HAZE_AMOUNT.comment = Configure how dense the atmosphere around you is. §bⓘ What is this?§r This is the blue haze you see in the distance.
     option.RainFog_amount.comment = Configure how dense the fog gets when it rains.
     option.BorderFog.comment = §bⓘ What is this?§r Toggle a fog that attempts to hide the chunks loading in. But because the sky is all over the place, it is difficult to do well. §a⚠ PERFORMANCE COST:§r very very low
 
@@ -1114,7 +1114,8 @@ screen.MOD_SETTINGS = Supported Mods
         value.DH_VOLUMETRIC_LIGHT_OCCLUSION.0 = §cOFF
     option.DH_VOLUMETRIC_OCCLUSION_SAMPLES = Volumetric Occlusion Samples
         value.DH_VOLUMETRIC_OCCLUSION_SAMPLES.0 = §cOFF
-    option.DH_VOLUMETRIC_OCCLUSION_STEP = Volumetric Occlusion Step Size
+    option.DH_VOLUMETRIC_OCCLUSION_LENGTH = Volumetric Occlusion Length
+    option.DH_VOLUMETRIC_OCCLUSION_BIAS = Volumetric Occlusion Depth Bias
     option.DH_VOLUMETRIC_OCCLUSION_DISTANCE = Volumetric Occlusion Max Distance
 
     screen.PHYSICS_MOD_OCEAN = Physics Mod §c⚠ READ DESCRIPTION§r
@@ -1127,6 +1128,7 @@ screen.MOD_SETTINGS = Supported Mods
     screen.PHYSICS_MOD_OCEAN.comment = The ocean of physics mod is supported. The mod has its own settings for it located in §bgame options -> physics settings -> ocean§r
 
     option.DH_VOLUMETRIC_OCCLUSION_SAMPLES.comment = Number of depth samples taken when evaluating DH volumetric occlusion. Higher values produce smoother masking at the cost of slightly more work.
+    option.DH_VOLUMETRIC_OCCLUSION_BIAS.comment = Controls how aggressively small and thin geometry is ignored when masking sun volumetrics. Higher values reject more fine detail and preserve only broader occluders.
     option.DH_VOLUMETRIC_OCCLUSION.comment = Uses Distant Horizons depth buffer when sampling for sun-produced volumetrics. Allows DH terrain to obscure sunlight. §a⚠ PERFORMANCE COST:§r medium
     
  ###################################################### ↓↓↓ THIS SUBMENU'S LABELS

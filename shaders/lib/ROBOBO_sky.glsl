@@ -32,9 +32,6 @@ const float sky_atmosphereRadiusSquared = sky_atmosphereRadius * sky_atmosphereR
 const mat3   sky_coefficientsAttenuation = mat3(sky_coefficientRayleigh , sky_coefficientMie, sky_coefficientOzone ); // commonly called the extinction coefficient
 
 
-
-
-
 float sky_rayleighPhase(float cosTheta) {
 	const vec2 mul_add = vec2(0.1, 0.28) * rPI;
 	return cosTheta * mul_add.x + mul_add.y; // optimized version from [Elek09], divided by 4 pi for energy conservation
@@ -175,7 +172,7 @@ vec3 calculateAtmosphere(vec3 background, vec3 viewVector, vec3 upVector, vec3 s
 		transmittance *= stepTransmittance;
 	}
 	
-	vec3 scattering = scatteringAmbient * background+ scatteringSun * sunColorBase + scatteringMoon*moonColorBase * 0.5;
+	vec3 scattering = scatteringAmbient * background + scatteringSun * sunColorBase + scatteringMoon * moonColorBase * 0.5;
 
 	return scattering;
 }

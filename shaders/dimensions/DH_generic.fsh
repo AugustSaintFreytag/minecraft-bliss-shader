@@ -2,10 +2,6 @@
 #define EMISSION_RELATED_SETTINGS
 #define SHADOWMAP_CONSTANT_RELATED_SETTINGS
 
-#include "/lib/settings.glsl"
-#include "/lib/util.glsl"
-#include "/lib/DH_utils.glsl"
-
 varying vec4 pos;
 varying vec4 gcolor;
 varying vec3 vNormal;
@@ -17,12 +13,18 @@ uniform sampler2DShadow shadow;
 uniform vec3 sunVec;
 uniform mat4 shadowModelView;
 uniform mat4 shadowProjection;
+uniform float far;
+uniform float near;
 
 uniform mat4 gbufferModelViewInverse;
 uniform int frameCounter;
 
 flat varying vec3 averageSkyCol_Clouds;
 flat varying vec3 lightSourceColor;
+
+#include "/lib/settings.glsl"
+#include "/lib/util.glsl"
+#include "/lib/dh_utils.glsl"
 
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
 

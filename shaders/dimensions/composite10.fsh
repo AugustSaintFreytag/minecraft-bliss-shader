@@ -57,11 +57,9 @@ vec4 Weather_properties = Moon_Weather_properties;
 float cdist(vec2 coord) {
 	return max(abs(coord.s-0.5),abs(coord.t-0.5))*2.0;
 }
+
 float blueNoise(){
   return fract(texelFetch(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887 * frameCounter);
-}
-float ld(float depth) {
-    return (2.0 * near) / (far + near - depth * (far - near));		// (-depth * (far - near)) = (2.0 * near)/ld - far - near
 }
 
 // uniform float viewWidth;
@@ -234,7 +232,7 @@ void main() {
 
 	#if DOF_QUALITY >= 0
 		/*--------------------------------*/
-		float z = ld(texture(depthtex1, texcoord.st*RENDER_SCALE).r)*far;
+		float z = linZ(texture(depthtex1, texcoord.st*RENDER_SCALE).r)*far;
 
 		#if MANUAL_FOCUS == -2
 			float focus = rodExposureDepth.y*far;

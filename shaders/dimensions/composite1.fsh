@@ -17,8 +17,6 @@
 #define WATER_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/macro_lod_mod.glsl"
-#include "/lib/TAA_jitter.glsl"
 
 // #if defined END_SHADER || defined NETHER_SHADER
 // 	#undef IS_LPV_ENABLED
@@ -153,6 +151,7 @@ float convertHandDepth_2(in float depth, bool hand) {
     return ndcDepth * 0.5 + 0.5;
 }
 
+#include "/lib/macro_lod_mod.glsl"
 #include "/lib/projections.glsl"
 #include "/lib/color_transforms.glsl"
 #include "/lib/waterBump.glsl"
@@ -160,6 +159,7 @@ float convertHandDepth_2(in float depth, bool hand) {
 #include "/lib/Shadows.glsl"
 #include "/lib/stars.glsl"
 #include "/lib/sky_gradient.glsl"
+#include "/lib/TAA_jitter.glsl"
 
 #ifdef OVERWORLD_SHADER
 	#include "/lib/scene_controller.glsl"
@@ -178,7 +178,7 @@ float convertHandDepth_2(in float depth, bool hand) {
 #include "/lib/diffuse_lighting.glsl"
 #include "/lib/end_fog.glsl"
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 #include "/lib/dh_occlusion.glsl"
 
 vec3 decode (vec2 encn){
@@ -421,12 +421,16 @@ float handHeldLight_SSRT_Shadows(vec3 viewPos, vec3 shadowHandPos, float noise){
 	direction.xy *= RENDER_SCALE;
 	
 	vec3 newPos = position + direction*noise;
-	newPos += direction*0.3;
-	for (int i = 0; i < int(steps); i++) {
-		
-		float samplePos = texture(depthtex2, newPos.xy).x;
+	newPos += direction * 0.3;
 
-		if(samplePos < newPos.z) return 0.0;
+	for (int i = 0; i < int(steps); i++) {
+		ivec2 sampleCoord = ivec2(newPos.xy / texelSize);
+		float samplePos = texelFetch(depthtex0, sampleCoord, 0).x;
+
+		bool isHandPixel = abs(decodeVec2(texelFetch(colortex1, sampleCoord, 0).w).y - 0.75) < 0.01;
+		if(samplePos < newPos.z && texelFetch(colortex2, sampleCoord, 0).a < 0.01 && !isHandPixel) {
+			return 0.0;
+		}
 
 		newPos += direction;
 	}
@@ -558,6 +562,7 @@ vec3 ComputeShadowMap_COLOR(in vec3 projectedShadowPosition, float distortFactor
 
 	vec3 shadowColor = vec3(0.0);
 	vec3 translucentTint = vec3(0.0);
+	vec3 baseShadowPos = projectedShadowPosition;
 
 	#ifdef BASIC_SHADOW_FILTER
 		int samples = SHADOW_FILTER_SAMPLE_COUNT;
@@ -565,15 +570,17 @@ vec3 ComputeShadowMap_COLOR(in vec3 projectedShadowPosition, float distortFactor
 		
 		for(int i = 0; i < samples; i++){
 			vec2 offsetS = CleanSample(i, samples - 1, noise) * rdMul;
-			projectedShadowPosition.xy += offsetS;
+			vec3 shadowPos = baseShadowPos;
+			shadowPos.xy += offsetS;
 	#else
 		int samples = 1;
+		vec3 shadowPos = baseShadowPos;
 	#endif
 
 	#ifdef TRANSLUCENT_COLORED_SHADOWS
-		float opaqueShadow = shadow2D(shadowtex0, projectedShadowPosition).x;
-		float opaqueShadowT = shadow2D(shadowtex1, projectedShadowPosition).x;
-		vec4 translucentShadow = texture2D(shadowcolor0, projectedShadowPosition.xy);
+		float opaqueShadow = shadow2D(shadowtex0, shadowPos).x;
+		float opaqueShadowT = shadow2D(shadowtex1, shadowPos).x;
+		vec4 translucentShadow = texture2D(shadowcolor0, shadowPos.xy);
 
 		float shadowAlpha = pow(1.0-pow(1.0-translucentShadow.a,2.0),5.0);
 		translucentShadow.rgb = normalize(translucentShadow.rgb*translucentShadow.rgb + 0.0001) * (1.0-shadowAlpha);
@@ -586,7 +593,7 @@ vec3 ComputeShadowMap_COLOR(in vec3 projectedShadowPosition, float distortFactor
 		FUNNYSHADOW += ((1.0-shadowAlpha) * opaqueShadowT)/samples;
 	#else
 		// shadowColor += directLightColor * shadow2D(shadow, projectedShadowPosition).x;
-		shadowColor += vec3(1.0) * shadow2D(shadow, projectedShadowPosition).x;
+		shadowColor += vec3(1.0) * shadow2D(shadow, shadowPos).x;
 	#endif
 
 
@@ -595,7 +602,7 @@ vec3 ComputeShadowMap_COLOR(in vec3 projectedShadowPosition, float distortFactor
 	#endif
 
 	#ifdef debug_SHADOWMAP
-		shadowDebug = shadow2D(shadow, projectedShadowPosition).x;
+		shadowDebug = shadow2D(shadow, baseShadowPos).x;
 	#endif
 	// #ifdef TRANSLUCENT_COLORED_SHADOWS
 		// directLightColor *= mix(vec3(1.0), translucentTint.rgb / samples, maxDistFade);
@@ -762,22 +769,19 @@ void main() {
 	bool isDHRange = z >= 1.0;
 
 	#ifdef USING_LOD_MOD
-		float DH_mixedLinearZ = sqrt(texture(colortex12,texcoord).a / 65000.0);
+		float DH_mixedLinearZ = sqrt(texture(colortex12, texcoord).a / 65000.0);
 		float DH_depth0 = texture(LOD_DEPTHTEX0, texcoord).x;
-		float DH_depth1 = texture(LOD_DEPTHTEX1 ,texcoord).x;
+		float DH_depth1 = texture(LOD_DEPTHTEX1, texcoord).x;
 
 		float depthOpaque = z;
 		float depthOpaqueL = linearizeDepthFast(depthOpaque, near, farPlane);
-		
-		#ifdef USING_LOD_MOD
-			float dhDepthOpaque = DH_depth1;
-			float dhDepthOpaqueL = linearizeDepthFast(dhDepthOpaque, dhNearPlane, dhFarPlane);
+		float dhDepthOpaque = DH_depth1;
+		float dhDepthOpaqueL = linearizeDepthFast(dhDepthOpaque, dhNearPlane, dhFarPlane);
 
-			if (depthOpaque >= 1.0 || (dhDepthOpaqueL < depthOpaqueL && dhDepthOpaque > 0.0)){
-				depthOpaque = dhDepthOpaque;
-				depthOpaqueL = dhDepthOpaqueL;
-			}
-		#endif
+		if ((depthOpaque >= 1.0 || dhDepthOpaqueL < depthOpaqueL) && dhDepthOpaque > 0.0) {
+			depthOpaque = dhDepthOpaque;
+			depthOpaqueL = dhDepthOpaqueL;
+		}
 
 		swappedDepth = depthOpaque;
 	#else
@@ -805,7 +809,7 @@ void main() {
 	// special curve to give more precision on high/low values of the gradient. this curve will be inverted after sampling and decoding.
 	// lightmap = 1.0-pow(1.0-pow(lightmap,vec2(2)),vec2(2));
 	// small offset to hide flickering from precision error in the encoding/decoding on values close to 1.0 or 0.0
-	lightmap.xy = min(max(lightmap.xy - 0.05,0.0)*1.06,1.0);
+	lightmap.xy = min(max(lightmap.xy - 0.05, 0.0) * 1.06, 1.0);
 	
 	#if MC_VERSION < 12109
 		#if !defined OVERWORLD_SHADER
@@ -1137,7 +1141,7 @@ void main() {
 				#ifdef DISTANT_HORIZONS
 					if (sunSSS_density > 0.0 && DH_SSS_OCCLUSION_INTENSITY > 0.0) {
 						vec3 sunDirection = normalize(WsunVec * mat3(gbufferModelViewInverse));
-						float sunVisibility = getDHSunVisibility(viewPos, sunDirection, BN.x, z0);
+						float sunVisibility = clamp(1.0 - getSunShadow(viewPos, sunDirection, BN.y, true, isDHRange), 0.0, 1.0);
 
 						SSSColor = mix(SSSColor, SSSColor * sunVisibility, DH_SSS_OCCLUSION_INTENSITY);
 					}
@@ -1299,18 +1303,18 @@ void main() {
 		#endif
 
 		#if indirect_effect == SSAO_FILTERED || indirect_effect == SSAO_HQ
-			float vanillaAO_curve = pow(1.0 - vanilla_AO*vanilla_AO,5.0);
+			float vanillaAO_curve = pow(1.0 - vanilla_AO * vanilla_AO, 5.0);
 			float SSAO_curve = pow(SSAO_SSS.x, 4.0);
 
 			// use the min of vanilla ao so they dont overdarken eachother
 			// AO = vec3( min(vanillaAO_curve, SSAO_curve) );
-			AO = vec3( SSAO_curve );
+			AO = vec3(SSAO_curve);
 			Indirect_lighting *= AO;
 		#endif
 
-		// // GTAO... this is so dumb but whatevverrr
+		// GTAO
 		#if indirect_effect == GTAO
-			float vanillaAO_curve = pow(1.0 - vanilla_AO*vanilla_AO,5.0);
+			float vanillaAO_curve = pow(1.0 - vanilla_AO * vanilla_AO, 5.0);
 
 			vec2 r2 = fract(R2_samples((frameCounter%40000) + frameCounter*2) + bnoise);
 			float getGTAO = !hand ? ambient_occlusion(vec3(texcoord/RENDER_SCALE-taaJitter*texelSize*0.5, z), viewPos, worldToView(slopednormal), r2) : 1.0;
@@ -1378,7 +1382,7 @@ void main() {
 				// return;
 				
 				// Blend all factors with smooth falloffs
-				float occlusionFactor = clamp(shadowFactor * 0.75 + (1.0 - lightPower) * 0.3 + skylightFactor * 0.3 + distanceFactor * 0.75, 0.0, 2.0);
+				float occlusionFactor = clamp(shadowFactor + (1.0 - lightPower) * 0.3 + skylightFactor * 0.3 + distanceFactor * 0.75, 0.0, 2.0);
 				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL * shadowColor) * mix(vec3(1.0), AO, occlusionFactor);
 			#else
 				Direct_lighting = DirectLightColor * mix(SSSColor, vec3(1.0), NdotL * shadowColor);
@@ -1402,15 +1406,14 @@ void main() {
 		#endif
 
 		gl_FragData[0].rgb = FINAL_COLOR;
-
 	} else {
-		vec3 Background = vec3(0.0);
+		vec3 background = vec3(0.0);
 
 		#ifdef OVERWORLD_SHADER
 
 			float atmosphereGround = 1.0 - exp2(-50.0 * pow(clamp(feetPlayerPos_normalized.y+0.025,0.0,1.0),2.0)); // darken the ground in the sky.
 			
-			#if RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 0 || RESOURCEPACK_SKY == 3
+			#if RESOURCEPACK_SKY == 0 || RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 3
 				// vec3 orbitstar = vec3(feetPlayerPos_normalized.x,abs(feetPlayerPos_normalized.y),feetPlayerPos_normalized.z); orbitstar.x -= WsunVec.x*0.2;
 				vec3 orbitstar = normalize(mat3(gbufferModelViewInverse) * toScreenSpace(vec3(texcoord/RENDER_SCALE,1.0)));
 				// float radiance = 2.39996 - (worldTime + worldDay*24000.0) / 24000.0;
@@ -1421,25 +1424,23 @@ void main() {
 				orbitstar.xy *= rotationMatrix;
 				
   				#if defined OVERWORLD_SHADER && defined TWILIGHT_FOREST_FLAG
-					Background += stars(orbitstar) * 100.0;
+					background += stars(orbitstar) * 100.0;
   				#else
-					Background += stars(orbitstar) * 10.0 * clamp(-unsigned_WsunVec.y*2.0,0.0,1.0);
+					background += stars(orbitstar) * 10.0 * clamp(-unsigned_WsunVec.y*2.0,0.0,1.0);
 				#endif
 
 				#if !defined ambientLight_only && (RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 0)
-					Background += drawSun(dot(unsigned_WsunVec, feetPlayerPos_normalized), 0, DirectLightColor,vec3(0.0));
-
+					background += drawSun(dot(unsigned_WsunVec, feetPlayerPos_normalized), 0, DirectLightColor,vec3(0.0));
 					vec3 moonLightCol = moonCol / 2400.0;
-
-					Background += drawMoon(feetPlayerPos_normalized, WmoonVec, moonLightCol, Background); 
+					background += drawMoon(feetPlayerPos_normalized, WmoonVec, moonLightCol, background); 
 				#endif
 
-				Background *= atmosphereGround;
+				background *= atmosphereGround;
 			#endif
 			
 			#ifndef ISOLATE_RESOURCEPACK_SKY
 				vec3 Sky = skyFromTex(feetPlayerPos_normalized, colortex4)/1200.0 * Sky_Brightness;
-				Background += Sky;
+				background += Sky;
 			#endif
 			
 			#if RESOURCEPACK_SKY == 1 || RESOURCEPACK_SKY == 2 || RESOURCEPACK_SKY == 3
@@ -1449,12 +1450,12 @@ void main() {
 					resourcePackskyBox *= atmosphereGround;
 				#endif
 
-				Background += resourcePackskyBox;
+				background += resourcePackskyBox;
 			#endif
 
 		#endif
 
-		gl_FragData[0].rgb = clamp(fp10Dither(Background, triangularize(noise_2)), 0.0, 65000.0);
+		gl_FragData[0].rgb = clamp(fp10Dither(background, triangularize(noise_2)), 0.0, 65000.0);
 	}
 
 
@@ -1490,17 +1491,21 @@ void main() {
 	#if DEBUG_VIEW == debug_SSAO
 		// if(hideGUI == 0){
 			float value = SSAO_SSS.y;
-			value = pow(value,3.5);
-			value = 1-pow(1-value,5);
+			value = pow(value, 3.5);
+			value = 1 - pow(1 - value, 5);
 
-			if(hideGUI == 1) value = pow(SSAO_SSS.x,6);
+			if (hideGUI == 1) {
+				value = pow(SSAO_SSS.x, 6);
+			}
 
 			// value = filteredShadow.x;
 			// value = exp(-10*sqrt(filteredShadow.y));
 			// value = 1.0-filteredShadow.z;
 			gl_FragData[0].rgb = vec3(value);
 
-			if(swappedDepth >= 1.0) gl_FragData[0].rgb  = vec3(1.0);
+			if(swappedDepth >= 1.0) {
+				gl_FragData[0].rgb  = vec3(1.0);
+			}
 		// }
 	#endif
 

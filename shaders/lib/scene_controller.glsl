@@ -125,16 +125,16 @@ float RNG = hash11(worldDay + 0.2);
         }
         case 3: {
             // Clear, Lightly Cloudy, w/ Cloudy Fog
-            smallCumulusCoverage = 0.5;
+            smallCumulusCoverage = 0.0;
             largeCumulusCoverage = 0.5;
-            altostratusCoverage = 0.8;
+            altostratusCoverage = 1.0;
 
-            smallCumulusDensity = 0.25;
+            smallCumulusDensity = 0.0;
             largeCumulusDensity = 0.2;
-            altostratusDensity = 0.5;
+            altostratusDensity = 0.2;
 
-            uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.45;
+            uniformFogDensity = 0.1;
+            clumpyFogDensity = 0.4;
             clumpyFogCoverage = 0.0;
             break;
         }
@@ -156,16 +156,16 @@ float RNG = hash11(worldDay + 0.2);
         case 5: {
             // Overcast w/ Cloudy Fog
             smallCumulusCoverage = 0.8;
-            largeCumulusCoverage = 1.0;
-            altostratusCoverage = 0.5;
+            largeCumulusCoverage = 0.0;
+            altostratusCoverage = 1.2;
 
             smallCumulusDensity = 0.5;
             largeCumulusDensity = 0.45;
-            altostratusDensity = 0.5;
+            altostratusDensity = 0.85;
 
-            uniformFogDensity = 0.1;
-            clumpyFogDensity = 0.4;
-            clumpyFogCoverage = 0.05;
+            uniformFogDensity = 0.15;
+            clumpyFogDensity = 0.25;
+            clumpyFogCoverage = 0.3;
             break;
         }
         case 6: {
@@ -178,9 +178,9 @@ float RNG = hash11(worldDay + 0.2);
             largeCumulusDensity = 0.0;
             altostratusDensity = 0.5;
 
-            uniformFogDensity = 0.18;
-            clumpyFogDensity = 0.15;
-            clumpyFogCoverage = 0.5;
+            uniformFogDensity = 0.2;
+            clumpyFogDensity = 0.25;
+            clumpyFogCoverage = 0.2;
             break;
         }
         case 7: {
@@ -199,7 +199,7 @@ float RNG = hash11(worldDay + 0.2);
             break;
         }
         case 8: {
-            // Dark Overcast, w/ Spread Out Fog
+            // Dark Overcast, w/ Minor Fog
             smallCumulusCoverage = 0.7;
             largeCumulusCoverage = 1.0;
             altostratusCoverage = 1.3;
@@ -208,39 +208,39 @@ float RNG = hash11(worldDay + 0.2);
             largeCumulusDensity = 0.85;
             altostratusDensity = 1.0;
 
-            uniformFogDensity = 0.05;
-            clumpyFogDensity = 0.45;
-            clumpyFogCoverage = 0.25;
+            uniformFogDensity = 0.08;
+            clumpyFogDensity = 0.4;
+            clumpyFogCoverage = 0.1;
             break;
         }
         case 9: {
-            // Mixed Overcast, w/ Very Light Fog
+            // Mixed Overcast
             smallCumulusCoverage = 0.0;
-            largeCumulusCoverage = 0.7;
-            altostratusCoverage = 1.0;
+            largeCumulusCoverage = 0.8;
+            altostratusCoverage = 0.9;
 
             smallCumulusDensity = 0.0;
-            largeCumulusDensity = 0.5;
-            altostratusDensity = 1.0;
+            largeCumulusDensity = 0.6;
+            altostratusDensity = 0.9;
 
             uniformFogDensity = 0.0;
-            clumpyFogDensity = 0.1;
-            clumpyFogCoverage = 0.3;
+            clumpyFogDensity = 0.0;
+            clumpyFogCoverage = 0.0;
             break;
         }
         case 10: {
             // Heavy Fog (Sea of Trees)
             smallCumulusCoverage = 1.0;
-            largeCumulusCoverage = 0.1;
+            largeCumulusCoverage = 1.2;
             altostratusCoverage = 1.0;
 
-            smallCumulusDensity = 0.1;
-            largeCumulusDensity = 0.5;
+            smallCumulusDensity = 0.25;
+            largeCumulusDensity = 0.7;
             altostratusDensity = 0.5;
 
-            uniformFogDensity = 0.12;
-            clumpyFogDensity = 0.9;
-            clumpyFogCoverage = 0.6;
+            uniformFogDensity = 0.25;
+            clumpyFogDensity = 0.85;
+            clumpyFogCoverage = 0.3;
             break;
         }
     }
@@ -343,7 +343,7 @@ float RNG = hash11(worldDay + 0.2);
     // clumpyFogCoverage = mix(todClumpyFogDensity * (TOD_FOG_BOOST * 0.5), clumpyFogDensity, TOD_FOG_MIX);
     uniformFogDensity += todUniformFogDensity;
     clumpyFogDensity += todClumpyFogDensity;
-    clumpyFogCoverage += (1.0 - todClumpyFogDensity) * 0.25;
+    clumpyFogCoverage = clamp(clumpyFogCoverage + (1.0 - todClumpyFogDensity) * 0.5, 0.0, 1.0);
 
 #endif
 

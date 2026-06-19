@@ -1,15 +1,12 @@
 #define SUB_SURFACE_SCATTERING_RELATED_SETTINGS
 #define EMISSION_RELATED_SETTINGS
 
-#include "/lib/settings.glsl"
-#include "/lib/util.glsl"
-#include "/lib/DH_utils.glsl"
-
 // varying vec4 pos;
 varying vec4 localPos;
 varying vec4 gcolor;
 varying vec2 lightmapCoords;
 varying vec4 normals_and_materials;
+
 flat varying float SSSAMOUNT;
 flat varying float EMISSIVE;
 flat varying int dh_material_id;
@@ -17,6 +14,19 @@ flat varying int dh_material_id;
 uniform float nightVision;
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
+uniform mat4 gbufferProjection;
+uniform mat4 gbufferProjectionInverse;
+uniform vec3 cameraPosition;
+uniform sampler2D noisetex;
+uniform int frameCounter;
+uniform float frameTimeCounter;
+
+uniform float far;
+uniform float near;
+
+#include "/lib/settings.glsl"
+#include "/lib/util.glsl"
+#include "/lib/dh_utils.glsl"
 
 vec3 viewToWorld(vec3 viewPosition) {
     vec4 pos;
@@ -55,20 +65,12 @@ float encodeVec2(float x,float y){
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
 #define  projMAD(m, v) (diagonal3(m) * (v) + (m)[3].xyz)
 
-uniform mat4 gbufferProjection;
-uniform mat4 gbufferProjectionInverse;
-uniform vec3 cameraPosition;
-
 vec3 toScreenSpace(vec3 p) {
 	vec4 iProjDiag = vec4(gbufferProjectionInverse[0].x, gbufferProjectionInverse[1].y, gbufferProjectionInverse[2].zw);
     vec3 feetPlayerPos = p * 2. - 1.;
     vec4 viewPos = iProjDiag * feetPlayerPos.xyzz + gbufferProjectionInverse[3];
     return viewPos.xyz / viewPos.w;
 }
-
-uniform sampler2D noisetex;
-uniform int frameCounter;
-uniform float frameTimeCounter;
 
 float blueNoise(){
   return fract(texelFetch(noisetex, ivec2(gl_FragCoord.xy)%512, 0).a + 1.0/1.6180339887 * frameCounter);

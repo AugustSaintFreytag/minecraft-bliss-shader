@@ -1,8 +1,11 @@
-#include "/lib/util.glsl"
+uniform int frameCounter;
+uniform float near;
+uniform float far;
 
 varying vec2 texcoord;
 flat varying float tempOffsets;
-uniform int frameCounter;
+
+#include "/lib/util.glsl"
 
 void main() {
 

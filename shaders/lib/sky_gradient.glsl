@@ -7,80 +7,46 @@ vec3 drawSun(float cosY, float sunInt,vec3 nsunlight, vec3 inColor) {
 }
 
 vec3 drawMoon(vec3 PlayerPos, vec3 WorldSunVec, vec3 Color, inout vec3 occludeStars) {
-
 	float Shape = min(max(dot(WorldSunVec,PlayerPos)-0.9994,0.0)/(1.0-0.9994),1.0);//  * clamp(-dot(WorldSunVec,PlayerPos),0,1);
-	
 	occludeStars *= max(1.0-Shape*5,0.0);
 
 	return Shape * Color * 40.0;
-	/*
-	float shape2 = pow(exp(Shape * -10),0.15) * 255.0;
-
-	vec3 sunNormal = vec3(dot(WorldSunVec+PlayerPos, vec3(shape2,0,0)), dot(PlayerPos+WorldSunVec, vec3(0,shape2,0)), -dot(WorldSunVec, PlayerPos) * 15.0);
-
-
-	// even has a little tilt approximation haha.... yeah....
-	vec3[8] phase = vec3[8](
-		vec3( -1.0,	 -0.5,	 1.0	),
-		vec3( -1.0,	 -0.5,	 0.35	),
-		vec3( -1.0,	 -0.5,   0.2	),
-		vec3( -1.0,	 -0.5,   0.1	),
-		vec3(  1.0,	 0.25,	-1.0	),
-		vec3(  1.0,	 0.25,	 0.1	),
-		vec3(  1.0,	 0.25,	 0.2	),
-		vec3(  1.0,	 0.25,	 0.35	)
-	);
-	
-	vec3 LightDir = phase[moonPhase];
-	
-
-	return Shape * pow(clamp(dot(sunNormal,LightDir)/5,0.0,1.5),5) * Color * 10.0 + clamp(Shape * 4.0 * pow(shape2/200,2.0),0.0,1.0)*0.004;
-	*/
 }
 
 
-float w0(float a)
-{
+float w0(float a) {
     return (1.0/6.0)*(a*(a*(-a + 3.0) - 3.0) + 1.0);
 }
 
-float w1(float a)
-{
+float w1(float a) {
     return (1.0/6.0)*(a*a*(3.0*a - 6.0) + 4.0);
 }
 
-float w2(float a)
-{
+float w2(float a) {
     return (1.0/6.0)*(a*(a*(-3.0*a + 3.0) + 3.0) + 1.0);
 }
 
-float w3(float a)
-{
+float w3(float a) {
     return (1.0/6.0)*(a*a*a);
 }
 
-float g0(float a)
-{
+float g0(float a) {
     return w0(a) + w1(a);
 }
 
-float g1(float a)
-{
+float g1(float a) {
     return w2(a) + w3(a);
 }
 
-float h0(float a)
-{
+float h0(float a) {
     return -1.0 + w1(a) / (w0(a) + w1(a));
 }
 
-float h1(float a)
-{
+float h1(float a) {
     return 1.0 + w3(a) / (w2(a) + w3(a));
 }
 
-vec4 texture2D_bicubic(sampler2D tex, vec2 uv)
-{
+vec4 texture2D_bicubic(sampler2D tex, vec2 uv) {
 	vec4 texelSize = vec4(texelSize,1.0/texelSize);
 	uv = uv*texelSize.zw;
 	vec2 iuv = floor( uv );
@@ -121,6 +87,7 @@ vec3 skyFromTex(vec3 pos, sampler2D sampler) {
 
 	return texture(sampler, uv).rgb;
 }
+
 vec3 skyFromTexLOD(vec3 pos, sampler2D sampler, float LOD) {
 	vec2 p = sphereToCarte(pos);
 	vec2 uv = (p * SKY_ATLAS_SIZE + vec2(SKY_ATLAS_OFFSET_X + 0.5, SKY_ATLAS_OFFSET_Y + 0.5)) * texelSize;
@@ -158,7 +125,6 @@ vec4 skyCloudsFromTexLOD(vec3 pos,sampler2D sampler, float roughness) {
 
 	return texture(sampler, uv);
 }
-
 
 vec4 volumetricsFromTex(vec3 pos,sampler2D sampler, float LOD) {
 	vec2 p = sphereToCarte(pos);

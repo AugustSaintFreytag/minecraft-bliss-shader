@@ -5,8 +5,6 @@
 #define WATER_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/util.glsl"
-#include "/lib/macro_lod_mod.glsl"
 
 flat varying vec3 zMults;
 flat varying vec3 WsunVec;
@@ -44,7 +42,6 @@ uniform float far;
 uniform float near;
 uniform float farPlane;
 
-
 uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferPreviousModelView;
@@ -69,6 +66,8 @@ uniform float fogEnd;
 uniform vec3 fogColor;
 uniform float eyeAltitude;
 
+#include "/lib/util.glsl"
+#include "/lib/macro_lod_mod.glsl"
 #include "/lib/waterBump.glsl"
 #include "/lib/res_params.glsl"
 
@@ -96,7 +95,7 @@ vec3 toScreenSpace(vec3 p) {
     return fragposition.xyz / fragposition.w;
 }
 
-#include "/lib/DistantHorizons_projections.glsl"
+#include "/lib/dh_projections.glsl"
 
 float interleaved_gradientNoise_temporal(){
 	#if TAA_MODE > 0
@@ -139,20 +138,12 @@ vec3 normVec (vec3 vec){
 	return vec*inversesqrt(dot(vec,vec));
 }
 
-float ld(float depth) {
-  return 1.0 / (zMults.y - depth * zMults.z);		// (-depth * (far - near)) = (2.0 * near)/ld - far - near
-}
-
-float linearize(float dist) {
-  return (2.0 * near) / (far + near - dist * (far - near));
-}
-
 float DH_ld(float dist) {
   return (2.0 * LOD_NEARPLANE) / (LOD_FARPLANE + LOD_NEARPLANE - dist * (LOD_FARPLANE - LOD_NEARPLANE));
 }
 
 float DH_inv_ld (float lindepth){
-	return -((2.0*LOD_NEARPLANE/lindepth)-LOD_FARPLANE-LOD_NEARPLANE)/(LOD_FARPLANE-LOD_NEARPLANE);
+	return -((2.0 * LOD_NEARPLANE / lindepth) - LOD_FARPLANE - LOD_NEARPLANE) / (LOD_FARPLANE - LOD_NEARPLANE);
 }
 
 float linearizeDepthFast(const in float depth, const in float near, const in float far) {
@@ -292,7 +283,7 @@ vec4 bilateralUpsample(vec2 fragcoord, sampler2D colortex, out float outerEdgeRe
 		#ifdef USING_LOD_MOD
 		  float offsetDepth = sqrt(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE,0).a/65000.0);
     #else
-      float offsetDepth = linearize(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE, 0).r);
+      float offsetDepth = linZ(texelFetch(depth, UV_DEPTH + (OFFSET[i] + UV_NOISE) * SCALE, 0).r);
     #endif
 
     float edgeDiff = abs(offsetDepth - referenceDepth) < threshold ? 1.0 : 1e-7;
@@ -368,55 +359,59 @@ vec4 VLTemporalFiltering(vec3 viewPos, in float referenceDepth, sampler2D depth,
 
 }
 
-void blendAllFogTypes( inout vec3 color, inout float bloomyFogMult, vec4 volumetrics, float linearDistance, vec3 playerPos, vec3 cameraPosition, bool isSky ){
+void blendAllFogTypes(inout vec3 color, inout float bloomyFogMult, vec4 volumetrics, float linearDistance, vec3 playerPos, vec3 cameraPosition, bool isSky){
 
   // blend cave fog
   #if defined OVERWORLD_SHADER && defined CAVE_FOG
     if (isEyeInWater == 0 && eyeAltitude < 1500){
       vec3 cavefogCol = vec3(CaveFogColor_R, CaveFogColor_G, CaveFogColor_B) * 0.3;
-      cavefogCol *= 1.0-pow(1.0-pow(1.0 - max(1.0 - linearDistance/far,0),2),CaveFogFallOff);
-      cavefogCol *= exp(-7.0*clamp(playerPos.y*0.5+0.5,0,1)) * 0.999 + 0.001;
+      float caveDistanceShape = 1.0 - pow(1.0 - pow(1.0 - max(1.0 - linearDistance / far, 0), 2), CaveFogFallOff);
+      float caveHeightShape = exp(-7.0 * clamp(playerPos.y * 0.5 + 0.5, 0, 1)) * 0.999 + 0.001;
+      float caveTau = caveDetection * caveDistanceShape * caveHeightShape;
 
       #ifdef CAVE_FOG_DARKEN_SKY
-        float skyhole = pow(clamp(1.0-pow(max(playerPos.y - 0.6,0.0)*5.0,2.0),0.0,1.0),2);
-        color.rgb = mix(color.rgb + cavefogCol * caveDetection, cavefogCol, isSky ? skyhole * caveDetection : 0.0);
-      #else
-        color.rgb += cavefogCol * caveDetection;
+        float skyhole = pow(clamp(1.0 - pow(max(playerPos.y - 0.6, 0.0) * 5.0, 2.0), 0.0, 1.0), 2);
+        caveTau *= isSky ? mix(1.0, 4.0, skyhole) : 1.0;
       #endif
+
+      float caveT = exp(-caveTau);
+      color.rgb = color.rgb * caveT + cavefogCol * (1.0 - caveT);
     }
   #endif
 
   /// water absorption; it is completed when volumetrics are blended.
   if(isEyeInWater == 1){
     vec3 totEpsilon = vec3(Water_Absorb_R, Water_Absorb_G, Water_Absorb_B);
-		vec3 scatterCoef = Dirt_Amount * vec3(Dirt_Scatter_R, Dirt_Scatter_G, Dirt_Scatter_B) / 3.14;
+		vec3 scatterCoef = Dirt_Amount * vec3(Dirt_Scatter_R, Dirt_Scatter_G, Dirt_Scatter_B) / PI;
 
-	  float distanceFromWaterSurface = playerPos.y + 1.0 + (cameraPosition.y - waterEnteredAltitude)/waterEnteredAltitude;
+	  float distanceFromWaterSurface = playerPos.y + 1.0 + (cameraPosition.y - waterEnteredAltitude) / waterEnteredAltitude;
     distanceFromWaterSurface = clamp(distanceFromWaterSurface,0,1);
 
     vec3 transmittance = exp(-totEpsilon * linearDistance);
     color.rgb *= transmittance;
 
     vec3 transmittance2 = exp(-totEpsilon * 50.0);
-    float fogfade = 1.0 - max((1.0 - linearDistance / min(far, 16.0*7.0) ),0);
+    float fogfade = 1.0 - max((1.0 - linearDistance / min(far, 16.0 * 7.0) ),0);
     color.rgb += (transmittance2 * scatterCoef) * fogfade;
     
-    bloomyFogMult *= dot(transmittance,vec3(0.3333))*0.75 + 0.25;
+    bloomyFogMult *= dot(transmittance, vec3(0.3333)) * 0.75 + 0.25;
   }
-  /// blend volumetrics
-  color = color * volumetrics.a + volumetrics.rgb;
   
   // make bloomy fog only work outside of the overworld (unless underwater)
   #if !defined OVERWORLD_SHADER
     bloomyFogMult = min(bloomyFogMult, volumetrics.a);
   #endif
 
+  /// blend volumetrics
+  float volumetricT = clamp(volumetrics.a, 0.0, 1.0);
+  color = color * volumetricT + volumetrics.rgb;
+
   // blend vanilla fogs (blindness, darkness, lava, powdered snow)
   if(isEyeInWater > 1 || blindness > 0 || darknessFactor > 0){
     float environmentFogDensity = 1.0 - clamp(linearDistance/fogEnd,0,1);
     environmentFogDensity = 1.0 - environmentFogDensity*environmentFogDensity;
     environmentFogDensity *= environmentFogDensity;
-    environmentFogDensity =  mix(environmentFogDensity, 1.0, min(darknessLightFactor*2.0,1));
+    environmentFogDensity = mix(environmentFogDensity, 1.0, min(darknessLightFactor*2.0,1));
 
     color = mix(color, toLinear(fogColor), environmentFogDensity);
   }
@@ -429,14 +424,12 @@ void blendForwardRendering( inout vec3 color, vec4 translucentShader ){
   }
 }
 
-float getBorderFogDensity(float linearDistance, vec3 playerPos, bool sky){
-
-  if(sky) return 0.0;
+float getBorderFogDensity(float linearDistance, vec3 playerPos){
 
   #ifdef USING_LOD_MOD
-  	float borderFogDensity = smoothstep(1.0, 0.0, min(max(1.0 - linearDistance / LOD_RENDERDISTANCE,0.0)*3.0,1.0)   );
+  	float borderFogDensity = smoothstep(1.0, 0.0, min(max(1.0 - linearDistance / LOD_RENDERDISTANCE,0.0) * 3.0, 1.0));
   #else
-  	float borderFogDensity = smoothstep(1.0, 0.0, min(max(1.0 - linearDistance / far,0.0)*3.0,1.0)   );
+  	float borderFogDensity = smoothstep(1.0, 0.0, min(max(1.0 - linearDistance / far, 0.0) * 3.0, 1.0));
   #endif
   
   borderFogDensity *= exp(-10.0 * pow(clamp(playerPos.y,0.0,1.0)*4.0,2.0));
@@ -444,6 +437,15 @@ float getBorderFogDensity(float linearDistance, vec3 playerPos, bool sky){
 
   return borderFogDensity;
 }
+
+void applyBorderFog(inout vec3 color, vec3 borderFogColor, float borderFogDensity){
+  float borderAmount = clamp(borderFogDensity, 0.0, 0.9999);
+  float borderTau = -log(max(1.0 - borderAmount, 1e-4));
+  float borderT = exp(-borderTau);
+
+  color = color * borderT + borderFogColor * (1.0 - borderT);
+}
+
 void main() {
   /* RENDERTARGETS:7,3,10 */
 
@@ -452,15 +454,16 @@ void main() {
   
   #if DEBUG_VIEW == debug_DEFERRED_RENDERING
     gl_FragData[0].r = 1.0; // pass fog alpha so bloom can do bloomy fog
-    gl_FragData[1].rgb = clamp(texture(colortex3, texcoord).rgb, 0.0,68000.0);
+    gl_FragData[1].rgb = clamp(texture(colortex3, texcoord).rgb, 0.0, 68000.0);
     return;
   #endif
   
   float depth = texelFetch(depthtex0, ivec2(gl_FragCoord.xy),0).x;
   bool hand = depth < 0.56;
+
   float z = depth;
   float z2 = texelFetch(depthtex1, ivec2(gl_FragCoord.xy),0).x;
-  float frDepth = linearize(z);
+  float frDepth = linZ(z);
 
 	float swappedDepth = z;
 
@@ -494,8 +497,8 @@ void main() {
 	vec3 playerPos_alt = mat3(gbufferModelViewInverse) * viewPos_alt + gbufferModelViewInverse[3].xyz;
   float linearDistance_cylinder_alt = length(playerPos_alt.xz);
 
-	float lightleakfix = clamp(pow(eyeBrightnessSmooth.y/240.,2) ,0.0,1.0);
-	float lightleakfixfast = clamp(eyeBrightness.y/240.,0.0,1.0);
+	float lightleakfix = clamp(pow(eyeBrightnessSmooth.y / 240., 2) , 0.0, 1.0);
+	float lightleakfixfast = clamp(eyeBrightness.y / 240., 0.0, 1.0);
 
 	////// --------------- UNPACK OPAQUE GBUFFERS --------------- //////
 	// float opaqueMasks = decodeVec2(texture(colortex1,texcoord).a).y;
@@ -512,7 +515,9 @@ void main() {
 	bool nameTagMask = abs(unpack1.a - 0.1) < 0.01;
   float nametagbackground = nameTagMask ? 0.25 : 1.0;
 
-  if(albedo.a < 0.01) tangentNormals = vec2(0.0);
+  if(albedo.a < 0.01) {
+    tangentNormals = vec2(0.0);
+  }
 
 	////// --------------- UNPACK MISC --------------- //////
 	// 1.0 = water mask
@@ -554,7 +559,7 @@ void main() {
   #ifdef USING_LOD_MOD
     vec4 VLBehindTranslucents = bilateralUpsample(refractedCoord/texelSize, colortex13, blank, DH_mixedLinearZ, depthtex1, hand);
   #else
-    vec4 VLBehindTranslucents = bilateralUpsample(refractedCoord/texelSize, colortex13, blank, linearize(texelFetch(depthtex1, ivec2(refractedCoord/texelSize),0).x), depthtex1, hand);
+    vec4 VLBehindTranslucents = bilateralUpsample(refractedCoord/texelSize, colortex13, blank, linZ(texelFetch(depthtex1, ivec2(refractedCoord/texelSize),0).x), depthtex1, hand);
   #endif
   
   ////// --------------- START BLENDING FOGS AND FORWARD RENDERED COLOR
@@ -576,13 +581,16 @@ void main() {
 
   // blend border fog. be sure to blend before and after forward rendered color blends.
   #if defined BorderFog && defined OVERWORLD_SHADER
-    vec4 borderFog = vec4(skyGroundColor, getBorderFogDensity(linearDistance_cylinder, playerPos_normalized, swappedDepth >= 1.0));
+    vec4 borderFog = vec4(skyGroundColor, getBorderFogDensity(linearDistance_cylinder, playerPos_normalized));
 
     #if !defined SKY_GROUND
       borderFog.rgb = skyFromTex(playerPos_normalized, colortex4)/1200.0 * Sky_Brightness;
     #endif
     #if !defined USING_LOD_MOD
-     if(!isWater) color = mix(color, borderFog.rgb, getBorderFogDensity(linearDistance_cylinder_alt, normalize(playerPos_alt), z2 >= 1.0 || TranslucentShader.a <= 0));
+      if(!isWater) {
+        float borderFogDensityAlt = getBorderFogDensity(linearDistance_cylinder_alt, normalize(playerPos_alt));
+        applyBorderFog(color, borderFog.rgb, borderFogDensityAlt);
+      }
     #endif
   #else
     vec4 borderFog = vec4(0.0);
@@ -600,7 +608,7 @@ void main() {
   blendForwardRendering(color, TranslucentShader);
 
   #if defined BorderFog && defined OVERWORLD_SHADER
-    color = mix(color, borderFog.rgb, getBorderFogDensity(linearDistance_cylinder, playerPos_normalized, swappedDepth >= 1.0));
+    applyBorderFog(color, borderFog.rgb, borderFog.a);
   #endif
   
   // tweaks to VL for nametag rendering
@@ -618,7 +626,7 @@ void main() {
   float rainDrops = texelFetch(colortex9,ivec2(texcoord/texelSize),0).a;
   
   if(rainDrops > 0.0) {
-    bloomyFogMult *= clamp(1.0 - pow(rainDrops*5.0,2),0.0,1.0);
+    bloomyFogMult *= clamp(1.0 - pow(rainDrops * 5.0, 2), 0.0, 1.0);
     color.rgb += color.rgb * 0.2 * rainDrops;
   }
 #endif
@@ -626,7 +634,7 @@ void main() {
 ////// --------------- FINALIZE
   #ifdef display_LUT
       vec2 coord = (gl_FragCoord.xy/2.0);
-      vec3 thingy = texelFetch2D(colortex4,ivec2(coord),0).rgb /1200.0;
+      vec3 thingy = texelFetch2D(colortex4, ivec2(coord), 0).rgb / 1200.0;
       coord *= texelSize;
 
       if(coord.x < 1 && coord.x > 0 && coord.y < 1 && coord.y > 0){
@@ -641,8 +649,8 @@ void main() {
     #endif
   #endif
 
-  gl_FragData[0] = vec4(bloomyFogMult,0.0,0.0,1.0); // pass fog alpha so bloom can do bloomy fog
-  gl_FragData[1].rgb = clamp(color.rgb, 0.0,68000.0);
+  gl_FragData[0] = vec4(bloomyFogMult, 0.0, 0.0, 1.0); // pass fog alpha so bloom can do bloomy fog
+  gl_FragData[1].rgb = clamp(color.rgb, 0.0, 68000.0);
 
 
 
