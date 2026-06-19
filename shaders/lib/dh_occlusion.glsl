@@ -162,6 +162,9 @@ const float SUN_SHADOW_FETCH_JITTER = 0.65;
 const float SUN_SHADOW_VANILLA_THICKNESS = 1.25;
 const float SUN_SHADOW_LOD_THICKNESS = 3.0;
 const int SUN_SHADOW_KERNEL_TAPS = 7;
+// Fraction of the sample budget spent on the coarse uniform scan.
+// The remainder is used for binary-search refinement around the first detected shadow edge.
+const float SUN_SHADOW_COARSE_RATIO = 0.65;
 
 float getSunFacingFactor(in vec3 viewPos, in vec3 lightDir) {
 	float pointDistance = length(viewPos);
@@ -415,21 +418,41 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 	float maxSupport = 0.0;
 	float stepOffset = startNoise * SUN_SHADOW_START_JITTER;
 
-	vec3 marchedClipPos = ray.clipStart + ray.clipStep * stepOffset;
-	vec3 marchedViewPos = ray.viewStart + ray.viewStep * stepOffset;
+	// Derived full-ray vectors so both phases can address any t in [0,1].
+	vec3 clipFull = ray.clipStep * float(ray.sampleCount);
+	vec3 viewFull = ray.viewStep * float(ray.sampleCount);
+
+	// Split sample budget: coarse scan then bisection.
+	int coarseCount = max(2, int(float(ray.sampleCount) * SUN_SHADOW_COARSE_RATIO));
+	int refineCount = ray.sampleCount - coarseCount;
+
+	// Phase 1: Uniform coarse scan
+	
+	// Identical blocker/support logic to the previous single-pass march.
+	// Tracks the last clear and first hit normalised positions along the ray
+	// so phase 2 knows exactly where to bisect.
+
+	float lastClearT = 0.0;
+	float firstHitT  = 1.0;
+	bool  hitFound   = false;
+	bool  earlyExited = false;
 
 	for (int i = 0; i < maxSamples; i++) {
-		if (i >= ray.sampleCount) {
+		if (i >= coarseCount) {
 			break;
 		}
 
-		if (!isWithinViewBounds(marchedClipPos.xy)) {
+		float t = (float(i) + stepOffset) / float(coarseCount);
+		vec3 coarseClipPos = ray.clipStart + clipFull * t;
+		vec3 coarseViewPos = ray.viewStart + viewFull * t;
+
+		if (!isWithinViewBounds(coarseClipPos.xy)) {
 			break;
 		}
 
-		float rayDepth = getSunShadowRayDepth(marchedViewPos, ray.depthCheck);
+		float rayDepth = getSunShadowRayDepth(coarseViewPos, ray.depthCheck);
 		vec2 fetchJitter = getSunShadowFetchJitter(stepSeed, i);
-		DepthSample depthSample = getSunOcclusionDepthSample(marchedClipPos.xy, kernelNoise, fetchJitter);
+		DepthSample depthSample = getSunOcclusionDepthSample(coarseClipPos.xy, kernelNoise, fetchJitter);
 
 		float support = getSunShadowBlockerSupport(depthSample, rayDepth, float(i));
 
@@ -442,15 +465,68 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 			currentStreak += 1.0;
 			maxStreak = max(maxStreak, currentStreak);
 
+			if (!hitFound) {
+				firstHitT = t;
+				hitFound  = true;
+			}
+
 			if (fast && supportTotal >= SUN_SHADOW_SUPPORT_THRESHOLD) {
+				earlyExited = true;
 				break;
 			}
 		} else {
 			currentStreak = 0.0;
+			if (!hitFound) {
+				lastClearT = t;
+			}
 		}
+	}
 
-		marchedClipPos += ray.clipStep;
-		marchedViewPos += ray.viewStep;
+	// Phase 2: Binary-search refinement (between lastClearT and firstHitT)
+
+	// Only runs when a blocker was found in the coarse scan and the fast path
+	// did not already reach full confidence. Bisection samples land spatially
+	// clustered at the mountain edge, so they contribute positively to both the
+	// streak and support accumulators, sharpening the shadow boundary.
+
+	if (hitFound && !earlyExited && refineCount > 0) {
+		float loT = lastClearT;
+		float hiT = firstHitT;
+
+		for (int i = 0; i < maxSamples; i++) {
+			if (i >= refineCount) {
+				break;
+			}
+
+			int globalIndex = coarseCount + i;
+			float midT = (loT + hiT) * 0.5;
+			vec3 refineClipPos = ray.clipStart + clipFull * midT;
+			vec3 refineViewPos = ray.viewStart + viewFull * midT;
+
+			if (!isWithinViewBounds(refineClipPos.xy)) {
+				break;
+			}
+
+			float rayDepth = getSunShadowRayDepth(refineViewPos, ray.depthCheck);
+			vec2 fetchJitter = getSunShadowFetchJitter(stepSeed, globalIndex);
+			DepthSample depthSample = getSunOcclusionDepthSample(refineClipPos.xy, kernelNoise, fetchJitter);
+
+			float support = getSunShadowBlockerSupport(depthSample, rayDepth, float(globalIndex));
+
+			supportTotal -= supportWindow[globalIndex % SUN_SHADOW_SUPPORT_WINDOW];
+			supportWindow[globalIndex % SUN_SHADOW_SUPPORT_WINDOW] = support;
+			supportTotal += support;
+			maxSupport = max(maxSupport, supportTotal);
+
+			if (support > 0.0) {
+				currentStreak += 1.0;
+				maxStreak = max(maxStreak, currentStreak);
+				hiT = midT; // edge is closer than midpoint; narrow towards viewer
+			} else {
+				currentStreak = 0.0;
+				loT = midT; // edge is further than midpoint; narrow towards sun
+			}
+		}
 	}
 
 	float streakThreshold = fast ? 3.0 : 4.0;
