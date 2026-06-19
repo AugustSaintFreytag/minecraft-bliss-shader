@@ -563,8 +563,8 @@ void main() {
 
         if (blockId == BLOCK_ELECTRIC_LIGHT) {
             lightColor = vec3(1.000, 0.821, 0.842);
-            lightRange = 24.0;
-            mixWeight = 0.85;
+            lightRange = 26.0;
+            mixWeight = 0.5;
         }
 
         if (blockId == BLOCK_LAVA) {
