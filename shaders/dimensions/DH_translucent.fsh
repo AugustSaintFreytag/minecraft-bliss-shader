@@ -48,6 +48,7 @@ flat varying vec3 WsunVec2;
 
 uniform int isEyeInWater;
 uniform float rainStrength;
+uniform bool isInRainFallEnvironment;
 
 #include "/lib/settings.glsl"
 #include "/lib/util.glsl"
@@ -249,7 +250,8 @@ if (gl_FragCoord.x * texelSize.x < 1.0  && gl_FragCoord.y * texelSize.y < 1.0 )	
     if(iswater && abs(worldSpaceNormals.y) > 0.1){
 	    vec3 waterPos = (playerPos+cameraPosition).xzy;
 
-		vec3 bump = normalize(getWaveNormal(waterPos, playerPos, true));
+		float rainRippleAmount = rainStrength * (isInRainFallEnvironment ? 1.0 : 0.0);
+		vec3 bump = normalize(getWaveNormal(waterPos, playerPos, true, rainRippleAmount));
 
 		float bumpmult = WATER_WAVE_STRENGTH;
 

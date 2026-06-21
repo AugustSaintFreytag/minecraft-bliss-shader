@@ -90,6 +90,7 @@ uniform float sunElevation;
 
 uniform int isEyeInWater;
 uniform float rainStrength;
+uniform bool isInRainFallEnvironment;
 uniform float skyIntensityNight;
 uniform float skyIntensity;
 uniform ivec2 eyeBrightnessSmooth;
@@ -541,7 +542,8 @@ if (gl_FragCoord.x * texelSize.x < 1.0  && gl_FragCoord.y * texelSize.y < 1.0 )	
 		
 			waterPos.xyz = getParallaxDisplacement(waterPos, playerPos);
 			
-			vec3 bump = normalize(getWaveNormal(waterPos, playerPos, false));
+			float rainRippleAmount = rainStrength * (isInRainFallEnvironment ? 1.0 : 0.0);
+			vec3 bump = normalize(getWaveNormal(waterPos, playerPos, false, rainRippleAmount));
 
 			float bumpmult = WATER_WAVE_STRENGTH;
 			bump = bump * vec3(bumpmult, bumpmult, bumpmult) + vec3(0.0f, 0.0f, 1.0f - bumpmult);

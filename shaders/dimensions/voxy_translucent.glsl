@@ -11,6 +11,9 @@
 // #include "/lib/diffuseLighting.glsl"
 #include "/lib/res_params.glsl"
 
+uniform float rainStrength;
+uniform bool isInRainFallEnvironment;
+
 // void readSceneControllerParameters(
 // 	sampler2D colortex,
 // 	out vec2 smallCumulus,
@@ -215,7 +218,8 @@ void voxy_emitFragment(VoxyFragmentParameters parameters) {
     if(isWater && abs(normal.y) > 0.1){
 	    vec3 waterPos = playerPos+cameraPosition;
 
-		vec3 bump = normalize(getWaveNormal(waterPos.xzy, playerPos, false));
+		float rainRippleAmount = rainStrength * (isInRainFallEnvironment ? 1.0 : 0.0);
+		vec3 bump = normalize(getWaveNormal(waterPos.xzy, playerPos, false, rainRippleAmount));
 		float bumpmult = WATER_WAVE_STRENGTH;
 		bump = bump * vec3(bumpmult, bumpmult, bumpmult) + vec3(0.0f, 0.0f, 1.0f - bumpmult);
 
