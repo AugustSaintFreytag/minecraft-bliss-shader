@@ -1,4 +1,3 @@
-#define FOG_USE_TURBULENCE 0
 #define FOG_USE_SHAPING 1
 #define FOG_SHAPING_INTENSITY 0.9
 
@@ -7,11 +6,15 @@
 uniform bool isInSpecialEnvironment;
 uniform vec3 exitedBiomePos;
 
-#define WEATHER_FOG_EXTINCTION_MULT 1.25
-#define LOCAL_FOG_EXTINCTION_MULT 1.35
+#define WEATHER_FOG_EXTINCTION_MULT 1.2
+#define LOCAL_FOG_EXTINCTION_MULT 1.3
 #define WEATHER_FOG_SINGLE_SCATTER_ALBEDO 0.98
 #define LOCAL_FOG_SINGLE_SCATTER_ALBEDO 0.98
+
 #define CLUMPY_FOG_MAX_DISTANCE 1024.0
+
+#define PLAYER_FOG_FADE_DISTANCE 8.0
+#define PLAYER_FOG_MIN_INTENSITY 0.5
 
 // Utilities
 
@@ -70,6 +73,14 @@ float applyFogShaping(float noise, float coverage, float intensity) {
 
 float getFogStartHeightFade(float height) {
 	return clamp(height - float(FOG_START_HEIGHT), 0.0, 1.0);
+}
+
+float getDistanceFogFade(float sampleDistance, float fadeDistance, float minIntensity) {
+	return mix(minIntensity, 1.0, smoothstep(0.0, fadeDistance, sampleDistance));
+}
+
+float getPlayerDistanceFogFade(float sampleDistance) {
+	return getDistanceFogFade(sampleDistance, PLAYER_FOG_FADE_DISTANCE, PLAYER_FOG_MIN_INTENSITY);
 }
 
 
@@ -276,12 +287,12 @@ vec4 GetVolumetricFog(
 
 	vec3 airAbsorbance = vec3(1.0);
 	
-	float indoors = clamp(eyeBrightnessSmooth.y / 240.0, 0, 1);
+	float eyeSkyVisibility = clamp(eyeBrightnessSmooth.y / 240.0, 0.0, 1.0);
 	float daylightFactor = clamp(sunElevation * 2.0, 0.0, 1.0);
 	float daylightAmp = (1.0 + (1.0 - daylightFactor) * 1.0);
 	
 	vec3 masterLightColor = lightColor * 1.5 * daylightAmp;
-	vec3 ambientLightColor = ambientColor * 1.2 + 0.25 * lightColor);
+	vec3 ambientLightColor = ambientColor * 1.2 + 0.25 * lightColor;
 
 	vec3 localFogColor = parameters.localFogColor.rgb;
 	vec3 localFogColor_lightCol = localFogColor * dot(masterLightColor, vec3(0.33333));
@@ -324,7 +335,7 @@ vec4 GetVolumetricFog(
 		vec3 shadows = getShadows(mix(weatherRayProgress, localRayProgress, localFogDensityFactor), sunVector, shadowMapZeroPos, shadowMapRayStartPos * sampleOffset, shadowMapRayProgress, flatPhase, sunPhase);
 		
 		#if defined LIGHTNING_FLASH && defined LIGHTNINGFLASH_VL
-			vec3 lightningFlash = createLightningPointLight(rayProgress - cameraPosition, lightningBoltPosition.xyz, 1.0, 1.0) * indoors;
+			vec3 lightningFlash = createLightningPointLight(rayProgress - cameraPosition, lightningBoltPosition.xyz, 1.0, 1.0) * eyeSkyVisibility;
 		#endif
 		
 		// (I) Atmosphere
@@ -364,14 +375,16 @@ vec4 GetVolumetricFog(
 		#endif
 
 		float uniformStepLength = volumeSampleOffset * weatherRayLength;
-		float uniformDensity = weatherKill * getUniformFogDensity(weatherRayProgress) * pow(indoors, 3);
+		float uniformFogFade = getPlayerDistanceFogFade(length(sampleOffset * weatherRayStartPos));
+		float uniformDensity = weatherKill * getUniformFogDensity(weatherRayProgress) * uniformFogFade;
 		float uniformSigmaT = uniformDensity * WEATHER_FOG_EXTINCTION_MULT;
 		float uniformFogVolumeCoeff = clamp(exp(-uniformSigmaT * uniformStepLength), 0.0, 1.0);
 		
 		color += fogLighting * (1.0 - uniformFogVolumeCoeff) * WEATHER_FOG_SINGLE_SCATTER_ALBEDO * absorbance;
 
 		float clumpyStepLength = volumeSampleOffset * clumpyRayLength;
-		float clumpyDensity = clumpyKill * getClumpyFogDensity(clumpyRayProgress) * pow(indoors, 3);
+		float clumpyFogFade = getPlayerDistanceFogFade(length(sampleOffset * clumpyRayStartPos));
+		float clumpyDensity = clumpyKill * getClumpyFogDensity(clumpyRayProgress) * clumpyFogFade;
 		float clumpySigmaT = clumpyDensity * WEATHER_FOG_EXTINCTION_MULT;
 		float clumpyFogVolumeCoeff = clamp(exp(-clumpySigmaT * clumpyStepLength), 0.0, 1.0);
 
@@ -389,10 +402,8 @@ vec4 GetVolumetricFog(
 
 		float localStepLength = volumeSampleOffset * localRayLength;
 		float localEffectDensity = localKill * getLocalEffectDensity(localRayProgress);
-
-		#ifdef EXCLUDE_WRITE_TO_LUT
-			localEffectDensity *= indoors;
-		#endif
+		float localFogFade = getPlayerDistanceFogFade(length(sampleOffset * localRayStartPos));
+		localEffectDensity *= localFogFade;
 
 		float localFogSigmaT = localEffectDensity * LOCAL_FOG_EXTINCTION_MULT;
 		float localFogVolumeCoeff = exp(-localFogSigmaT * localStepLength);
