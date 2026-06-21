@@ -377,6 +377,10 @@ screen.World = 世界
         option.Dirt_Amount = 水体浑浊程度
         option.Water_Top_Layer = 海平面 Y 轴坐标
         option.WATER_WAVE_STRENGTH = 水波强度
+        option.WATER_RAIN_RIPPLES = 雨滴涟漪
+        option.WATER_RAIN_RIPPLE_STRENGTH = 雨滴涟漪强度
+        option.WATER_RAIN_RIPPLE_SIZE = 雨滴涟漪大小
+        option.WATER_RAIN_RIPPLE_DENSITY = 雨滴涟漪密度
         option.SNELLS_WINDOW = 斯涅尔窗 (Snell's Window)
         
         screen.Water_fog_color = 水雾设置
@@ -654,6 +658,10 @@ option.SKY_GROUND = 地天
 
 option.MATERIAL_AO.comment = 开关基于资源包提供的内容应用环境光遮蔽的功能. §a性能消耗水平:§r 非常低.
 option.WATER_WAVE_STRENGTH.comment = 配置出现的水波强度.
+option.WATER_RAIN_RIPPLES.comment = 下雨时在水面添加细微的雨滴涟漪细节.
+option.WATER_RAIN_RIPPLE_STRENGTH.comment = 控制水面雨滴涟漪的可见强度.
+option.WATER_RAIN_RIPPLE_SIZE.comment = 控制雨滴涟漪的半径和环宽.
+option.WATER_RAIN_RIPPLE_DENSITY.comment = 控制水面出现的雨滴涟漪数量.
 option.MOONPHASE_BASED_MOONLIGHT.comment = §b这啥?§r 每晚月亮有不同的照度. 此选项根据月相来调整发出的月光亮度. §a性能消耗水平:§r 近乎于无.
 
 option.END_STORM_DENSTIY.comment =  §b这啥?§r 这是末地的一层暗色云雾. 配置末地风暴的密度.
