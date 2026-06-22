@@ -633,7 +633,6 @@ void main() {
 		float sunShadow = 0.0;
 	#endif
 
-	float daylightFactor = clamp(sunElevation * 2.0, 0.0, 1.0);
 	float cloudPlaneDistance = 0.0;
 
 	#if defined OVERWORLD_SHADER
