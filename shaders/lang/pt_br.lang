@@ -219,6 +219,10 @@ screen.World = Mundo
         option.FAKE_REFRACTION_EFFECT = Refração na Água/Vidro
         option.Dirt_Amount = Quantidade de Sujeira
         option.Water_Top_Layer = Coordenada Y do Oceano
+        option.WATER_RAIN_RIPPLES = Ondulações da Chuva
+        option.WATER_RAIN_RIPPLE_STRENGTH = Intensidade das Ondulações da Chuva
+        option.WATER_RAIN_RIPPLE_SIZE = Tamanho das Ondulações da Chuva
+        option.WATER_RAIN_RIPPLE_DENSITY = Densidade das Ondulações da Chuva
         
         screen.Water_fog_color = Ajustes da Névoa na Água
             option.Dirt_Scatter_R = Disperção Vermelho (Sujeira)
@@ -454,6 +458,10 @@ screen.World.comment = Ajuste configurações para váriadas coisas que acontece
         option.FAKE_REFRACTION_EFFECT.comment = Habilita refração em coisas translúcidas. §bO Que é Isso?§r Olhe para a água e você vai perceber a refração da luz distorcendo as coisas dentro dela. §aCUSTO DE PERFORMANCE:§r Baixo
         option.Dirt_Amount.comment = Ajusta quanta sujeira tem na água. Isso controla quanta névoa tem dentro da água.
         option.Water_Top_Layer.comment = Ajusta a coordenada Y que oceano deve estar no mundo.
+        option.WATER_RAIN_RIPPLES.comment = Adiciona detalhes sutis de ondulações da chuva na superfície da água durante a chuva.
+        option.WATER_RAIN_RIPPLE_STRENGTH.comment = Controla o quanto as ondulações da chuva aparecem na água.
+        option.WATER_RAIN_RIPPLE_SIZE.comment = Controla o raio e a largura dos anéis das ondulações da chuva.
+        option.WATER_RAIN_RIPPLE_DENSITY.comment = Controla quantas ondulações da chuva aparecem na água.
         
         screen.Water_fog_color.comment = Ajusta as cores da névoa na água. 
 

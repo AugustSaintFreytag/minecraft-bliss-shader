@@ -367,6 +367,10 @@ screen.World = Мир
         option.Dirt_Amount = Количество грязи
         option.Water_Top_Layer = Координата океана Y
         option.WATER_WAVE_STRENGTH = Сила волны
+        option.WATER_RAIN_RIPPLES = Круги от дождя
+        option.WATER_RAIN_RIPPLE_STRENGTH = Сила кругов от дождя
+        option.WATER_RAIN_RIPPLE_SIZE = Размер кругов от дождя
+        option.WATER_RAIN_RIPPLE_DENSITY = Плотность кругов от дождя
         option.SNELLS_WINDOW = Вид из подводы
 		option.WATER_WAVE_SPEED = Скорость волн
         
@@ -708,6 +712,10 @@ option.SKY_GROUND = Атмосфера грунта
 
 option.MATERIAL_AO.comment = Переключайте использование внешней окклюзии в зависимости от того, что предоставляет пакет ресурсов. §aНАГРУЗКА:§r очень низкая
 option.WATER_WAVE_STRENGTH.comment = Настройте, насколько сильными будут казаться волны
+option.WATER_RAIN_RIPPLES.comment = Добавляет тонкие круги от дождя на поверхности воды во время дождя
+option.WATER_RAIN_RIPPLE_STRENGTH.comment = Настройте, насколько заметны круги от дождя на воде
+option.WATER_RAIN_RIPPLE_SIZE.comment = Настройте радиус и ширину колец кругов от дождя
+option.WATER_RAIN_RIPPLE_DENSITY.comment = Настройте, сколько кругов от дождя появляется на воде
 option.MOONPHASE_BASED_MOONLIGHT.comment = §bЧто это?§r каждую ночь луна освещается по-разному. Этот параметр регулирует яркость лунного света в зависимости от того, насколько сильно светит Луна. §aНАГРУЗКА:§r незначительная
 
 option.END_STORM_DENSTIY.comment = §bЧто это?§r Это темный облачный туман в конце. Настройте плотность конечной бури (та, что в эндер мире)

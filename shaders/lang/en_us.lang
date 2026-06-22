@@ -999,6 +999,10 @@ screen.Water = Water Settings
     option.Water_Top_Layer = Ocean Y coordinate
     option.WATER_WAVE_STRENGTH = Wave Strength
     option.WATER_WAVE_SPEED = Wave Speed
+    option.WATER_RAIN_RIPPLES = Rain Ripples
+    option.WATER_RAIN_RIPPLE_STRENGTH = Rain Ripple Strength
+    option.WATER_RAIN_RIPPLE_SIZE = Rain Ripple Size
+    option.WATER_RAIN_RIPPLE_DENSITY = Rain Ripple Density
     option.SNELLS_WINDOW = Snell's Window
     option.MINIMUM_WATER_ABSORBANCE = Minimum Water Absorbance
         value.MINIMUM_WATER_ABSORBANCE.-1 = AUTO
@@ -1029,6 +1033,10 @@ screen.Water = Water Settings
  ###################################################### ↑↑↑ THIS SUBMENU'S DESCRIPTIONS
 
     option.WATER_WAVE_STRENGTH.comment = configure how strong the waves appear.
+    option.WATER_RAIN_RIPPLES.comment = Adds subtle rain ripple detail to water surfaces during rain.
+    option.WATER_RAIN_RIPPLE_STRENGTH.comment = Controls how visible rain ripples are on water.
+    option.WATER_RAIN_RIPPLE_SIZE.comment = Controls the radius and ring width of rain ripples.
+    option.WATER_RAIN_RIPPLE_DENSITY.comment = Controls how many rain ripples appear on water.
     option.MINIMUM_WATER_ABSORBANCE.comment = §bⓘ What is this?§r This controls how "clear" the water is in shallow areas. AUTO allows water to be clear outdoors, but adjust to be at a minimum value of 7 when indoors, to make it clearly visible. §dTHIS SETTING DOES NOT IMPACT UNDER-WATER VISUALS.        
 
 ###################################################### ↓↓↓ THIS SUBMENU'S LABELS
