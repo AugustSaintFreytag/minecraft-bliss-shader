@@ -595,7 +595,6 @@ void main() {
     indirectLight += vec3(1.0) * minimumLightAmount;
 	
 	vec3 indirectLight_fog = indirectLightColor * skyLightLevelSmooth * ambient_brightness; 
-    indirectLight_fog += vec3(1.0) * minimumLightAmount;
 
 	#if defined LPV_VL_FOG_ILLUMINATION
 		vec4 LPV_ILLUMINATION = raymarchLPV(viewPos0, R2_dither());
