@@ -39,18 +39,18 @@ float phaseCloudFog(float x, float g) {
     return (gg * -0.25 + 0.25) * pow(-2.0 * (g * x) + (gg + 1.0), -1.5) / 3.14;
 }
 
-
 float shapeFogNoise(float noise, float coverage, float intensity) {
-	float noiseFloor = mix(0, 0.20, pow((coverage - 0.5) / 0.5, 2.0));
-	float noiseCeiling = mix(0.10, 0.85, pow(coverage, 2.0));
+	float coverageCurve = pow(coverage, 2.0);
+	float noiseFloor = mix(0.0, 0.20, coverageCurve);
+	float noiseCeiling = mix(0.10, 0.85, coverageCurve);
 	float shapedNoise = smoothstep(noiseFloor, noiseCeiling, noise);
 
 	return mix(noise, shapedNoise, intensity);
 }
 
-float applyFogShaping(float noise, float coverage, float intensity) {
+float applyFogShaping(float noise, float coverage) {
 #if FOG_USE_SHAPING
-	return clamp(shapeFogNoise(noise, coverage, intensity), 0.0, 1.0);
+	return clamp(shapeFogNoise(noise, coverage, FOG_SHAPING_INTENSITY), 0.0, 1.0);
 #else
 	return clamp(noise, 0.0, 1.0);
 #endif
@@ -89,21 +89,21 @@ float getLocalEffectDensity(
 	in vec3 playerPos
 ) {	
 	float uniformFog = scaleFogSetting(parameters.localFog.x, FOG_UNIFORM_SCALE * 0.1);
-	float clumpyFog = scaleFogSetting(parameters.localFog.y, FOG_CLUMPY_SCALE * 0.1);
-	float clumpyCoverage = clamp(parameters.localFog.z, 0.0, 1.0);
+	float clumpyIntensity = scaleFogSetting(parameters.localFog.y, FOG_CLUMPY_SCALE * 0.1);
+	float clumpyCoverage = parameters.localFog.z;
 
 	float fogResult = uniformFog;
 	
-	if(clumpyFog > 0.0) {
+	if (clumpyIntensity > 0.0) {
 		vec3 pos = playerPos;
 		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) * 24.0 * 7.0;
 
 		samplePos += vec3(1.0, -0.01, 1.0) * frameTimeCounter * 500.0 * Cloud_Speed;
 
-		float localClumpyFog = min(max(1.0 - applyFogShaping(localClumpyNoise, clumpyCoverage, FOG_SHAPING_INTENSITY), 0.0), 1.0);
 		float localClumpyNoise = getFogDensityAtPos(samplePos);
+		float localclumpyIntensity = min(max(1.0 - applyFogShaping(localClumpyNoise, clumpyCoverage), 0.0), 1.0);
 
-		fogResult += localClumpyFog * clumpyFog;
+		fogResult += localclumpyIntensity * clumpyIntensity;
 	}
 	
 	return pow(fogResult, 2) * getFogStartHeightFade(playerPos.y);
@@ -113,31 +113,30 @@ float getUniformFogDensity(
 	in vec3 playerPos
 ) {
 	float uniformFog = scaleFogSetting(parameters.fog.x, FOG_UNIFORM_SCALE);
-
 	return pow(uniformFog, 3) * getFogStartHeightFade(playerPos.y);
 }
 
 float getClumpyFogDensity(
 	in vec3 playerPos
 ) {
-	float clumpyFog = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
-	float clumpyCoverage = parameters.fog.z;
+	float clumpyIntensity = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
+	float clumpyCoverage = clamp(parameters.fog.z, 0.0, 1.0);
 
 	float fogResult = 0.0;
 
-	if(clumpyFog > 0.0) {
+	if (clumpyIntensity > 0.0) {
 		vec3 movement = vec3(1.0, -0.01, 1.0) * frameTimeCounter * Cloud_Speed;
 		vec3 pos = playerPos;
 		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 24.0, 1.0) + movement;
 		vec3 samplePos2 = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) + movement;
 
-		float shape = 1.0 - applyFogShaping(shapeNoise, clumpyCoverage, FOG_SHAPING_INTENSITY);
-		float shape2 = 1.0 - applyFogShaping(shape2Noise, clumpyCoverage, FOG_SHAPING_INTENSITY);
 		float shapeNoise = getFogDensityAtPos(samplePos * 24.0);
+		float shape = 1.0 - applyFogShaping(shapeNoise, clumpyCoverage);
 		float shape2Noise = getFogDensityAtPos(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0, 1.0) * 200.0));
+		float shape2 = 1.0 - applyFogShaping(shape2Noise, clumpyCoverage);
 		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - float(FOG_START_HEIGHT), 0.0));
 
-		fogResult += finalShape * pow(clumpyFog, 3);
+		fogResult += finalShape * pow(clumpyIntensity, 3);
 	}
 	
 	return fogResult * getFogStartHeightFade(playerPos.y);
@@ -158,16 +157,16 @@ vec3 sampleShadowmapVL(vec3 shadowMapZeroPos, vec3 shadowMapRayStartPos, vec3 sh
 
 	vec3 shadowPos = vec3(shadowMapRayProgress.xy*distortFactor, shadowMapRayProgress.z);
 
-	if (abs(shadowPos.x) < 1.0-0.5/2048. && abs(shadowPos.y) < 1.0-0.5/2048) {
+	if (abs(shadowPos.x) < 1.0 - 0.5 / 2048.0 && abs(shadowPos.y) < 1.0 - 0.5 / 2048.0) {
 
-		shadowPos = shadowPos * vec3(0.5, 0.5, 0.5/6.0) + 0.5;
+		shadowPos = shadowPos * vec3(0.5, 0.5, 0.5 / 6.0) + 0.5;
 
 		#ifdef TRANSLUCENT_COLORED_SHADOWS
 			shadowColor = vec3(shadow2D(shadowtex0, shadowPos).x);
 
 			if(shadow2D(shadowtex1, shadowPos).x > shadowPos.z && shadowColor.x < 1.0) {
 				vec4 translucentShadow = texture(shadowcolor0, shadowPos.xy);
-				if(translucentShadow.a < 0.9) shadowColor = normalize(translucentShadow.rgb+0.0001);
+				if(translucentShadow.a < 0.9) shadowColor = normalize(translucentShadow.rgb + 0.0001);
 			}
 		#else
 			float shadowMap = shadow2D(shadow, shadowPos).x;
@@ -375,6 +374,8 @@ vec4 GetVolumetricFog(
 			fogLighting += lightningFlash;
 		#endif
 
+		// Main
+
 		float uniformStepLength = volumeSampleOffset * weatherRayLength;
 		float uniformFogFade = getPlayerDistanceFogFade(length(sampleOffset * weatherRayStartPos));
 		float uniformDensity = weatherKill * getUniformFogDensity(weatherRayProgress) * uniformFogFade;
@@ -384,14 +385,14 @@ vec4 GetVolumetricFog(
 		color += fogLighting * (1.0 - uniformFogVolumeCoeff) * WEATHER_FOG_SINGLE_SCATTER_ALBEDO * absorbance;
 
 		float clumpyStepLength = volumeSampleOffset * clumpyRayLength;
-		float clumpyFogFade = getPlayerDistanceFogFade(length(sampleOffset * clumpyRayStartPos));
-		float clumpyDensity = clumpyKill * getClumpyFogDensity(clumpyRayProgress) * clumpyFogFade;
+		float clumpyIntensityFade = getPlayerDistanceFogFade(length(sampleOffset * clumpyRayStartPos));
+		float clumpyDensity = clumpyKill * getClumpyFogDensity(clumpyRayProgress) * clumpyIntensityFade;
 		float clumpySigmaT = clumpyDensity * WEATHER_FOG_EXTINCTION_MULT;
-		float clumpyFogVolumeCoeff = clamp(exp(-clumpySigmaT * clumpyStepLength), 0.0, 1.0);
+		float clumpyIntensityVolumeCoeff = clamp(exp(-clumpySigmaT * clumpyStepLength), 0.0, 1.0);
 
-		color += fogLighting * (1.0 - clumpyFogVolumeCoeff) * WEATHER_FOG_SINGLE_SCATTER_ALBEDO * absorbance * uniformFogVolumeCoeff;
+		color += fogLighting * (1.0 - clumpyIntensityVolumeCoeff) * WEATHER_FOG_SINGLE_SCATTER_ALBEDO * absorbance * uniformFogVolumeCoeff;
 
-		float fogVolumeCoeff = uniformFogVolumeCoeff * clumpyFogVolumeCoeff;
+		float fogVolumeCoeff = uniformFogVolumeCoeff * clumpyIntensityVolumeCoeff;
 
 		// (III) Local Fog
 
