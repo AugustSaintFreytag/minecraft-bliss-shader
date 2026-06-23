@@ -1,10 +1,10 @@
-#define FOG_USE_SHAPING 1
-#define FOG_SHAPING_INTENSITY 0.9
-
 #include "/lib/fog_utils.glsl"
 
 uniform bool isInSpecialEnvironment;
 uniform vec3 exitedBiomePos;
+
+#define FOG_USE_SHAPING 1
+#define FOG_SHAPING_INTENSITY 0.5
 
 #define WEATHER_FOG_EXTINCTION_MULT 1.2
 #define LOCAL_FOG_EXTINCTION_MULT 1.3
@@ -39,21 +39,6 @@ float phaseCloudFog(float x, float g) {
     return (gg * -0.25 + 0.25) * pow(-2.0 * (g * x) + (gg + 1.0), -1.5) / 3.14;
 }
 
-float densityAtPosFog(in vec3 pos) {
-	pos /= 32.0;
-	pos.xz *= 0.5;
-	
-	vec3 p = floor(pos);
-	vec3 f = fract(pos);
-	
-	f = (f*f) * (3.0 - 2.0 * f);
-	
-	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0, 193.0);
-	vec2 coord =  uv / 512.0;
-	vec2 xy = texture2D(noisetex, coord).yx;
-
-	return mix(xy.r, xy.g, f.y);
-}
 
 float shapeFogNoise(float noise, float coverage, float intensity) {
 	float noiseFloor = mix(0, 0.20, pow((coverage - 0.5) / 0.5, 2.0));
@@ -83,6 +68,22 @@ float getPlayerDistanceFogFade(float sampleDistance) {
 	return getDistanceFogFade(sampleDistance, PLAYER_FOG_FADE_DISTANCE, PLAYER_FOG_MIN_INTENSITY);
 }
 
+float getFogDensityAtPos(in vec3 pos) {
+	pos /= 32.0;
+	pos.xz *= 0.5;
+	
+	vec3 p = floor(pos);
+	vec3 f = fract(pos);
+	
+	f = f * f * (3.0 - 2.0 * f);
+	
+	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0, 193.0);
+	vec2 coord =  uv / 512.0;
+	vec2 xy = texture2D(noisetex, coord).yx;
+
+	return mix(xy.r, xy.g, f.y);
+}
+
 
 float getLocalEffectDensity(
 	in vec3 playerPos
@@ -99,8 +100,8 @@ float getLocalEffectDensity(
 
 		samplePos += vec3(1.0, -0.01, 1.0) * frameTimeCounter * 500.0 * Cloud_Speed;
 
-		float localClumpyNoise = densityAtPosFog(samplePos);
 		float localClumpyFog = min(max(1.0 - applyFogShaping(localClumpyNoise, clumpyCoverage, FOG_SHAPING_INTENSITY), 0.0), 1.0);
+		float localClumpyNoise = getFogDensityAtPos(samplePos);
 
 		fogResult += localClumpyFog * clumpyFog;
 	}
@@ -130,10 +131,10 @@ float getClumpyFogDensity(
 		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 24.0, 1.0) + movement;
 		vec3 samplePos2 = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) + movement;
 
-		float shapeNoise = densityAtPosFog(samplePos * 24.0);;
 		float shape = 1.0 - applyFogShaping(shapeNoise, clumpyCoverage, FOG_SHAPING_INTENSITY);
-		float shape2Noise = densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0, 1.0) * 200.0));
 		float shape2 = 1.0 - applyFogShaping(shape2Noise, clumpyCoverage, FOG_SHAPING_INTENSITY);
+		float shapeNoise = getFogDensityAtPos(samplePos * 24.0);
+		float shape2Noise = getFogDensityAtPos(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0, 1.0) * 200.0));
 		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - float(FOG_START_HEIGHT), 0.0));
 
 		fogResult += finalShape * pow(clumpyFog, 3);
