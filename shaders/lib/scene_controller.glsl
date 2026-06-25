@@ -239,8 +239,8 @@ float RNG = hash11(worldDay + 0.2);
             altostratusDensity = 0.5;
 
             uniformFogDensity = 0.25;
-            clumpyFogDensity = 0.85;
-            clumpyFogCoverage = 0.3;
+            clumpyFogDensity = 0.5;
+            clumpyFogCoverage = 0.6;
             break;
         }
     }
@@ -724,8 +724,8 @@ if(rainStrength > 0.0001) {
     // Blend
 
     float weatherBlend = smoothstep(0.0, 1.0, rainStrength);
-    float cloudWeatherBlend = 0.8 * weatherBlend;
-    float fogWeatherBlend = 0.7 * weatherBlend;
+    float cloudWeatherBlend = 0.6 * weatherBlend;
+    float fogWeatherBlend = 0.6 * weatherBlend;
 
     smallCumulusCoverage = mix(smallCumulusCoverage, weatherSmallCumulusCoverage, cloudWeatherBlend);
     smallCumulusDensity = mix(smallCumulusDensity, weatherSmallCumulusDensity, cloudWeatherBlend);
