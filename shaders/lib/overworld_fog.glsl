@@ -3,7 +3,6 @@
 uniform bool isInSpecialEnvironment;
 uniform vec3 exitedBiomePos;
 
-#define FOG_USE_SHAPING 1
 #define FOG_SHAPING_INTENSITY 0.5
 
 #define WEATHER_FOG_EXTINCTION_MULT 1.2
@@ -16,7 +15,21 @@ uniform vec3 exitedBiomePos;
 #define PLAYER_FOG_FADE_DISTANCE 8.0
 #define PLAYER_FOG_MIN_INTENSITY 0.5
 
-// Utilities
+// Fade Utilities
+
+float getFogStartHeightFade(float height) {
+	return clamp(height - float(FOG_START_HEIGHT), 0.0, 1.0);
+}
+
+float getDistanceFogFade(float sampleDistance, float fadeDistance, float minIntensity) {
+	return mix(minIntensity, 1.0, smoothstep(0.0, fadeDistance, sampleDistance));
+}
+
+float getPlayerDistanceFogFade(float sampleDistance) {
+	return getDistanceFogFade(sampleDistance, PLAYER_FOG_FADE_DISTANCE, PLAYER_FOG_MIN_INTENSITY);
+}
+
+// Phase Utilities
 
 float phaseRayleigh(float cosTheta) {
 	const float oneOverPi 	= 1.0 / acos(-1.0);
@@ -39,51 +52,57 @@ float phaseCloudFog(float x, float g) {
     return (gg * -0.25 + 0.25) * pow(-2.0 * (g * x) + (gg + 1.0), -1.5) / 3.14;
 }
 
-float shapeFogNoise(float noise, float coverage, float intensity) {
+// Shaping
+
+float shapeFogNoise(float noise, float coverage) {
 	float coverageCurve = pow(coverage, 2.0);
 	float noiseFloor = mix(0.0, 0.20, coverageCurve);
 	float noiseCeiling = mix(0.10, 0.85, coverageCurve);
 	float shapedNoise = smoothstep(noiseFloor, noiseCeiling, noise);
 
-	return mix(noise, shapedNoise, intensity);
+	return mix(noise, shapedNoise, FOG_SHAPING_INTENSITY);
 }
 
-float applyFogShaping(float noise, float coverage) {
-#if FOG_USE_SHAPING
-	return clamp(shapeFogNoise(noise, coverage, FOG_SHAPING_INTENSITY), 0.0, 1.0);
-#else
-	return clamp(noise, 0.0, 1.0);
-#endif
-}
-
-float getFogStartHeightFade(float height) {
-	return clamp(height - float(FOG_START_HEIGHT), 0.0, 1.0);
-}
-
-float getDistanceFogFade(float sampleDistance, float fadeDistance, float minIntensity) {
-	return mix(minIntensity, 1.0, smoothstep(0.0, fadeDistance, sampleDistance));
-}
-
-float getPlayerDistanceFogFade(float sampleDistance) {
-	return getDistanceFogFade(sampleDistance, PLAYER_FOG_FADE_DISTANCE, PLAYER_FOG_MIN_INTENSITY);
-}
+// Densities
 
 float getFogDensityAtPos(in vec3 pos) {
-	pos /= 32.0;
+	pos /= 18.0;
 	pos.xz *= 0.5;
 	
 	vec3 p = floor(pos);
 	vec3 f = fract(pos);
 	
-	f = f * f * (3.0 - 2.0 * f);
+	f = (f * f) * (3.0 - 2.0 * f);
 	
 	vec2 uv =  p.xz + f.xz + p.y * vec2(0.0, 193.0);
 	vec2 coord =  uv / 512.0;
-	vec2 xy = texture2D(noisetex, coord).yx;
-
+	vec2 xy = texture(noisetex, coord).yx;
+	
 	return mix(xy.r, xy.g, f.y);
 }
 
+float getClumpyFogDensity(
+	in vec3 playerPos
+) {
+	float fogIntensityX = scaleFogSetting(parameters.fog.x, FOG_CLUMPY_SCALE);
+	float fogIntensityY = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
+	float fogResult = pow(fogIntensityX, 3.0);
+	
+	if(fogIntensityY > 0.0) {
+		vec3 movement = vec3(1.0, -0.01, 1.0) * frameTimeCounter;
+		vec3 pos = playerPos;
+		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 24.0, 1.0) + movement;
+		vec3 samplePos2 = playerPos * vec3(1.0,1.0 / 48.0, 1.0) + movement;
+
+		float shape = 1.0 - getFogDensityAtPos(samplePos * 24.0);
+		float shape2 = 1.0 - getFogDensityAtPos(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0 ,1.0) * 200.0));
+		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - 60, 0.0));
+
+		fogResult += finalShape * pow(fogIntensityY, 3.0);
+	}
+	
+	return fogResult;
+}
 
 float getLocalEffectDensity(
 	in vec3 playerPos
@@ -101,12 +120,12 @@ float getLocalEffectDensity(
 		samplePos += vec3(1.0, -0.01, 1.0) * frameTimeCounter * 500.0 * Cloud_Speed;
 
 		float localClumpyNoise = getFogDensityAtPos(samplePos);
-		float localclumpyIntensity = min(max(1.0 - applyFogShaping(localClumpyNoise, clumpyCoverage), 0.0), 1.0);
+		float localclumpyIntensity = min(max(1.0 - shapeFogNoise(localClumpyNoise, clumpyCoverage), 0.0), 1.0);
 
 		fogResult += localclumpyIntensity * clumpyIntensity;
 	}
 	
-	return pow(fogResult, 2) * getFogStartHeightFade(playerPos.y);
+	return pow(fogResult, 2.0) * getFogStartHeightFade(playerPos.y);
 }
 
 float getUniformFogDensity(
@@ -114,32 +133,6 @@ float getUniformFogDensity(
 ) {
 	float uniformFog = scaleFogSetting(parameters.fog.x, FOG_UNIFORM_SCALE);
 	return pow(uniformFog, 3) * getFogStartHeightFade(playerPos.y);
-}
-
-float getClumpyFogDensity(
-	in vec3 playerPos
-) {
-	float clumpyIntensity = scaleFogSetting(parameters.fog.y, FOG_CLUMPY_SCALE);
-	float clumpyCoverage = clamp(parameters.fog.z, 0.0, 1.0);
-
-	float fogResult = 0.0;
-
-	if (clumpyIntensity > 0.0) {
-		vec3 movement = vec3(1.0, -0.01, 1.0) * frameTimeCounter * Cloud_Speed;
-		vec3 pos = playerPos;
-		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 24.0, 1.0) + movement;
-		vec3 samplePos2 = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) + movement;
-
-		float shapeNoise = getFogDensityAtPos(samplePos * 24.0);
-		float shape = 1.0 - applyFogShaping(shapeNoise, clumpyCoverage);
-		float shape2Noise = getFogDensityAtPos(samplePos2 * 200.0 - vec3(min(max(shape - 0.6, 0.0) * 2.0, 1.0) * 200.0));
-		float shape2 = 1.0 - applyFogShaping(shape2Noise, clumpyCoverage);
-		float finalShape = max(min(max(shape - 0.6, 0.0) * 2.0, 1.0) - shape2 * 0.4, 0.0) * exp(-0.05 * max(pos.y - float(FOG_START_HEIGHT), 0.0));
-
-		fogResult += finalShape * pow(clumpyIntensity, 3);
-	}
-	
-	return fogResult * getFogStartHeightFade(playerPos.y);
 }
 
 // Shadows
