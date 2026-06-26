@@ -42,7 +42,7 @@ uniform vec4 Moon_Weather_properties; // R = cloud coverage 		G = fog density
 uniform int hideGUI;
 
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 
 uniform mat4 gbufferModelViewInverse;

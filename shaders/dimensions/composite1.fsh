@@ -154,17 +154,17 @@ float convertHandDepth_2(in float depth, bool hand) {
 #include "/lib/macro_lod_mod.glsl"
 #include "/lib/projections.glsl"
 #include "/lib/color_transforms.glsl"
-#include "/lib/waterBump.glsl"
-#include "/lib/Shadow_Params.glsl"
-#include "/lib/Shadows.glsl"
+#include "/lib/waterbump.glsl"
+#include "/lib/shadow_params.glsl"
+#include "/lib/shadows.glsl"
 #include "/lib/stars.glsl"
 #include "/lib/sky_gradient.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 #ifdef OVERWORLD_SHADER
 	#include "/lib/scene_controller.glsl"
 	#define CLOUDSHADOWSONLY
-	#include "/lib/volumetricClouds.glsl"
+	#include "/lib/volumetricclouds.glsl"
 #endif
 
 #ifdef IS_LPV_ENABLED
@@ -448,7 +448,7 @@ void Emission(
 }
 
 #include "/lib/indirect_lighting_effects.glsl"
-#include "/lib/PhotonGTAO.glsl"
+#include "/lib/photongtao.glsl"
 
 void doEdgeAwareBlur(
 	sampler2D tex1, sampler2D tex2, sampler2D depth,

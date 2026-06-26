@@ -21,7 +21,7 @@ uniform float near;
 
 #include "/lib/util.glsl"
 #include "/lib/res_params.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 void main() {
 	gl_Position = ftransform();

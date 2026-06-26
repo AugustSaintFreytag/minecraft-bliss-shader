@@ -45,7 +45,7 @@ uniform float far;
 
 
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 uniform vec3 cameraPosition;
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)

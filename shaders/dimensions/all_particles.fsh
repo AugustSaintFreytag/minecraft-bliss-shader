@@ -73,12 +73,12 @@ uniform vec3 previousCameraPosition;
 
 #include "/lib/util.glsl"
 #include "/lib/projections.glsl"
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 
 #ifdef OVERWORLD_SHADER
 	#include "/lib/scene_controller.glsl"
 	#define CLOUDSHADOWSONLY
-	#include "/lib/volumetricClouds.glsl"
+	#include "/lib/volumetricclouds.glsl"
 #endif
 
 uniform int heldItemId;
@@ -96,7 +96,7 @@ uniform int heldBlockLightValue2;
 
 #include "/lib/diffuse_lighting.glsl"
 #include "/lib/sky_gradient.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 vec3 toLinear(vec3 sRGB){
 	return sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);

@@ -43,7 +43,7 @@ uniform ivec2 eyeBrightnessSmooth;
 uniform int heldItemId;
 uniform int heldItemId2;
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
 #define  projMAD(m, v) (diagonal3(m) * (v) + (m)[3].xyz)

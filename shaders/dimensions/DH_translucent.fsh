@@ -55,8 +55,8 @@ uniform bool isInRainFallEnvironment;
 #include "/lib/res_params.glsl"
 #include "/lib/color_transforms.glsl"
 #include "/lib/sky_gradient.glsl"
-#include "/lib/waterBump.glsl"
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/waterbump.glsl"
+#include "/lib/shadow_params.glsl"
 #include "/lib/macro_lod_mod.glsl"
 #include "/lib/projections.glsl"
 #include "/lib/dh_projections.glsl"
@@ -87,7 +87,7 @@ float linearizeDepthFast(const in float depth, const in float dhNearPlane, const
 #ifdef OVERWORLD_SHADER
 	#include "/lib/scene_controller.glsl"
 	#define CLOUDSHADOWSONLY
-	#include "/lib/volumetricClouds.glsl"
+	#include "/lib/volumetricclouds.glsl"
 #endif
 #ifndef OVERWORLD_SHADER
 #undef WATER_SUN_SPECULAR
@@ -115,7 +115,7 @@ float GGX(vec3 n, vec3 v, vec3 l, float r, float f0) {
 
 
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 vec3 doScreenSpaceReflectiom(vec3 dir, vec3 position, float dither, float quality){
 

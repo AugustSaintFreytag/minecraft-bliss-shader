@@ -95,9 +95,9 @@ uniform int hideGUI;
 #include "/lib/projections.glsl"
 #include "/lib/res_params.glsl"
 #include "/lib/sky_gradient.glsl"
-#include "/lib/Shadow_Params.glsl"
-#include "/lib/waterBump.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/shadow_params.glsl"
+#include "/lib/waterbump.glsl"
+#include "/lib/taa_jitter.glsl"
 #include "/lib/dh_projections.glsl"
 #include "/lib/dh_occlusion.glsl"
 
@@ -213,7 +213,7 @@ uniform float nightVision;
 
 	#define TIMEOFDAYFOG
 
-	#include "/lib/volumetricClouds.glsl"
+	#include "/lib/volumetricclouds.glsl"
 	#include "/lib/climate_settings.glsl"
 	#include "/lib/overworld_fog.glsl"
 #endif

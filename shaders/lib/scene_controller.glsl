@@ -17,7 +17,7 @@ uniform bool isInNoRainFallEnvironment;
 uniform int worldTime;
 
 #define DECLARE_UNIFORMS_OR_WRITE_FUNCTIONS_FOR_CUSTOM_SCENE_CONTROLLER_PROFILES
-#include "/CUSTOM_SCENE_PARAMETERS.glsl"
+#include "/custom_scene_parameters.glsl"
 
 // https://www.shadertoy.com/view/llGSzw
 float hash11( uint n ) 
@@ -795,7 +795,7 @@ if(localClumpyFogCoverage < 0.0) {
 
 #define WRITE_CUSTOM_SCENE_CONTROLLER_PROFILES
 #undef DECLARE_UNIFORMS_OR_WRITE_FUNCTIONS_FOR_CUSTOM_SCENE_CONTROLLER_PROFILES
-#include "/CUSTOM_SCENE_PARAMETERS.glsl"
+#include "/custom_scene_parameters.glsl"
 
 }
 #endif

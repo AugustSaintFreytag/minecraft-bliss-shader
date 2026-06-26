@@ -9,7 +9,7 @@
 #include "/lib/blocks.glsl"
 #include "/lib/entities.glsl"
 #include "/lib/items.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 #include "/lib/waving_utils.glsl"
 
 #if defined HAND

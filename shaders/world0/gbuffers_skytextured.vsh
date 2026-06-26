@@ -2,7 +2,7 @@
 #define ANTIALIASING_RELATED_SETTINGS
 #include "/lib/settings.glsl"
 #include "/lib/res_params.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 #if RESOURCEPACK_SKY != 0
 	/*

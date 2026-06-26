@@ -2,4 +2,4 @@
 
 #define OVERWORLD_SHADER
 
-#include "/dimensions/DH_translucent.fsh"
+#include "/dimensions/dh_translucent.fsh"

@@ -67,9 +67,9 @@ uniform float dhNearPlane;
 
 #include "/lib/util.glsl"
 #include "/lib/res_params.glsl"
-#include "/lib/Shadows.glsl"
+#include "/lib/shadows.glsl"
 #include "/lib/macro_lod_mod.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 #define ffstep(x,y) clamp((y - x) * 1e35,0.0,1.0)
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
@@ -181,7 +181,7 @@ vec3 viewToWorld(vec3 viewPos) {
     return pos.xyz;
 }
 
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 
 
 vec2 SpiralSample(

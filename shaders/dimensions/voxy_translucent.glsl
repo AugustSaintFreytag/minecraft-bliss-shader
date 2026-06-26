@@ -7,8 +7,8 @@
 #define WATER_RELATED_SETTINGS
 #include "/lib/settings.glsl"
 // #include "/lib/macro_lod_mod.glsl"
-#include "/lib/waterBump.glsl"
-// #include "/lib/diffuseLighting.glsl"
+#include "/lib/waterbump.glsl"
+// #include "/lib/diffuselighting.glsl"
 #include "/lib/res_params.glsl"
 
 uniform float rainStrength;
@@ -41,7 +41,7 @@ uniform bool isInRainFallEnvironment;
 vec3 WsunVec = normalize((float(sunElevation > 1e-5)*2.0 - 1.0) * normalize(mat3(vxModelViewInv) * sunPosition));
 
 // #define CLOUDSHADOWSONLY
-// #include "/lib/volumetricClouds.glsl"
+// #include "/lib/volumetricclouds.glsl"
 
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
 #define projMAD(m, v) (diagonal3(m) * (v) + (m)[3].xyz)
