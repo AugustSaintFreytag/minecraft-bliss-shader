@@ -122,22 +122,27 @@ float getClumpyFogDensity(
 float getLocalEffectDensity(
 	in vec3 playerPos
 ) {	
-	float uniformFog = scaleFogSetting(parameters.localFog.x, FOG_UNIFORM_SCALE * 0.1);
-	float clumpyIntensity = scaleFogSetting(parameters.localFog.y, FOG_CLUMPY_SCALE * 0.1);
-	float clumpyCoverage = parameters.localFog.z;
+	float localUniformFogDensity = scaleFogSetting(parameters.localFog.x, FOG_UNIFORM_SCALE * 0.1);
+	float localClumpyFogDensity = scaleFogSetting(parameters.localFog.y, FOG_CLUMPY_SCALE * 0.1);
+	float localClumpyFogCoverage = parameters.localFog.z;
 
-	float fogResult = uniformFog;
+	float fogResult = localUniformFogDensity;
 	
-	if (clumpyIntensity > 0.0) {
-		vec3 pos = playerPos;
-		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) * 24.0 * 7.0;
+	if (localClumpyFogDensity > 0.0) {
+		float localBaseScale = 24.0 * 7.0;
+		float localDetailScale = 200.0 / 24.0;
+		vec3 movement = vec3(1.0, -0.01, 1.0) * frameTimeCounter * 500.0 * Cloud_Speed;
+		vec3 samplePos = playerPos * vec3(1.0, 1.0 / 48.0, 1.0) * localBaseScale + movement;
+		vec3 samplePos2 = playerPos * vec3(1.0, 1.0 / 96.0, 1.0) * localBaseScale + movement;
 
-		samplePos += vec3(1.0, -0.01, 1.0) * frameTimeCounter * 500.0 * Cloud_Speed;
+		float densityA = getFogDensityAtPos(samplePos);
+		float shapeA = 1.0 - shapeFogNoise(densityA, localClumpyFogCoverage);
 
-		float localClumpyNoise = getFogDensityAtPos(samplePos);
-		float localclumpyIntensity = min(max(1.0 - shapeFogNoise(localClumpyNoise, clumpyCoverage), 0.0), 1.0);
+		float densityB = 1.0 - getFogDensityAtPos(samplePos2 * localDetailScale - vec3(min(max(shapeA - 0.6, 0.0) * 2.0, 1.0) * 200.0));
+		float shapeB = shapeFogNoise(densityB, localClumpyFogCoverage * 0.25);
 
-		fogResult += localclumpyIntensity * clumpyIntensity;
+		float finalShape = max(min(max(shapeA - 0.6, 0.0) * 2.0, 1.0) - shapeB * 0.4, 0.0);
+		fogResult += finalShape * localClumpyFogDensity;
 	}
 	
 	return pow(fogResult, 2.0) * getFogStartHeightFade(playerPos.y);
