@@ -27,7 +27,7 @@ uniform float frameTimeCounter;
 #include "/lib/util.glsl"
 #include "/lib/res_params.glsl"
 #include "/lib/scene_controller.glsl"
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 #include "/lib/sky_gradient.glsl"
 
 

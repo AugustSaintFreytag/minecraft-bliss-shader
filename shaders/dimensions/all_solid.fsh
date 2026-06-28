@@ -10,7 +10,7 @@
 #include "/lib/entities.glsl"
 #include "/lib/items.glsl"
 #include "/lib/res_params.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 #if defined HAND
 	#undef POM

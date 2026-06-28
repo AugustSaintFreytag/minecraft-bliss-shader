@@ -4,7 +4,7 @@ uniform sampler2D colortex3;
 
 uniform vec2 texelSize;
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 // Compute 3x3 min max for TAA
 
 uniform float viewHeight;

@@ -27,7 +27,7 @@ flat varying vec3 lightSourceColor;
 	#include "/lib/bokeh.glsl"
 #endif
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 
 void main() {

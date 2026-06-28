@@ -10,7 +10,7 @@
 #define VOLUMETRIC_FOG_RELATED_SETTINGS
 
 #include "/lib/settings.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 // this is an emergency plain text that will be visible as an the log error when a user tries to use voxy and DH both at once.
 #if defined VOXY && defined DISTANT_HORIZONS 
@@ -78,9 +78,9 @@ uniform int hideGUI;
 #include "/lib/res_params.glsl"
 #include "/lib/macro_lod_mod.glsl"
 #include "/lib/color_transforms.glsl"
-#include "/lib/ROBOBO_sky.glsl"
+#include "/lib/robobo_sky.glsl"
 #include "/lib/sky_gradient.glsl"
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 
 #include "/lib/dh_projections.glsl"
 #include "/lib/dh_occlusion.glsl"
@@ -177,7 +177,7 @@ float linearizeDepthFast(const in float depth, const in float near, const in flo
 
 	#define VL_CLOUDS_DEFERRED
 
-	#include "/lib/volumetricClouds.glsl"
+	#include "/lib/volumetricclouds.glsl"
 	#include "/lib/climate_settings.glsl"
 	#include "/lib/overworld_fog.glsl"
 #endif

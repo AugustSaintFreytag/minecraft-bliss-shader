@@ -29,7 +29,7 @@ uniform float screenBrightness;
 
 
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferModelView;

@@ -37,9 +37,9 @@ uniform int frameCounter;
 uniform float frameTimeCounter;
 
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 #include "/lib/util.glsl"
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 
 void main() {
 	gl_Position = ftransform();

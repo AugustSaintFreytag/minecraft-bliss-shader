@@ -3,4 +3,4 @@
 #define OVERWORLD_SHADER
 #define TWILIGHT_FOREST_FLAG
 
-#include "/dimensions/DH_translucent.vsh"
+#include "/dimensions/dh_translucent.vsh"

@@ -55,9 +55,9 @@ vec3 sunVec = normalize(mat3(gbufferModelViewInverse) * sunPosition);
 #include "/lib/util.glsl"
 #include "/lib/res_params.glsl"
 #include "/lib/macro_lod_mod.glsl"
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 #include "/lib/sky_gradient.glsl"
-#include "/lib/ROBOBO_sky.glsl"
+#include "/lib/robobo_sky.glsl"
 
 float luma(vec3 color) {
 	return dot(color,vec3(0.21, 0.72, 0.07));

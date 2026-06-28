@@ -2,4 +2,4 @@
 
 #define OVERWORLD_SHADER
 
-#include "/dimensions/DH_solid.vsh"
+#include "/dimensions/dh_solid.vsh"

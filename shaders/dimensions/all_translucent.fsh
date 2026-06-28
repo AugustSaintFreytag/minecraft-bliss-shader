@@ -114,11 +114,11 @@ uniform vec3 nsunColor;
 uniform float waterEnteredAltitude;
 
 #include "/lib/util.glsl"
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 #include "/lib/color_transforms.glsl"
 #include "/lib/projections.glsl"
 #include "/lib/sky_gradient.glsl"
-#include "/lib/waterBump.glsl"
+#include "/lib/waterbump.glsl"
 
 #define LIGHTNINGFLASH_DIFFUSE
 #include "/lib/lightning_stuff.glsl"
@@ -129,7 +129,7 @@ uniform float waterEnteredAltitude;
 	#include "/lib/scene_controller.glsl"
 	
 	#define CLOUDSHADOWSONLY
-	#include "/lib/volumetricClouds.glsl"
+	#include "/lib/volumetricclouds.glsl"
 
 #endif
 
@@ -191,7 +191,7 @@ float blueNoise(){
 	#endif
 }
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 varying vec3 viewVector;
 vec3 getParallaxDisplacement(vec3 waterPos, vec3 playerPos) {
@@ -285,7 +285,7 @@ uniform float dhFarPlane;
 #ifdef OVERWORLD_SHADER
 
 
-#include "/lib/Shadows.glsl"
+#include "/lib/shadows.glsl"
 
 float ComputeShadowMap(inout vec3 directLightColor, vec3 playerPos, float maxDistFade, float noise, in vec3 geoNormals){
 

@@ -2,4 +2,4 @@
 
 #define NETHER_SHADER
 
-#include "/dimensions/DH_solid.fsh"
+#include "/dimensions/dh_solid.fsh"

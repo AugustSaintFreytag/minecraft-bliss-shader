@@ -80,7 +80,7 @@ uniform float far;
 #include "/lib/res_params.glsl"
 #include "/lib/util.glsl"
 #include "/lib/projections.glsl"
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 #include "/lib/macro_lod_mod.glsl"
 #include "/lib/dh_projections.glsl"
 

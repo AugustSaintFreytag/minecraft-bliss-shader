@@ -54,7 +54,7 @@ attribute vec4 mc_Entity;
 uniform int blockEntityId;
 uniform int entityId;
 
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 #include "/lib/bokeh.glsl"
 #include "/lib/blocks.glsl"
 #include "/lib/entities.glsl"

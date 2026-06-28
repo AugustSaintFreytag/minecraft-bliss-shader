@@ -2,4 +2,4 @@
 
 #define OVERWORLD_SHADER
 
-#include "/dimensions/DH_generic.fsh"
+#include "/dimensions/dh_generic.fsh"

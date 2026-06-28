@@ -68,7 +68,7 @@ uniform float eyeAltitude;
 
 #include "/lib/util.glsl"
 #include "/lib/macro_lod_mod.glsl"
-#include "/lib/waterBump.glsl"
+#include "/lib/waterbump.glsl"
 #include "/lib/res_params.glsl"
 
 #ifdef OVERWORLD_SHADER

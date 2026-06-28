@@ -9,7 +9,7 @@
 #include "/lib/items.glsl"
 
 uniform float frameTimeCounter;
-#include "/lib/Shadow_Params.glsl"
+#include "/lib/shadow_params.glsl"
 
 #if defined PHYSICSMOD_OCEAN_SHADER
 	#include "/lib/oceans.glsl"
@@ -82,7 +82,7 @@ uniform int heldItemId2;
 uniform vec2 texelSize;
 
 
-#include "/lib/TAA_jitter.glsl"
+#include "/lib/taa_jitter.glsl"
 
 
 #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)

@@ -2,4 +2,4 @@
 
 #define NETHER_SHADER
 
-#include "/dimensions/DH_translucent.vsh"
+#include "/dimensions/dh_translucent.vsh"
