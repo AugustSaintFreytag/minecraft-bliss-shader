@@ -180,6 +180,13 @@ bool shouldSkipSunShadow(float pointDistance, float sunFacingFactor, float sunAn
 	return maxSamples <= 0 || pointDistance > maxDistance || sunAngleFactor >= 0.99 || sunFacingFactor <= 0.0;
 }
 
+float getSunShadowDistanceFade(float pointDistance, float maxDistance) {
+	float fadeDistance = max(maxDistance * 0.25, 1e-4);
+	float fadeStart = max(maxDistance - fadeDistance, 0.0);
+
+	return 1.0 - smoothstep(fadeStart, maxDistance, pointDistance);
+}
+
 float getSunShadowRayDepth(in vec3 viewPos, bool depthCheck) {
 	vec3 clipPos = toClipSpace3_DH(viewPos, depthCheck);
 
@@ -377,8 +384,8 @@ float getSunShadowBlockerSupport(DepthSample depthSample, float rayDepth, float 
 	return coverageWeight * bootstrapWeight;
 }
 
-float finalizeSunShadow(float baseOcclusion, float sunFacingFactor, float sunAngleFactor) {
-	return clamp(baseOcclusion * sunFacingFactor * (1.0 - sunAngleFactor), 0.0, 1.0);
+float finalizeSunShadow(float baseOcclusion, float sunFacingFactor, float sunAngleFactor, float distanceFade) {
+	return clamp(baseOcclusion * sunFacingFactor * (1.0 - sunAngleFactor) * distanceFade, 0.0, 1.0);
 }
 
 
@@ -410,6 +417,8 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 	if (shouldSkipSunShadow(ray.pointDistance, sunFacingFactor, sunAngleFactor, maxSamples, maxDistance) || ray.rayLength <= 0.0) {
 		return 0.0;
 	}
+
+	float distanceFade = getSunShadowDistanceFade(ray.pointDistance, maxDistance);
 
 	float currentStreak = 0.0;
 	float maxStreak = 0.0;
@@ -534,5 +543,5 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 	float supportOcclusion = smoothstep(1.8, SUN_SHADOW_SUPPORT_THRESHOLD, maxSupport);
 	float baseOcclusion = max(streakOcclusion * 0.6, supportOcclusion);
 
-	return finalizeSunShadow(baseOcclusion, sunFacingFactor, sunAngleFactor);
+	return finalizeSunShadow(baseOcclusion, sunFacingFactor, sunAngleFactor, distanceFade);
 }
