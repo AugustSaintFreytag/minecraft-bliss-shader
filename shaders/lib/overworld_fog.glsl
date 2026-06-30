@@ -21,6 +21,10 @@ float getFogStartHeightFade(float height) {
 	return clamp(height - float(FOG_START_HEIGHT), 0.0, 1.0);
 }
 
+float getClumpyFogHeightFade(float height) {
+	return smoothstep(float(FOG_START_HEIGHT) - 8.0, float(FOG_START_HEIGHT), height);
+}
+
 float getDistanceFogFade(float sampleDistance, float fadeDistance, float minIntensity) {
 	return mix(minIntensity, 1.0, smoothstep(0.0, fadeDistance, sampleDistance));
 }
@@ -114,7 +118,7 @@ float getClumpyFogDensity(
 	float shapeB = shapeFogNoise(densityB, clumpyFogCoverage * 0.25);
 
 	float finalShape = max(min(max(shapeA - 0.6, 0.0) * 2.0, 1.0) - shapeB * 0.4, 0.0) * exp(-0.05 * max(pos.y - 60, 0.0));
-	float fogResult = finalShape * pow(clumpyFogDensity, 3.0);
+	float fogResult = finalShape * pow(clumpyFogDensity, 3.0) * getClumpyFogHeightFade(playerPos.y);
 	
 	return fogResult;
 }
