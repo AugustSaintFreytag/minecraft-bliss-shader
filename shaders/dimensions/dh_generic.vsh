@@ -60,7 +60,7 @@ void main() {
 	gcolor = gl_Color;
 	vNormal = normalize(gl_NormalMatrix * gl_Normal);
 	
-	averageSkyCol_Clouds = texelFetch2D(colortex4, ivec2(0, 37), 0).rgb;
+	averageSkyCol_Clouds = texelFetch2D(colortex4, SKY_AND_CLOUDS_AVERAGE_COLOR_COORDS, 0).rgb;
 	lightSourceColor = texelFetch2D(colortex4, LIGHT_COLOR_COORDS, 0).rgb;
 	
 	#if DOF_QUALITY == 5

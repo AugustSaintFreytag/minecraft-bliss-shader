@@ -89,7 +89,7 @@ void main() {
 			float lodStart = far - lodFadeLength;
 			float drawStart = max(lodStart - overdrawDistance, 0.0);
 			
-			if(viewDist < drawStart || texture2D(depthtex1, gl_FragCoord.xy*texelSize).x < 1.0){ 
+			if(viewDist < drawStart || texture2D(depthtex1, gl_FragCoord.xy * texelSize).x < 1.0){ 
 				discard; 
 				return;
 			}
@@ -106,12 +106,6 @@ void main() {
 		#endif
 
 		vec3 albedo = toLinear(gcolor.rgb);
-        
-		// if(length(playerPos) < clamp(far -16  *4, 16, maxOverdrawDistance) || texture(depthtex1, gl_FragCoord.xy * texelSize).x < 1.0) { 
-		// 	discard; 
-		// 	return;
-		// }
-    #endif
 
 		#ifdef DH_NOISE_TEXTURE
 			albedo = applyNoise(vec4(albedo, 1.0), playerPos + cameraPosition, length(playerPos)).rgb;
