@@ -1141,7 +1141,7 @@ void main() {
 				#ifdef DISTANT_HORIZONS
 					if (sunSSS_density > 0.0 && DH_SSS_OCCLUSION_INTENSITY > 0.0) {
 						vec3 sunDirection = normalize(WsunVec * mat3(gbufferModelViewInverse));
-						float sunVisibility = clamp(1.0 - getSunShadow(viewPos, sunDirection, BN.y, true, isDHRange), 0.0, 1.0);
+						float sunVisibility = clamp(1.0 - getSunShadow(viewPos, sunDirection, isDHRange, true, BN.y, false, colortex7), 0.0, 1.0);
 
 						SSSColor = mix(SSSColor, SSSColor * sunVisibility, DH_SSS_OCCLUSION_INTENSITY);
 					}

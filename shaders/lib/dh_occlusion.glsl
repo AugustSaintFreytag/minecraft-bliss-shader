@@ -5,6 +5,7 @@ struct DepthSample {
 	float raw;
 	vec3 pos;
 	bool isLOD;
+	bool isWaterSurface;
 };
 
 // Utility
@@ -32,12 +33,17 @@ vec3 viewToClipSpace(in vec3 pos) {
 	return viewToClipSpace(pos, true);
 }
 
-DepthSample getDepthSample(in vec2 pos) {
+DepthSample makeDepthSample(float value, float raw, vec3 pos, bool isLOD, bool isWaterSurface) {
+	return DepthSample(value, raw, pos, isLOD, isWaterSurface);
+}
+
+DepthSample getDepthSample(in vec2 pos, bool waterSurfaceCap, sampler2D waterMaskTex) {
 	float depth = 0.0;
 	float depthRaw = 0.0;
 
 	vec3 depthViewPos = vec3(0.0);
 	bool depthIsLOD = false;
+	bool depthIsWaterSurface = false;
 
 	// All clip XY we use are in the same scaled space as other screenspace effects.
 	// Convert back to unscaled UVs for depth fetches + view reconstruction.
@@ -71,8 +77,77 @@ DepthSample getDepthSample(in vec2 pos) {
 	float z1_01 = texelFetch(depthtex1, p01, 0).r;
 	float z1_11 = texelFetch(depthtex1, p11, 0).r;
 
+	if (waterSurfaceCap) {
+		bool water00 = texelFetch(waterMaskTex, p00, 0).a > 0.99;
+		bool water10 = texelFetch(waterMaskTex, p10, 0).a > 0.99;
+		bool water01 = texelFetch(waterMaskTex, p01, 0).a > 0.99;
+		bool water11 = texelFetch(waterMaskTex, p11, 0).a > 0.99;
+
+		float waterDepth = 1.0;
+		vec2 waterUV = uv00;
+		
+		bool hasWaterSurface = false;
+		bool waterSurfaceIsLOD = false;
+
+		if (water00 && z0_00 < waterDepth) { waterDepth = z0_00; waterUV = uv00; hasWaterSurface = z0_00 < 1.0; }
+		if (water10 && z0_10 < waterDepth) { waterDepth = z0_10; waterUV = uv10; hasWaterSurface = z0_10 < 1.0; }
+		if (water01 && z0_01 < waterDepth) { waterDepth = z0_01; waterUV = uv01; hasWaterSurface = z0_01 < 1.0; }
+		if (water11 && z0_11 < waterDepth) { waterDepth = z0_11; waterUV = uv11; hasWaterSurface = z0_11 < 1.0; }
+
+		if (!hasWaterSurface) {
+			float zLodTrans00 = texelFetch(LOD_DEPTHTEX0, p00, 0).r;
+			float zLodTrans10 = texelFetch(LOD_DEPTHTEX0, p10, 0).r;
+			float zLodTrans01 = texelFetch(LOD_DEPTHTEX0, p01, 0).r;
+			float zLodTrans11 = texelFetch(LOD_DEPTHTEX0, p11, 0).r;
+
+			waterDepth = 1.0;
+			if (water00 && zLodTrans00 < waterDepth) { waterDepth = zLodTrans00; waterUV = uv00; hasWaterSurface = zLodTrans00 < 1.0; }
+			if (water10 && zLodTrans10 < waterDepth) { waterDepth = zLodTrans10; waterUV = uv10; hasWaterSurface = zLodTrans10 < 1.0; }
+			if (water01 && zLodTrans01 < waterDepth) { waterDepth = zLodTrans01; waterUV = uv01; hasWaterSurface = zLodTrans01 < 1.0; }
+			if (water11 && zLodTrans11 < waterDepth) { waterDepth = zLodTrans11; waterUV = uv11; hasWaterSurface = zLodTrans11 < 1.0; }
+			waterSurfaceIsLOD = hasWaterSurface;
+		}
+
+		float foregroundDepth = 1.0;
+		vec2 foregroundUV = uv00;
+
+		if (!water00 && z0_00 < foregroundDepth) { foregroundDepth = z0_00; foregroundUV = uv00; }
+		if (!water10 && z0_10 < foregroundDepth) { foregroundDepth = z0_10; foregroundUV = uv10; }
+		if (!water01 && z0_01 < foregroundDepth) { foregroundDepth = z0_01; foregroundUV = uv01; }
+		if (!water11 && z0_11 < foregroundDepth) { foregroundDepth = z0_11; foregroundUV = uv11; }
+
+		if (hasWaterSurface) {
+			if (!waterSurfaceIsLOD && foregroundDepth < waterDepth) {
+				depth = swapperLinZ(foregroundDepth, near, far * 4.0);
+				depthViewPos = clipToViewSpace(foregroundUV, foregroundDepth, 0.0);
+				return makeDepthSample(depth, foregroundDepth, depthViewPos, false, false);
+			}
+
+			if (waterSurfaceIsLOD && foregroundDepth < 1.0) {
+				depth = swapperLinZ(foregroundDepth, near, far * 4.0);
+				depthViewPos = clipToViewSpace(foregroundUV, foregroundDepth, 0.0);
+				return makeDepthSample(depth, foregroundDepth, depthViewPos, false, false);
+			}
+
+			if (waterSurfaceIsLOD) {
+				depth = swapperLinZ(waterDepth, LOD_NEARPLANE + far, LOD_FARPLANE);
+				depthViewPos = clipToViewSpace(waterUV, 1.0, waterDepth);
+				return makeDepthSample(depth, waterDepth, depthViewPos, true, true);
+			}
+
+			depth = swapperLinZ(waterDepth, near, far * 4.0);
+			depthViewPos = clipToViewSpace(waterUV, waterDepth, 0.0);
+			return makeDepthSample(depth, waterDepth, depthViewPos, false, true);
+		}
+
+		if (water00 || water10 || water01 || water11) {
+			return makeDepthSample(1.0, 1.0, vec3(0.0), false, true);
+		}
+	}
+
 	float depthBase = z0_00;
 	vec2 uvMin = uv00;
+
 	if (z0_10 < depthBase) { depthBase = z0_10; uvMin = uv10; }
 	if (z0_01 < depthBase) { depthBase = z0_01; uvMin = uv01; }
 	if (z0_11 < depthBase) { depthBase = z0_11; uvMin = uv11; }
@@ -104,7 +179,7 @@ DepthSample getDepthSample(in vec2 pos) {
 		depthIsLOD = true;
 	}
 
-	return DepthSample(depth, depthRaw, depthViewPos, depthIsLOD);
+	return makeDepthSample(depth, depthRaw, depthViewPos, depthIsLOD, depthIsWaterSurface);
 }
 
 bool isWithinViewBounds(in vec2 pos) {
@@ -159,8 +234,8 @@ const float SUN_SHADOW_SUPPORT_THRESHOLD = 2.6;
 const float SUN_SHADOW_BOOTSTRAP_STEPS = 2.0;
 const float SUN_SHADOW_START_JITTER = 0.45;
 const float SUN_SHADOW_FETCH_JITTER = 0.65;
-const float SUN_SHADOW_VANILLA_THICKNESS = 1.25;
-const float SUN_SHADOW_LOD_THICKNESS = 3.0;
+const float SUN_SHADOW_VANILLA_THICKNESS = 2.0;
+const float SUN_SHADOW_LOD_THICKNESS = 5.0;
 const int SUN_SHADOW_KERNEL_TAPS = 7;
 // Fraction of the sample budget spent on the coarse uniform scan.
 // The remainder is used for binary-search refinement around the first detected shadow edge.
@@ -293,16 +368,16 @@ vec2 getSunShadowFetchJitter(float stepSeed, int stepIndex) {
 	return r2 * pixelStep * SUN_SHADOW_FETCH_JITTER;
 }
 
-DepthSample getSunOcclusionDepthSample(in vec2 pos, float kernelNoise, vec2 fetchJitter) {
+DepthSample getSunOcclusionDepthSample(in vec2 pos, float kernelNoise, vec2 fetchJitter, bool waterSurfaceCap, sampler2D waterMaskTex) {
 	vec2 pixelStep = texelSize * RENDER_SCALE;
 	int kernelIndex = min(int(floor(kernelNoise * 4.0)), 3);
 
 	vec2 kernelOffset = getSunShadowKernelOffset(kernelIndex, 0) * pixelStep;
-	DepthSample bestSample = getDepthSample(pos + fetchJitter + kernelOffset);
+	DepthSample bestSample = getDepthSample(pos + fetchJitter + kernelOffset, waterSurfaceCap, waterMaskTex);
 
 	for (int tapIndex = 1; tapIndex < SUN_SHADOW_KERNEL_TAPS; tapIndex++) {
 		kernelOffset = getSunShadowKernelOffset(kernelIndex, tapIndex) * pixelStep;
-		DepthSample candidateSample = getDepthSample(pos + fetchJitter + kernelOffset);
+		DepthSample candidateSample = getDepthSample(pos + fetchJitter + kernelOffset, waterSurfaceCap, waterMaskTex);
 
 		if (candidateSample.value < bestSample.value) {
 			bestSample = candidateSample;
@@ -356,6 +431,10 @@ float getSunShadowBlockerThickness(DepthSample depthSample, float rayDepth) {
 }
 
 bool isSunShadowBlockerCandidate(DepthSample depthSample, float rayDepth) {
+	if (depthSample.isWaterSurface) {
+		return false;
+	}
+
 	if (!depthSample.isLOD && depthSample.raw >= 1.0) {
 		return false;
 	}
@@ -384,12 +463,32 @@ float getSunShadowBlockerSupport(DepthSample depthSample, float rayDepth, float 
 	return coverageWeight * bootstrapWeight;
 }
 
+float getViewPosPlayerY(in vec3 viewPos) {
+	return (mat3(gbufferModelViewInverse) * viewPos + gbufferModelViewInverse[3].xyz).y;
+}
+
+bool isRejectedWaterSurfaceBlocker(DepthSample depthSample, bool waterSurfaceCap, float waterSurfacePlayerY) {
+	if (!waterSurfaceCap || depthSample.isWaterSurface) {
+		return false;
+	}
+
+	return getViewPosPlayerY(depthSample.pos) < waterSurfacePlayerY - 0.25;
+}
+
 float finalizeSunShadow(float baseOcclusion, float sunFacingFactor, float sunAngleFactor, float distanceFade) {
 	return clamp(baseOcclusion * sunFacingFactor * (1.0 - sunAngleFactor) * distanceFade, 0.0, 1.0);
 }
 
 
-float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bool sourceIsLOD) {
+float getSunShadow(
+	in vec3 viewPos,
+	in vec3 lightDir,
+	bool sourceIsLOD,
+	bool fast,
+	float noise,
+	bool waterSurfaceCap,
+	sampler2D waterMaskTex
+) {
 	// This is the function.
 
 	// It should provide a reasonable level of sun shadowing from the sampled position towards the sun.
@@ -411,6 +510,7 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 	float startNoise = hashNoise(noise + 0.17);
 	float kernelNoise = hashNoise(noise + 11.13);
 	float stepSeed = hashNoise(noise + 23.71);
+	float waterSurfacePlayerY = getViewPosPlayerY(viewPos);
 
 	SunShadowRay ray = setupSunShadowRay(viewPos, lightDir, maxSampleDistance, maxSamples, fast, sourceIsLOD);
 
@@ -461,9 +561,9 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 
 		float rayDepth = getSunShadowRayDepth(coarseViewPos, ray.depthCheck);
 		vec2 fetchJitter = getSunShadowFetchJitter(stepSeed, i);
-		DepthSample depthSample = getSunOcclusionDepthSample(coarseClipPos.xy, kernelNoise, fetchJitter);
+		DepthSample depthSample = getSunOcclusionDepthSample(coarseClipPos.xy, kernelNoise, fetchJitter, waterSurfaceCap, waterMaskTex);
 
-		float support = getSunShadowBlockerSupport(depthSample, rayDepth, float(i));
+		float support = isRejectedWaterSurfaceBlocker(depthSample, waterSurfaceCap, waterSurfacePlayerY) ? 0.0 : getSunShadowBlockerSupport(depthSample, rayDepth, float(i));
 
 		supportTotal -= supportWindow[i % SUN_SHADOW_SUPPORT_WINDOW];
 		supportWindow[i % SUN_SHADOW_SUPPORT_WINDOW] = support;
@@ -518,9 +618,9 @@ float getSunShadow(in vec3 viewPos, in vec3 lightDir, float noise, bool fast, bo
 
 			float rayDepth = getSunShadowRayDepth(refineViewPos, ray.depthCheck);
 			vec2 fetchJitter = getSunShadowFetchJitter(stepSeed, globalIndex);
-			DepthSample depthSample = getSunOcclusionDepthSample(refineClipPos.xy, kernelNoise, fetchJitter);
+			DepthSample depthSample = getSunOcclusionDepthSample(refineClipPos.xy, kernelNoise, fetchJitter, waterSurfaceCap, waterMaskTex);
 
-			float support = getSunShadowBlockerSupport(depthSample, rayDepth, float(globalIndex));
+			float support = isRejectedWaterSurfaceBlocker(depthSample, waterSurfaceCap, waterSurfacePlayerY) ? 0.0 : getSunShadowBlockerSupport(depthSample, rayDepth, float(globalIndex));
 
 			supportTotal -= supportWindow[globalIndex % SUN_SHADOW_SUPPORT_WINDOW];
 			supportWindow[globalIndex % SUN_SHADOW_SUPPORT_WINDOW] = support;
