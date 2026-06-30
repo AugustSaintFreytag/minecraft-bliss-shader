@@ -3,7 +3,7 @@
 uniform bool isInSpecialEnvironment;
 uniform vec3 exitedBiomePos;
 
-#define FOG_SHAPING_INTENSITY 0.75
+#define FOG_SHAPING_INTENSITY 0.9
 
 #define WEATHER_FOG_EXTINCTION_MULT 1.2
 #define LOCAL_FOG_EXTINCTION_MULT 1.3
@@ -62,7 +62,7 @@ float levels(float value, float blackPoint, float whitePoint, float gamma) {
 }
 
 float shapeFogNoise(float noise, float coverage) {
-    float crush = coverage * 0.5;
+    float crush = coverage * 0.15;
 
 	float factor = 0.7;
     float blackPoint = crush * factor;
@@ -304,8 +304,8 @@ vec4 GetVolumetricFog(
 	float daylightFactor = clamp(sunElevation * 2.0, 0.0, 1.0);
 	float daylightAmp = (1.0 + (1.0 - daylightFactor) * 1.25);
 	
-	vec3 masterLightColor = lightColor * 1.5 * daylightAmp;
-	vec3 ambientLightColor = mix(ambientColor, averagedAmbientColor, 0.5) + masterLightColor * 0.1;
+	vec3 masterLightColor = lightColor * daylightAmp;
+	vec3 ambientLightColor = mix(ambientColor, averagedAmbientColor * 1.25, 0.5) + masterLightColor * 0.1;
 
 	vec3 localFogColor = parameters.localFogColor.rgb;
 	vec3 localFogColor_lightCol = localFogColor * dot(masterLightColor, vec3(0.33333));
