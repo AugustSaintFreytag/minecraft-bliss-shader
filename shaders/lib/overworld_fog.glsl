@@ -305,7 +305,7 @@ vec4 GetVolumetricFog(
 	float daylightAmp = (1.0 + (1.0 - daylightFactor) * 1.25);
 	
 	vec3 masterLightColor = lightColor * 1.5 * daylightAmp;
-	vec3 ambientLightColor = mix(ambientColor, averagedAmbientColor, 0.0) + masterLightColor * 0.1;
+	vec3 ambientLightColor = mix(ambientColor, averagedAmbientColor, 0.5) + masterLightColor * 0.1;
 
 	vec3 localFogColor = parameters.localFogColor.rgb;
 	vec3 localFogColor_lightCol = localFogColor * dot(masterLightColor, vec3(0.33333));
